@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: django_db
+    environment:
+      POSTGRES_DB: team_control_db
+      POSTGRES_USER: postgres_user
+      POSTGRES_PASSWORD: postgres_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: django_backend
+    command: sleep infinity
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_NAME=team_control_db
+      - DB_USER=postgres_user
+      - DB_PASSWORD=postgres_password
+      - DB_HOST=db
+      - DB_PORT=5432
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
