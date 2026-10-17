@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head><meta charset="UTF-8"><title>Подтверждение кода</title></head>
+<body style="font-family: Arial; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f4f5f7;">
+<div style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 300px;">
+    <h2 style="text-align: center;">Введите код</h2>
+    <p style="text-align: center; font-size:13px; color:#666;">Код отправлен на почту вашего аккаунта. Он действует 5 минут. Доступно 5 попыток.</p>
+    {% if error %}<p style="color: red; text-align: center;">{{ error }}</p>{% endif %}
+    <form method="post">{% csrf_token %}
+        <p><input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="******" required style="width:100%; padding:12px; font-size:20px; text-align:center; letter-spacing:5px;"></p>
+        <button type="submit" style="width:100%; padding:10px; background:#10b981; color:white; border:none; border-radius:4px; cursor:pointer;">Войти</button>
+    </form>
+<p><a href="{% url 'login_request' %}">Вернуться к вводу логина и пароля</a></p></div>
+</body>
+</html>
