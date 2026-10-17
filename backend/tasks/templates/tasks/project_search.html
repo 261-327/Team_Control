@@ -1,0 +1,17 @@
+{% extends 'tasks/workspace_base.html' %}
+{% block title %}Вступить в проект — Team Control{% endblock %}
+{% block content %}
+<p><a href="{% url 'home' %}">← Мои проекты</a></p><h1>Вступить в проект</h1>
+<p class="muted">Введите название или его часть, чтобы найти проект. Вступление открыто для зарегистрированных пользователей.</p>
+<form method="get" class="card" style="margin-bottom:24px;max-width:700px">
+<label for="id_q">Название проекта</label><input id="id_q" name="q" maxlength="255" value="{{ query }}" placeholder="Например, Team Control" autofocus>
+{% for error in form.q.errors %}<p class="error" role="alert">{{ error }}</p>{% endfor %}
+<button type="submit" style="margin-top:14px">Найти</button></form>
+{% if query %}
+<h2>Доступные проекты</h2><div class="grid">{% for project in page %}
+<article class="card"><h3>{{ project.name }}</h3><p class="muted">Владелец: {{ project.owner.username }}</p>
+<p>{{ project.description|default:'Описание пока не добавлено.'|truncatechars:180 }}</p>
+<a class="button" href="{% url 'project_join' project.pk %}">Вступить в проект</a></article>
+{% empty %}<p class="muted">Доступных проектов с таким названием нет. Проекты, в которых вы уже участвуете, находятся в разделе «Мои проекты».</p>{% endfor %}</div>
+{% if page.has_other_pages %}<nav class="actions" aria-label="Страницы результатов" style="margin-top:20px">{% if page.has_previous %}<a href="?q={{ query|urlencode }}&page={{ page.previous_page_number }}">Назад</a>{% endif %}<span>{{ page.number }} / {{ page.paginator.num_pages }}</span>{% if page.has_next %}<a href="?q={{ query|urlencode }}&page={{ page.next_page_number }}">Далее</a>{% endif %}</nav>{% endif %}
+{% endif %}{% endblock %}

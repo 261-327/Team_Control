@@ -1,4 +1,7 @@
 from django.db import models
+from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db.models.functions import Lower, Trim
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 from datetime import timedelta
@@ -7,13 +10,6 @@ from django.contrib.auth.hashers import make_password, check_password
 
 class WorkspaceUser(AbstractUser):
     """Кастомная модель пользователя с OTP-авторизацией"""
-    ROLE_CHOICES = [
-        ('admin', 'Администратор'),
-        ('manager', 'Продукт-менеджер'),
-        ('developer', 'Разработчик'),
-        ('guest', 'Гость/Клиент'),
-    ]
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='developer', verbose_name="Роль в команде")
     bio = models.TextField(max_length=500, blank=True, verbose_name="О себе")
 
     # Поля для одноразового кода
@@ -26,6 +22,13 @@ class WorkspaceUser(AbstractUser):
 
     class Meta:
         app_label = 'tasks'
+        constraints = [
+            models.UniqueConstraint(
+                Lower(Trim('email')), condition=~models.Q(email=''),
+                name='workspaceuser_unique_email_ci',
+                violation_error_message='Эта почта уже зарегистрирована.',
+            ),
+        ]
 
     def generate_otp(self):
         """Генерирует 6-значный код, действующий 5 минут"""
@@ -43,7 +46,7 @@ class WorkspaceUser(AbstractUser):
         return False
 
     def __str__(self):
-        return f"{self.username} ({self.get_role_display()})"
+        return self.username
 
 
 class Project(models.Model):
@@ -52,8 +55,68 @@ class Project(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     owner = models.ForeignKey(WorkspaceUser, on_delete=models.CASCADE, related_name='owned_projects', verbose_name="Владелец")
 
+    members = models.ManyToManyField(WorkspaceUser, through='Membership', related_name='joined_projects', blank=True, verbose_name='Участники')
+
     class Meta: app_label = 'tasks'
     def __str__(self): return self.name
+
+
+class Membership(models.Model):
+    """A user's role and participation belong to one specific project."""
+    user = models.ForeignKey(WorkspaceUser, on_delete=models.CASCADE, related_name='memberships', verbose_name='Пользователь')
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='memberships', verbose_name='Проект')
+    ROLE_CHOICES = [
+        ('developer', 'Разработчик'),
+        ('designer', 'Дизайнер'),
+        ('analyst', 'Аналитик'),
+        ('security', 'Безопасник'),
+        ('tester', 'Тестировщик'),
+        ('other', 'Другое'),
+    ]
+    DEVELOPER_SPECIALIZATION_CHOICES = [
+        ('backend', 'Бекенд'),
+        ('frontend', 'Фронтенд'),
+        ('ios', 'Мобильное (iOS)'),
+        ('android', 'Мобильное (Android)'),
+    ]
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='developer', verbose_name='Роль в команде')
+    developer_specialization = models.CharField(max_length=20, choices=DEVELOPER_SPECIALIZATION_CHOICES, blank=True, verbose_name='Направление разработки')
+    custom_role = models.CharField(max_length=100, blank=True, verbose_name='Своя роль')
+
+    is_confirmed = models.BooleanField(default=False, verbose_name='Подтверждено вступление')
+    joined_at = models.DateTimeField(default=timezone.now, verbose_name='Дата вступления')
+
+    class Meta:
+        app_label = 'tasks'
+        verbose_name = 'Участие в проекте'
+        verbose_name_plural = 'Участники проектов'
+        constraints = [models.UniqueConstraint(fields=['user', 'project'], name='unique_user_project_membership')]
+
+    def clean(self):
+        super().clean()
+        if self.role == 'developer':
+            if not self.developer_specialization:
+                raise ValidationError({'developer_specialization': 'Выберите направление разработки.'})
+            self.custom_role = ''
+        elif self.role == 'other':
+            if not self.custom_role.strip():
+                raise ValidationError({'custom_role': 'Укажите свою роль в проекте.'})
+            self.developer_specialization = ''
+        else:
+            self.developer_specialization = ''
+            self.custom_role = ''
+
+    @property
+    def role_description(self):
+        if self.role == 'other' and self.custom_role:
+            return self.custom_role
+        if self.role == 'developer' and self.developer_specialization:
+            return f'{self.get_role_display()} — {self.get_developer_specialization_display()}'
+        return self.get_role_display()
+
+    def __str__(self):
+        return f'{self.user} — {self.project}: {self.role_description}'
+
 
 class Board(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='boards', verbose_name="Проект")
@@ -68,8 +131,14 @@ class Column(models.Model):
     name = models.CharField(max_length=100, verbose_name="Название колонки")
     position = models.PositiveIntegerField(default=0, verbose_name="Порядковый номер")
 
-    class Meta: app_label = 'tasks'; ordering = ['position']
-    def __str__(self): return f"{self.board.name} | {self.name}"
+    max_tasks = models.PositiveSmallIntegerField(default=15, validators=[MinValueValidator(1), MaxValueValidator(15)], verbose_name='Лимит задач')
+
+    class Meta:
+        app_label = 'tasks'
+        ordering = ['position']
+        constraints = [models.CheckConstraint(condition=models.Q(max_tasks__gte=1, max_tasks__lte=15), name='column_task_limit_1_15')]
+
+    def __str__(self): return f'{self.board.name} | {self.name}'
 
 class Task(models.Model):
     column = models.ForeignKey(Column, on_delete=models.CASCADE, related_name='tasks', verbose_name="Колонка/Статус")

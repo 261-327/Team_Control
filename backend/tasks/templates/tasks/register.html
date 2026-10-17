@@ -2,27 +2,57 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Регистрация в Team Control</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f5f7; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        .register-box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 350px; }
-        h2 { text-align: center; color: #333; margin-bottom: 20px; }
-        form p { margin-bottom: 15px; }
-        input, select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        button { width: 100%; padding: 10px; background: #5145cd; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 15px; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Arial, sans-serif; background: #f4f5f7; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 32px 16px; color: #262638; }
+        .register-box { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,.1); width: 100%; max-width: 420px; }
+        h1 { text-align: center; font-size: 24px; }
+        .field { margin: 18px 0; }
+        label { display: block; margin-bottom: 6px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #bbb; border-radius: 5px; font-size: 16px; }
+        [aria-invalid="true"] { border-color: #b42318; }
+        .help { color: #626273; font-size: 13px; line-height: 1.5; margin-top: 6px; }
+        .help ul { padding-left: 20px; }
+        .error { color: #a51d16; font-size: 14px; margin: 6px 0; }
+        .summary { background: #fff0ee; border: 1px solid #ffc9c2; border-radius: 6px; padding: 14px; margin: 16px 0; }
+        .summary p { margin: 0 0 8px; }
+        .summary ul { margin: 0; padding-left: 20px; }
+        .summary a { color: #a51d16; }
+        button { width: 100%; padding: 12px; background: #5145cd; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
         button:hover { background: #4035a8; }
     </style>
 </head>
 <body>
-
-<div class="register-box">
-    <h2>Создать аккаунт</h2>
-    <form method="post">
-        {% csrf_token %} <!-- Защита Django от хакерских атак -->
-        {{ form.as_p }}  <!-- Автоматический вывод полей формы -->
-        <button type="submit">Зарегистрироваться</button>
+<main class="register-box">
+    <h1>Создать аккаунт</h1>
+    <p>Укажите свою почту — мы отправим код для завершения регистрации.</p>
+    {% for message in messages %}<div class="summary" role="alert">{{ message }}</div>{% endfor %}
+    {% if form.errors %}
+    <div class="summary" role="alert" tabindex="-1" id="registration-errors">
+        <p><strong>Регистрация не завершена:</strong></p>
+        <ul>
+        {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+        {% for field in form %}{% for error in field.errors %}<li><a href="#{{ field.id_for_label }}">{{ field.label }}: {{ error }}</a></li>{% endfor %}{% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="field" data-field="{{ field.name }}">
+            {{ field.label_tag }}
+            {{ field }}
+            {% for error in field.errors %}<p class="error">{{ error }}</p>{% endfor %}
+            {% if field.help_text %}<div class="help">{{ field.help_text|safe }}</div>{% endif %}
+        </div>
+        {% endfor %}
+        <button type="submit">Получить код подтверждения</button>
     </form>
-</div>
+    <p><a href="{% url 'login_request' %}">Уже есть аккаунт? Войти</a></p>
+</main>
+{% if form.errors %}<script>document.getElementById('registration-errors').focus();</script>{% endif %}
 
 </body>
 </html>
