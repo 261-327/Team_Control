@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Team Control{% endblock %}</title>
+<style>
+* { box-sizing: border-box; } body { margin:0; background:#f5f6fa; color:#242638; font:16px Arial,sans-serif; }
+header { background:white; border-bottom:1px solid #e5e7ef; padding:18px 5%; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+a { color:#5145cd; } .brand { font-size:21px; font-weight:bold; text-decoration:none; color:#242638; }
+main { max-width:1150px; margin:0 auto; padding:36px 20px; } h1 { margin:0 0 12px; font-size:30px; overflow-wrap:anywhere; }
+.muted { color:#6b6e80; line-height:1.5; } .toolbar { display:flex; justify-content:space-between; align-items:center; gap:20px; flex-wrap:wrap; margin-bottom:28px; }
+.button, button { display:inline-block; padding:12px 20px; background:#5145cd; border:1px solid #5145cd; border-radius:8px; color:white; text-decoration:none; font:inherit; cursor:pointer; }
+.secondary { background:white; color:#5145cd; } .button:hover, button:hover { filter:brightness(.95); } a:focus-visible,button:focus-visible { outline:3px solid #a69df0; outline-offset:3px; }
+.card { background:white; border:1px solid #e4e6ee; border-radius:12px; padding:24px; overflow-wrap:anywhere; } .empty { text-align:center; padding:48px 24px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:18px; }
+.card h2 { margin-top:0; font-size:21px; } .notice { background:#e9f7ed; border:1px solid #bbdfc6; padding:14px; border-radius:8px; margin-bottom:20px; }
+label { display:block; margin-bottom:8px; font-weight:bold; } input,textarea,select { width:100%; padding:12px; font:inherit; border:1px solid #b9bdcb; border-radius:7px; } textarea { resize:vertical; } .field { margin-bottom:22px; }
+.error { color:#b42318; margin:8px 0; } .actions { display:flex; align-items:center; gap:16px; flex-wrap:wrap; } .description { white-space:pre-wrap; line-height:1.6; overflow-wrap:anywhere; }
+.columns { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:20px 0 32px; } .column { background:#edeff5; padding:18px; border-radius:12px; } .column h3 { font-size:17px; margin:0 0 20px; } .task { background:white; border-radius:8px; padding:14px; margin-bottom:12px; overflow-wrap:anywhere; }
+@media(max-width:700px) { .columns { grid-template-columns:1fr; } h1 { font-size:26px; } }
+.error-notice { background:#fff0ee; border-color:#ffc9c2; color:#a51d16; }
+.danger-button { background:white; border:1px solid #e5b8b4; color:#b42318; padding:10px 16px; border-radius:8px; text-decoration:none; display:inline-block; } .danger-solid { background:#b42318; border-color:#b42318; color:white; }
+</style>
+</head>
+<body>
+<header><a class="brand" href="{% url 'home' %}">Team Control</a><div class="actions"><span>{{ user.username }}</span><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="secondary" type="submit">Выйти</button></form></div></header>
+<main>{% for message in messages %}<div class="notice {% if message.tags == 'error' %}error-notice{% endif %}" role="status">{{ message }}</div>{% endfor %}{% block content %}{% endblock %}</main>
+<style>
+#task-delete-dialog { border:0; border-radius:14px; padding:24px; max-width:420px; width:calc(100% - 32px); color:#242638; box-shadow:0 20px 80px #0003; }
+#task-delete-dialog::backdrop { background:rgba(20,22,38,.4); }
+#task-delete-dialog h2 { margin-top:0; font-size:22px; }
+#task-delete-dialog [data-delete-name] { overflow-wrap:anywhere; }
+</style>
+<dialog id="task-delete-dialog" aria-labelledby="task-delete-heading">
+<h2 id="task-delete-heading">Удалить задачу?</h2><p data-delete-name></p><p class="muted">Задача будет удалена без возможности восстановления.</p>
+<form method="post" data-delete-form>{% csrf_token %}<input type="hidden" name="confirm" value="yes">
+<div class="actions"><button class="secondary" type="button" data-delete-cancel autofocus>Отмена</button><button class="danger-solid" type="submit">Удалить</button></div>
+</form></dialog>
+<script>
+(() => {
+    const dialog = document.getElementById('task-delete-dialog');
+    document.addEventListener('click', event => {
+        const link = event.target.closest('a[data-task-delete]');
+        if (!link || typeof dialog.showModal !== 'function') return;
+        event.preventDefault();
+        dialog.querySelector('[data-delete-name]').textContent = link.dataset.taskTitle;
+        dialog.querySelector('[data-delete-form]').action = link.href;
+        dialog.showModal();
+    });
+    dialog.querySelector('[data-delete-cancel]').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', event => {
+        const rect = dialog.getBoundingClientRect();
+        if (event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) dialog.close();
+    });
+})();
+</script>
+</body></html>

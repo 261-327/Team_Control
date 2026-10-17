@@ -1,0 +1,5 @@
+{% extends 'tasks/workspace_base.html' %}
+{% block title %}Переименовать статус{% endblock %}
+{% block content %}<h1>Переименовать статус</h1><p class="muted">Проект: {{ project.name }}</p>
+<form method="post" class="card" style="max-width:600px" novalidate>{% csrf_token %}<label for="id_name">Название статуса</label>{{ form.name }}
+{% for error in form.name.errors %}<p class="error">{{ error }}</p>{% endfor %}<div class="actions" style="margin-top:20px"><button type="submit">Сохранить</button><a href="{% url 'project_detail' project.pk %}">Отмена</a></div></form>{% endblock %}

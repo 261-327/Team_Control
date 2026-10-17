@@ -1,0 +1,10 @@
+{% extends 'tasks/workspace_base.html' %}
+{% block title %}Удалить статус{% endblock %}
+{% block content %}<section class="card" style="max-width:650px"><h1>Удалить статус «{{ column.name }}»?</h1>
+{% if last_column %}<p class="error">Это последний статус доски. Сначала добавьте другой статус.</p>{% endif %}
+<p>Задач в статусе: {{ task_count }}.</p>{% if task_count %}<p>Выберите, куда перенести задачи. Все задачи и их исполнители сохранятся.</p>{% else %}<p>Статус пуст. Задачи переносить не нужно.</p>{% endif %}
+<form method="post" novalidate>{% csrf_token %}{{ form.confirm }}
+{% for error in form.non_field_errors %}<p class="error">{{ error }}</p>{% endfor %}{% for error in form.confirm.errors %}<p class="error">{{ error }}</p>{% endfor %}
+{% if task_count %}{{ form.target.label_tag }}{{ form.target }}{% endif %}{% for error in form.target.errors %}<p class="error">{{ error }}</p>{% endfor %}
+<div class="actions" style="margin-top:20px">{% if not last_column %}<button class="danger-solid" type="submit">{% if task_count %}Перенести задачи и удалить{% else %}Удалить статус{% endif %}</button>{% endif %}<a href="{% url 'project_detail' project.pk %}">Отмена</a></div>
+</form></section>{% endblock %}

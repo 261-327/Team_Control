@@ -1,0 +1,211 @@
+{% extends 'tasks/workspace_base.html' %}
+{% block title %}{{ project.name }} — Team Control{% endblock %}
+{% block content %}
+<style>
+.board-columns { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)) minmax(160px,.7fr); gap:16px; align-items:start; padding:4px 4px 24px; margin:20px 0 30px; }
+.board-columns .column { min-width:0; width:100%; min-height:200px; border:2px solid transparent; }
+.board-columns .column.drag-over { border-color:#5145cd; background:#e7e3ff; }
+.column-heading { display:flex; gap:10px; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.column-heading h3 { margin:0; overflow-wrap:anywhere; }
+.task-count { font-size:13px; color:#676b7f; background:#fff; border-radius:12px; padding:3px 8px; }
+.task[draggable] { cursor:grab; } .task.dragging { opacity:.5; } .task.saving { opacity:.6; pointer-events:none; }
+.drag-handle { float:right; background:transparent; color:#777b8f; border:0; padding:0 6px; font-size:20px; touch-action:none; cursor:grab; }
+.add-column { min-width:0; }
+.add-column summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:10px; color:#5145cd; padding:16px; border:2px dashed #c7c3e4; border-radius:12px; background:white; }
+.add-column summary::-webkit-details-marker { display:none; }
+.add-column summary:focus-visible { outline:3px solid #a69df0; outline-offset:3px; }
+.add-column form { margin-top:12px; padding:16px; background:white; border-radius:12px; }
+.add-column input { margin-bottom:12px; } .add-column button { width:100%; }
+.board-feedback { min-height:24px; } .column-empty { color:#6b6e80; font-size:14px; }
+.task.swap-target { outline:2px dashed #5145cd; outline-offset:3px; }
+.board-columns > * { min-width:0; }
+@media (max-width:1050px) { .board-columns { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (max-width:760px) { .board-columns { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:520px) { .board-columns { grid-template-columns:minmax(0,1fr); } }
+.limit-settings { margin:0 0 18px; font-size:13px; } .limit-settings summary { cursor:pointer; color:#5145cd; } .limit-settings form { margin-top:12px; } .limit-settings button { margin-top:10px; padding:8px 12px; }
+.member-list { list-style:none; margin:0; padding:0; }
+.member-row { display:flex; align-items:center; gap:14px; padding:14px 0; border-bottom:1px solid #e5e7ef; flex-wrap:wrap; }
+.member-row:last-child { border-bottom:0; }
+.member-avatar { display:grid; place-items:center; flex:0 0 40px; height:40px; border-radius:50%; background:#edeaff; color:#5145cd; font-weight:bold; }
+.member-info { flex:1; min-width:140px; overflow-wrap:anywhere; line-height:1.5; }
+.member-badge { color:#5145cd; background:#f1effc; border-radius:12px; padding:4px 10px; font-size:13px; }
+.danger-button { background:white; border-color:#e5b8b4; color:#b42318; padding:8px 12px; font-size:14px; }
+</style>
+<p><a href="{% url 'home' %}">← Мои проекты</a></p>
+<div class="toolbar"><h1>{{ project.name }}</h1><div class="actions">
+<a class="button" href="{% url 'task_create' project.pk %}">Создать задачу</a>
+
+{% if not can_manage_project %}<form method="post" action="{% url 'project_leave' project.pk %}" data-confirm="Выйти из проекта? Вы перестанете быть исполнителем его задач." onsubmit="return confirm(this.dataset.confirm)">{% csrf_token %}<button class="danger-button" type="submit">Выйти из проекта</button></form>{% endif %}
+</div></div>
+{% if project.description %}<p class="description">{{ project.description }}</p>{% else %}<p class="muted">Описание пока не добавлено.</p>{% endif %}
+<section class="card project-members" aria-labelledby="project-members-heading" style="margin:20px 0">
+<h2 id="project-members-heading">Участники проекта <span class="muted">({{ participants|length }})</span></h2>
+<ul class="member-list">
+{% for participant in participants %}
+<li class="member-row">
+<span class="member-avatar" aria-hidden="true">{{ participant.user.username|first|upper }}</span>
+<div class="member-info"><strong>{{ participant.user.get_full_name|default:participant.user.username }}</strong>
+<div class="muted">{{ participant.user.username }} · {{ participant.role_description }}</div></div>
+{% if participant.user_id == project.owner_id %}<span class="member-badge">Владелец</span>{% else %}<span class="member-badge">Участник</span>{% endif %}
+{% if not participant.user.is_active %}<span class="muted">Неактивен</span>{% endif %}
+{% if can_manage_project and participant.user_id != project.owner_id %}
+<form method="post" action="{% url 'project_remove_member' project.pk participant.user_id %}" data-confirm="Удалить участника {{ participant.user.username }} из проекта и снять его с задач?" onsubmit="return confirm(this.dataset.confirm)">
+{% csrf_token %}<button class="danger-button" type="submit" aria-label="Удалить участника {{ participant.user.username }}">Удалить из проекта</button>
+</form>{% endif %}
+</li>
+{% endfor %}
+</ul></section>
+<p class="muted">Перетащите задачу на другую карточку, чтобы поменять их местами, или на свободное место в колонке, чтобы изменить статус. На телефоне используйте значок ⠿ на карточке. Статус также можно изменить на экране редактирования.</p>
+<div id="board-feedback" class="board-feedback" role="status" aria-live="polite"></div>
+{% for board in boards %}
+<section data-board="{{ board.pk }}"><h2>{{ board.name }}</h2>
+<div class="board-columns">
+{% for column in board.columns.all %}
+<section class="column" data-column="{{ column.pk }}" data-board-id="{{ board.pk }}" data-limit="{{ column.max_tasks }}">
+<div class="column-heading"><h3>{{ column.name }}</h3><span class="task-count">{{ column.tasks.all|length }} / {{ column.max_tasks }}</span></div>
+{% if can_manage_project %}<details class="limit-settings"><summary>Настройки статуса</summary>
+<form method="post" action="{% url 'column_limit' project.pk column.pk %}">{% csrf_token %}
+<div class="actions" style="margin-bottom:12px"><a href="{% url 'column_edit' project.pk column.pk %}">Переименовать</a><a href="{% url 'column_delete' project.pk column.pk %}" style="color:#b42318">Удалить статус</a></div>
+<label for="limit-{{ column.pk }}">Максимум задач (1–15)</label>
+<input id="limit-{{ column.pk }}" type="number" name="max_tasks" min="1" max="15" value="{{ column.max_tasks }}" required>
+<button type="submit">Сохранить</button>
+</form></details>{% endif %}
+<div class="task-list">
+{% for task in column.tasks.all %}
+<article class="task" draggable="true" data-task="{{ task.pk }}" data-move-url="{% url 'task_move' project.pk task.pk %}">
+<button class="drag-handle" type="button" aria-label="Перетащить задачу {{ task.title }}" title="Перетащить задачу">⠿</button>
+<strong><a href="{% url 'task_edit' project.pk task.pk %}">{{ task.title }}</a></strong>
+{% if task.description %}<p>{{ task.description|linebreaksbr }}</p>{% endif %}
+<p class="muted">Статус: <span data-task-status>{{ column.name }}</span></p>
+<p class="muted">Исполнитель: {% for assignee in task.assignees.all %}{{ assignee.username }}{% if not forloop.last %}, {% endif %}{% empty %}Исполнитель не назначен{% endfor %}</p>
+<div class="actions"><a href="{% url 'task_edit' project.pk task.pk %}">Редактировать</a><a href="{% url 'task_delete' project.pk task.pk %}" data-task-delete data-task-title="{{ task.title }}" style="color:#b42318">Удалить</a></div>
+</article>
+{% endfor %}
+</div><p class="column-empty" {% if column.tasks.all %}hidden{% endif %}>Задач пока нет</p>
+</section>
+{% endfor %}
+{% if can_manage_project %}<details class="add-column"><summary aria-label="Добавить статус"><span aria-hidden="true" style="font-size:26px">+</span> Добавить статус</summary>
+<form method="post" action="{% url 'column_create' project.pk board.pk %}">{% csrf_token %}
+<label for="status-name-{{ board.pk }}">Название статуса</label>
+<input id="status-name-{{ board.pk }}" name="name" maxlength="100" required placeholder="Например, На проверке">
+<button type="submit">Добавить</button>
+</form></details>{% endif %}
+</div></section>
+{% empty %}<div class="card"><p class="muted">В этом проекте пока нет досок.</p></div>{% endfor %}
+<script>
+(() => {
+    let dragged = null;
+    let saving = false;
+    const feedback = document.getElementById('board-feedback');
+    const columns = [...document.querySelectorAll('[data-column]')];
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    function clearHighlights() {
+        columns.forEach(column => column.classList.remove('drag-over'));
+        document.querySelectorAll('.swap-target').forEach(card => card.classList.remove('swap-target'));
+    }
+    function targetCardAt(element, card) {
+        const other = element?.closest('[data-task]');
+        return other && other !== card ? other : null;
+    }
+    function highlightTarget(column, other) {
+        clearHighlights();
+        if (column) column.classList.add('drag-over');
+        if (other) other.classList.add('swap-target');
+    }
+    function finishDrag() { clearHighlights(); if (dragged) dragged.classList.remove('dragging'); dragged = null; }
+    function validTarget(column, card) {
+        return column && card && column.dataset.boardId === card.closest('[data-column]').dataset.boardId;
+    }
+    function updateColumn(column) {
+        const count = column.querySelectorAll('.task').length;
+        column.querySelector('.task-count').textContent = count + ' / ' + column.dataset.limit;
+        column.querySelector('.column-empty').hidden = count !== 0;
+    }
+    async function moveTask(card, target, other = null) {
+        const source = card.closest('[data-column]');
+        if (saving || !validTarget(target, card) || (source === target && !other)) return;
+        saving = true;
+        card.classList.add('saving');
+        if (other) other.classList.add('saving');
+        feedback.classList.remove('error');
+        feedback.textContent = 'Сохраняем расположение…';
+        try {
+            const response = await fetch(card.dataset.moveUrl, {
+                method: 'POST', credentials: 'same-origin',
+                headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'},
+                body: new URLSearchParams({column: target.dataset.column, ...(other ? {target_task: other.dataset.task} : {})}),
+            });
+            if (response.redirected) throw new Error('Сессия завершилась. Обновите страницу и войдите снова.');
+            if (!response.ok) {
+                let message = 'Не удалось сохранить статус. Попробуйте ещё раз.';
+                try { const data = await response.json(); if (data.error) message = data.error; } catch (_) {}
+                throw new Error(message);
+            }
+            const data = await response.json();
+            if (other && data.swapped_task) {
+                const marker = document.createComment('swap');
+                card.replaceWith(marker);
+                other.replaceWith(card);
+                marker.replaceWith(other);
+                other.querySelector('[data-task-status]').textContent = data.swapped_task.status;
+            } else {
+                target.querySelector('.task-list').appendChild(card);
+            }
+            card.querySelector('[data-task-status]').textContent = data.status;
+            updateColumn(source); updateColumn(target);
+            feedback.textContent = data.swapped_task ? 'Задачи поменялись местами.' : 'Статус изменён: ' + data.status;
+        } catch (error) {
+            feedback.classList.add('error');
+            feedback.textContent = error instanceof TypeError ? 'Нет соединения. Задача осталась в прежней колонке. Повторите перенос.' : error.message;
+        } finally { saving = false; card.classList.remove('saving'); if (other) other.classList.remove('saving'); }
+    }
+    document.querySelectorAll('[data-task]').forEach(card => {
+        card.addEventListener('dragstart', event => {
+            if (saving) { event.preventDefault(); return; }
+            dragged = card;
+            card.classList.add('dragging');
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', card.dataset.task);
+        });
+        card.addEventListener('dragend', finishDrag);
+        const handle = card.querySelector('.drag-handle');
+        let pointerId = null;
+        handle.addEventListener('pointerdown', event => {
+            if (event.pointerType === 'mouse' || saving) return;
+            pointerId = event.pointerId;
+            dragged = card;
+            card.classList.add('dragging');
+            handle.setPointerCapture(pointerId);
+            event.preventDefault();
+        });
+        handle.addEventListener('pointermove', event => {
+            if (event.pointerId !== pointerId) return;
+            clearHighlights();
+            const element = document.elementFromPoint(event.clientX, event.clientY);
+            const target = element?.closest('[data-column]');
+            if (validTarget(target, card)) highlightTarget(target, targetCardAt(element, card));
+        });
+        handle.addEventListener('pointerup', event => {
+            if (event.pointerId !== pointerId) return;
+            const element = document.elementFromPoint(event.clientX, event.clientY);
+            const target = element?.closest('[data-column]');
+            pointerId = null; finishDrag();
+            if (target) moveTask(card, target, targetCardAt(element, card));
+        });
+        handle.addEventListener('pointercancel', () => { pointerId = null; finishDrag(); });
+    });
+    columns.forEach(column => {
+        column.addEventListener('dragover', event => {
+            if (saving || !validTarget(column, dragged)) return;
+            event.preventDefault(); event.dataTransfer.dropEffect = 'move';
+            highlightTarget(column, targetCardAt(event.target, dragged));
+        });
+        column.addEventListener('dragleave', event => { if (!column.contains(event.relatedTarget)) column.classList.remove('drag-over'); });
+        column.addEventListener('drop', event => {
+            event.preventDefault(); const card = dragged; finishDrag();
+            if (card) moveTask(card, column, targetCardAt(event.target, card));
+        });
+    });
+})();
+</script>
+{% endblock %}

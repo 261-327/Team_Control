@@ -1,0 +1,21 @@
+{% extends 'tasks/workspace_base.html' %}
+{% block title %}Подтверждение удаления — Team Control{% endblock %}
+{% block content %}
+<section class="card" style="max-width:650px;margin:24px auto">
+{% if deleting_project %}
+<h1>Удалить проект?</h1><p><strong>{{ project.name }}</strong></p>
+<p class="description">Проект будет удалён вместе со всеми его досками, статусами и задачами. Аккаунты участников сохранятся. Отменить удаление нельзя.</p>
+{% else %}
+<h1>Удалить задачу?</h1><p><strong>{{ task.title }}</strong></p>
+<p class="muted">Проект: {{ project.name }}</p><p>Задача и её назначения будут удалены. Отменить удаление нельзя.</p>
+{% endif %}
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+<form method="post">{% csrf_token %}
+{% if deleting_project %}<p>Чтобы подтвердить удаление, перепишите эти 6 цифр:</p>
+<p style="font-size:28px;letter-spacing:6px;font-weight:bold;user-select:none" aria-label="Код подтверждения">{{ confirmation_code }}</p>
+<label for="project-delete-code">Введите цифры</label><input id="project-delete-code" name="confirmation_code" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="off" required style="max-width:240px;margin-bottom:20px">
+{% endif %}
+<div class="actions"><button class="danger-solid" name="confirm" value="yes" type="submit">{% if deleting_project %}Да, удалить проект{% else %}Да, удалить задачу{% endif %}</button>
+{% if deleting_project %}<a class="button secondary" href="{% url 'home' %}">Отмена</a>{% else %}<a class="button secondary" href="{% url 'task_edit' project.pk task.pk %}">Отмена</a>{% endif %}</div>
+</form></section>
+{% endblock %}

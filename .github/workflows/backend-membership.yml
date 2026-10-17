@@ -1,0 +1,47 @@
+name: Backend membership checks
+
+on:
+  pull_request:
+    paths: ['backend/**', '.github/workflows/backend-membership.yml']
+  push:
+    branches: [main]
+    paths: ['backend/**', '.github/workflows/backend-membership.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  django-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: team_control_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    env:
+      TEST_POSTGRES: '1'
+      DB_NAME: team_control_test
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DJANGO_SETTINGS_MODULE: config.test_settings
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r requirements.txt
+      - run: python manage.py check
+      - run: python manage.py makemigrations --check --dry-run
+      - run: python manage.py migrate --noinput
+      - run: python manage.py test tasks --noinput

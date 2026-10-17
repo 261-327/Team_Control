@@ -1,13 +1,7 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head><meta charset="UTF-8"><title>Панель управления</title></head>
-<body style="font-family: Arial; padding: 50px;">
-    <h1>Привет, {{ user.first_name }} ({{ user.username }})!</h1>
-    <p>Вы успешно зашли в систему по одноразовому коду.</p>
-    <p>Ваша роль: <strong>{{ user.get_role_display }}</strong></p>
-    <form method="post" action="{% url 'logout' %}">
-        {% csrf_token %}
-        <button type="submit" style="padding: 10px 24px; background: #5145cd; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">Выйти</button>
-    </form>
-</body>
-</html>
+{% extends 'tasks/workspace_base.html' %}
+{% block title %}Мои проекты — Team Control{% endblock %}
+{% block content %}
+<div class="toolbar"><div><h1>Мои проекты</h1><p class="muted">{{ user.first_name|default:user.username }}</p></div><div class="actions"><a class="button secondary" href="{% url 'project_search' %}">Вступить в проект</a><a class="button" href="{% url 'project_create' %}">Создать проект</a></div></div>
+{% if projects %}<div class="grid">{% for project in projects %}<article class="card"><h2><a href="{% url 'project_detail' project.pk %}">{{ project.name }}</a></h2><p class="muted">{{ project.description|default:'Описание пока не добавлено.'|truncatechars:180 }}</p><p class="muted">Владелец: {{ project.owner.username }} · Создан {{ project.created_at|date:'d.m.Y' }}</p>{% if project.owner_id == user.pk %}<a class="danger-button" href="{% url 'project_delete' project.pk %}">Удалить проект</a>{% endif %}</article>{% endfor %}</div>
+{% else %}<section class="card empty"><h2>Пока нет проектов</h2><p class="muted">Создайте проект или найдите команду по названию проекта.</p><a class="button" href="{% url 'project_create' %}">Создать первый проект</a></section>{% endif %}
+{% endblock %}

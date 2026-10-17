@@ -1,0 +1,11 @@
+{% extends 'tasks/workspace_base.html' %}
+{% block title %}Редактировать задачу — {{ project.name }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'project_detail' project.pk %}">← К проекту</a></p>
+<h1>Редактировать задачу</h1><p class="muted">Проект: {{ project.name }}</p>
+<p class="muted">Создана {{ task.created_at|date:'d.m.Y H:i' }} · Обновлена {{ task.updated_at|date:'d.m.Y H:i' }}</p>
+<section class="card" style="max-width:700px"><form method="post" novalidate>{% csrf_token %}
+{% for error in form.non_field_errors %}<p class="error" role="alert">{{ error }}</p>{% endfor %}
+{% for field in form %}<div class="field">{{ field.label_tag }}{{ field }}{% for error in field.errors %}<p class="error" role="alert">{{ error }}</p>{% endfor %}</div>{% endfor %}
+<div class="actions"><button type="submit">Сохранить изменения</button><a href="{% url 'project_detail' project.pk %}">Отмена</a></div>
+</form><hr style="border:0;border-top:1px solid #e5e7ef;margin:24px 0"><a class="danger-button" href="{% url 'task_delete' project.pk task.pk %}" data-task-delete data-task-title="{{ task.title }}">Удалить задачу</a></section>{% endblock %}
