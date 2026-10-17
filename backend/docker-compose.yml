@@ -16,7 +16,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: django_backend
-    command: sleep infinity
+    command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - .:/app
     ports:
@@ -27,6 +27,13 @@ services:
       - DB_PASSWORD=postgres_password
       - DB_HOST=db
       - DB_PORT=5432
+      - EMAIL_HOST=${EMAIL_HOST:-}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-true}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL:-false}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-}
     depends_on:
       - db
 

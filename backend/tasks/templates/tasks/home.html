@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head><meta charset="UTF-8"><title>Панель управления</title></head>
+<body style="font-family: Arial; padding: 50px;">
+    <h1>Привет, {{ user.first_name }} ({{ user.username }})!</h1>
+    <p>Вы успешно зашли в систему по одноразовому коду.</p>
+    <p>Ваша роль: <strong>{{ user.get_role_display }}</strong></p>
+    <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit" style="padding: 10px 24px; background: #5145cd; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">Выйти</button>
+    </form>
+</body>
+</html>
