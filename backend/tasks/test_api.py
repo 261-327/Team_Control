@@ -264,7 +264,7 @@ class FrontendMigrationTests(TransactionTestCase):
     def test_existing_tasks_assignments_and_custom_columns_survive_migration(self):
         from django.db import connection
         from django.db.migrations.executor import MigrationExecutor
-        before = [('tasks', '0011_registration_pending')]
+        before = [('tasks', '0011_registration_pending'), ('tasks', '0012_project_invitations')]
         executor = MigrationExecutor(connection)
         latest = executor.loader.graph.leaf_nodes()
         executor.migrate(before)
@@ -277,7 +277,7 @@ class FrontendMigrationTests(TransactionTestCase):
             board = OldBoard.objects.create(project=project, name='Доска')
             todo = OldColumn.objects.create(board=board, name='К выполнению', position=0)
             done = OldColumn.objects.create(board=board, name='Готово', position=1)
-            custom = OldColumn.objects.create(board=board, name='Ожидает согласования', position=2)
+            custom = OldColumn.objects.create(board=board, name='Ожидает согласования', position=2, is_completed=True)
             second_board = OldBoard.objects.create(project=project, name='Вторая доска')
             extra_todo = OldColumn.objects.create(board=second_board, name='К выполнению', position=0)
             task = OldTask.objects.create(column=custom, title='Не потерять задачу', creator=owner)
@@ -288,6 +288,8 @@ class FrontendMigrationTests(TransactionTestCase):
             self.assertEqual(Column.objects.get(pk=todo.pk).workflow_status, 'todo')
             self.assertEqual(Column.objects.get(pk=done.pk).workflow_status, 'done')
             self.assertEqual(Column.objects.get(pk=custom.pk).workflow_status, '')
+            self.assertTrue(Column.objects.get(pk=custom.pk).is_completed)
+            self.assertTrue(Column.objects.get(pk=done.pk).is_completed)
             self.assertEqual(Column.objects.get(pk=extra_todo.pk).workflow_status, '')
             self.assertEqual(Task.objects.get(pk=task.pk).column_id, custom.pk)
             self.assertEqual(set(Task.objects.get(pk=task.pk).assignees.values_list('pk', flat=True)), {owner.pk, member.pk})
@@ -297,3 +299,4 @@ class FrontendMigrationTests(TransactionTestCase):
             self.assertEqual(Board.objects.count(), 2)
         finally:
             MigrationExecutor(connection).migrate(latest)
+

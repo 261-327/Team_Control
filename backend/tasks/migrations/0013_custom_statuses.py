@@ -10,9 +10,12 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterField(
+        # Only Python validation/default metadata changes here. Avoid rebuilding
+        # SQLite's table with a branch-local model state, which drops sibling fields.
+        migrations.SeparateDatabaseAndState(state_operations=[migrations.AlterField(
             model_name='column',
             name='workflow_status',
             field=models.CharField(blank=True, choices=[('todo', 'К выполнению'), ('in_progress', 'В работе'), ('in_review', 'На проверке'), ('done', 'Готово')], default='', max_length=16),
-        ),
+        )], database_operations=[]),
     ]
+

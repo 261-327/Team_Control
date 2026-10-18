@@ -31,7 +31,7 @@
 .member-badge { color:#5145cd; background:#f1effc; border-radius:12px; padding:4px 10px; font-size:13px; }
 .danger-button { background:white; border-color:#e5b8b4; color:#b42318; padding:8px 12px; font-size:14px; }
 </style>
-<p><a href="{% url 'home' %}">← Мои проекты</a></p>
+<p><a href="{% url 'projects_list' %}">← Мои проекты</a></p>
 <div class="toolbar"><h1>{{ project.name }}</h1><div class="actions">
 <a class="button" href="{% url 'task_create' project.pk %}">Создать задачу</a>
 
@@ -88,7 +88,7 @@
 <form method="post" action="{% url 'column_create' project.pk board.pk %}">{% csrf_token %}
 <label for="status-name-{{ board.pk }}">Название статуса</label>
 <input id="status-name-{{ board.pk }}" name="name" maxlength="100" required placeholder="Например, На проверке">
-<button type="submit">Добавить</button>
+<label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" name="is_completed" style="width:auto;margin:0"> Завершает задачу</label><button type="submit">Добавить</button>
 </form></details>{% endif %}
 </div></section>
 {% empty %}<div class="card"><p class="muted">В этом проекте пока нет досок.</p></div>{% endfor %}
@@ -209,3 +209,4 @@
 })();
 </script>
 {% endblock %}
+

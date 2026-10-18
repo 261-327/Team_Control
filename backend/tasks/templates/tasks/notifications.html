@@ -1,0 +1,9 @@
+<details class="notifications">
+<summary aria-label="Уведомления: {{ notification_count }}" title="Уведомления">
+<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M10 21h4"/></svg>
+{% if notification_count %}<span class="notification-count">{{ notification_count }}</span>{% endif %}</summary>
+<div class="notification-panel"><h2>Уведомления</h2>
+{% for invitation in notification_invitations %}<a class="notification-item" href="{% url 'project_invitation' invitation.pk %}"><strong>Приглашение в «{{ invitation.project.name }}»</strong><span class="muted">От @{{ invitation.sender.username }}</span></a>{% endfor %}
+{% for connection in notification_colleagues %}<a class="notification-item" href="{% url 'profile' %}#colleagues"><strong>@{{ connection.requested_by.username }}</strong><span class="muted">Хочет добавить вас в коллеги</span></a>{% endfor %}
+{% if not notification_count %}<p class="muted">Новых уведомлений нет.</p>{% endif %}
+</div></details>

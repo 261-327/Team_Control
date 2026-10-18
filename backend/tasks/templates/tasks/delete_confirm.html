@@ -16,6 +16,7 @@
 <label for="project-delete-code">Введите цифры</label><input id="project-delete-code" name="confirmation_code" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="off" required style="max-width:240px;margin-bottom:20px">
 {% endif %}
 <div class="actions"><button class="danger-solid" name="confirm" value="yes" type="submit">{% if deleting_project %}Да, удалить проект{% else %}Да, удалить задачу{% endif %}</button>
-{% if deleting_project %}<a class="button secondary" href="{% url 'home' %}">Отмена</a>{% else %}<a class="button secondary" href="{% url 'task_edit' project.pk task.pk %}">Отмена</a>{% endif %}</div>
+{% if deleting_project %}<a class="button secondary" href="{% url 'projects_list' %}">Отмена</a>{% else %}<a class="button secondary" href="{% url 'task_edit' project.pk task.pk %}">Отмена</a>{% endif %}</div>
 </form></section>
 {% endblock %}
+

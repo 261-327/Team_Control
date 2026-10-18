@@ -4,7 +4,7 @@
 <section class="card" style="max-width:700px"><form method="post" novalidate>{% csrf_token %}
 {% for error in form.non_field_errors %}<p class="error" role="alert">{{ error }}</p>{% endfor %}
 {% for field in form %}<div class="field">{{ field.label_tag }}{{ field }}{% for error in field.errors %}<p class="error" role="alert">{{ error }}</p>{% endfor %}</div>{% endfor %}
-<p class="muted">В проекте появится доска с колонками «К выполнению», «В работе» и «Готово».</p><div class="actions"><button type="submit">Создать проект</button><a href="{% url 'home' %}">Отмена</a></div>
+<p class="muted">В проекте появится доска с колонками «К выполнению», «В работе» и «Готово».</p><div class="actions"><button type="submit">Создать проект</button><a href="{% url 'projects_list' %}">Отмена</a></div>
 </form></section><script>
 (() => {
     const role = document.getElementById('id_role');
@@ -20,3 +20,4 @@
     role.addEventListener('change',update); update();
 })();
 </script>{% endblock %}
+

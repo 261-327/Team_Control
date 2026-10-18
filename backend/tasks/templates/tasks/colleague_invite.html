@@ -1,0 +1,7 @@
+{% extends 'tasks/workspace_base.html' %}
+{% block title %}Пригласить коллегу{% endblock %}{% block content %}
+<h1>Пригласить @{{ recipient.username }} в проект</h1>
+<p class="muted">Коллега получит приглашение в личном кабинете и выберет свою роль при вступлении.</p>
+<form method="post" class="card" style="max-width:560px">{% csrf_token %}{{ form.as_p }}
+{% if form.fields.project.queryset.exists %}<button type="submit">Пригласить</button>{% else %}<p>Нет доступных проектов. Создайте свой проект или выберите коллегу, который ещё не вступил в него.</p>{% endif %}
+<a href="{% url 'profile' %}#colleagues">Назад</a></form>{% endblock %}

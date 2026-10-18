@@ -639,7 +639,7 @@ class ProjectMembershipTests(TestCase):
         self.join_url = f'/projects/{self.project.pk}/join/'
 
     def test_search_join_and_participant_list(self):
-        self.assertContains(self.client.get('/'), 'Вступить в проект')
+        self.assertContains(self.client.get('/projects/'), 'Вступить в проект')
         self.assertNotContains(self.client.get('/projects/search/'), 'Find This Project')
         self.assertContains(self.client.get('/projects/search/', {'q': 'find this'}), 'Find This Project')
         self.assertEqual(self.client.get(f'/projects/{self.project.pk}/').status_code, 404)
@@ -894,7 +894,7 @@ class ProjectAndTaskDeletionTests(TestCase):
 
     def test_delete_links_visibility(self):
         page=self.client.get(f'/projects/{self.project.pk}/')
-        self.assertContains(self.client.get('/'),self.project_url)
+        self.assertContains(self.client.get('/projects/'),self.project_url)
         self.assertNotContains(page,self.project_url)
         self.assertContains(page,self.task_url)
         self.assertContains(self.client.get(f'/projects/{self.project.pk}/tasks/{self.task.pk}/edit/'),'Удалить задачу')
@@ -1067,3 +1067,363 @@ class ExplicitMembershipMigrationTests(TransactionTestCase):
             self.assertNotIn('role',[f.name for f in apps.get_model('tasks','WorkspaceUser')._meta.fields])
         finally:
             MigrationExecutor(connection).migrate(MigrationExecutor(connection).loader.graph.leaf_nodes())
+
+
+
+class PersonalProfileTests(TestCase):
+    def setUp(self):
+        from .models import Project, Board, Column, Task
+        self.user=WorkspaceUser.objects.create_user(username='profileuser',email='profile@example.com',first_name='Анна',last_name='Иванова')
+        self.other=WorkspaceUser.objects.create_user(username='otherprofile',email='otherprofile@example.com')
+        self.project=Project.objects.create(name='My profile project',owner=self.user)
+        Membership.objects.create(user=self.user,project=self.project,role='designer',is_confirmed=True)
+        column=Column.objects.create(board=Board.objects.create(project=self.project,name='Board'),name='In progress')
+        self.task=Task.objects.create(title='Assigned to me',description='Visible task',column=column)
+        self.task.assignees.add(self.user)
+        self.unassigned=Task.objects.create(title='Someone elses task',column=column)
+        self.unassigned.assignees.add(self.other)
+        self.private=Project.objects.create(name='Private unrelated project',owner=self.other)
+        column=Column.objects.create(board=Board.objects.create(project=self.private,name='Other board'),name='Private')
+        stale=Task.objects.create(title='Stale inaccessible assignment',column=column)
+        stale.assignees.add(self.user)
+
+    def test_guest_cannot_open_or_change_profile(self):
+        self.assertEqual(self.client.get('/profile/').status_code,302)
+        self.assertEqual(self.client.post('/profile/',{'first_name':'Changed'}).status_code,302)
+        self.user.refresh_from_db(); self.assertEqual(self.user.first_name,'Анна')
+
+    def test_profile_displays_only_own_projects_and_assignments(self):
+        self.client.force_login(self.user)
+        page=self.client.get('/profile/')
+        self.assertContains(page,'My profile project')
+        self.assertContains(page,'Assigned to me')
+        self.assertContains(page,'Дизайнер')
+        self.assertNotContains(page,'Someone elses task')
+        self.assertNotContains(page,'Private unrelated project')
+        self.assertNotContains(page,'Stale inaccessible assignment')
+        self.assertContains(page,'profile@example.com')
+        self.assertContains(page,'Личный кабинет')
+
+    def test_edit_only_allowed_fields_of_current_user(self):
+        self.client.force_login(self.user)
+        password=self.user.password
+        response=self.client.post('/profile/',{'first_name':'Мария','last_name':'Петрова','bio':'Дизайнер интерфейсов',
+            'id':self.other.pk,'email':'changed@example.com','username':'hacked','is_staff':'true','is_superuser':'true','password':'bad'})
+        self.assertRedirects(response,'/profile/')
+        self.user.refresh_from_db(); self.other.refresh_from_db()
+        self.assertEqual(self.user.first_name,'Мария'); self.assertEqual(self.user.bio,'Дизайнер интерфейсов')
+        self.assertEqual(self.user.email,'profile@example.com'); self.assertEqual(self.user.username,'profileuser')
+        self.assertEqual(self.user.password,password); self.assertFalse(self.user.is_staff); self.assertFalse(self.user.is_superuser)
+        self.assertEqual(self.other.first_name,'')
+        self.assertEqual(Membership.objects.get(project=self.project,user=self.user).role,'designer')
+
+    def test_invalid_profile_is_not_saved_and_csrf_required(self):
+        from django.test import Client
+        self.client.force_login(self.user)
+        page=self.client.post('/profile/',{'first_name':'x'*151,'last_name':'Name','bio':'x'*501})
+        self.assertEqual(page.status_code,200)
+        self.assertContains(page,'Профиль не сохранён')
+        self.user.refresh_from_db(); self.assertEqual(self.user.first_name,'Анна')
+        client=Client(enforce_csrf_checks=True); client.force_login(self.user)
+        self.assertEqual(client.post('/profile/',{'first_name':'Unsafe'}).status_code,403)
+
+    def test_project_roles_are_independent_and_task_pagination_works(self):
+        from .models import Project,Task
+        second=Project.objects.create(name='Second profile project',owner=self.other)
+        Membership.objects.create(user=self.user,project=second,role='developer',developer_specialization='backend',is_confirmed=True)
+        for i in range(12):
+            Task.objects.create(title=f'Extra task {i}',column=self.task.column).assignees.add(self.user)
+        self.client.force_login(self.user)
+        page=self.client.get('/profile/')
+        self.assertContains(page,'Дизайнер'); self.assertContains(page,'Разработчик — Бекенд')
+        self.assertEqual(page.context['task_page'].paginator.count,13)
+        self.assertEqual(len(page.context['task_page']),10)
+        self.assertEqual(len(self.client.get('/profile/',{'tasks_page':2}).context['task_page']),3)
+
+
+
+class ActiveTaskDashboardTests(TestCase):
+    def setUp(self):
+        from .models import Project,Board,Column,Task
+        self.user=WorkspaceUser.objects.create_user(username='dashuser',email='dashuser@example.com')
+        self.other=WorkspaceUser.objects.create_user(username='dashother',email='dashother@example.com')
+        self.project=Project.objects.create(name='Dashboard Project A',owner=self.user)
+        self.second=Project.objects.create(name='Dashboard Project B',owner=self.other)
+        Membership.objects.create(user=self.user,project=self.second,role='designer',is_confirmed=True)
+        self.active=Column.objects.create(board=Board.objects.create(project=self.project,name='Board'),name='В работе')
+        self.done=Column.objects.create(board=self.active.board,name='Ready renamed',is_completed=True)
+        self.custom=Column.objects.create(board=Board.objects.create(project=self.second,name='Board'),name='На проверке')
+        self.task=Task.objects.create(title='My active task',column=self.active)
+        self.task.assignees.add(self.user)
+        Task.objects.create(title='My completed task',column=self.done).assignees.add(self.user)
+        Task.objects.create(title='Other persons task',column=self.active).assignees.add(self.other)
+        Task.objects.create(title='My second project task',column=self.custom).assignees.add(self.user)
+        private=Project.objects.create(name='Hidden project',owner=self.other)
+        column=Column.objects.create(board=Board.objects.create(project=private,name='Board'),name='Hidden')
+        Task.objects.create(title='Inaccessible stale task',column=column).assignees.add(self.user)
+
+    def test_root_is_personal_active_board(self):
+        self.client.force_login(self.user)
+        response=self.client.get('/')
+        self.assertContains(response,'Мои активные задачи')
+        self.assertContains(response,'My active task')
+        self.assertContains(response,'My second project task')
+        self.assertContains(response,'На проверке')
+        self.assertNotContains(response,'My completed task')
+        self.assertNotContains(response,'Other persons task')
+        self.assertNotContains(response,'Inaccessible stale task')
+        self.assertEqual(response.context['task_count'],2)
+
+    def test_filter_and_separate_projects_menu(self):
+        self.client.force_login(self.user)
+        page=self.client.get('/',{'project':self.project.pk})
+        self.assertContains(page,'My active task')
+        self.assertNotContains(page,'My second project task')
+        self.assertEqual(self.client.get('/',{'project':'bad'}).context['task_count'],0)
+        self.assertContains(self.client.get('/projects/'),'Создать проект')
+        self.assertContains(self.client.get('/projects/'),'Вступить в проект')
+
+    def test_custom_completion_flag_and_change_of_status(self):
+        self.client.force_login(self.user)
+        self.active.is_completed=True; self.active.save()
+        self.assertNotContains(self.client.get('/'),'My active task')
+        self.active.name='Another label'; self.active.save()
+        self.assertNotContains(self.client.get('/'),'My active task')
+        self.active.is_completed=False; self.active.save()
+        self.assertContains(self.client.get('/'),'My active task')
+
+    def test_guests_welcome_and_default_project_done_column(self):
+        from .models import Project
+        self.assertContains(self.client.get('/'),'Зарегистрироваться')
+        self.assertEqual(self.client.get('/projects/').status_code,302)
+        self.client.force_login(self.user)
+        self.client.post('/projects/new/',{'name':'Default status project','role':'designer'})
+        project=Project.objects.get(name='Default status project')
+        columns=project.boards.get().columns
+        self.assertTrue(columns.get(name='Готово').is_completed)
+        self.assertFalse(columns.get(name='К выполнению').is_completed)
+
+
+
+class DashboardSectionsTests(ActiveTaskDashboardTests):
+    def test_selected_project_tasks_include_team_and_completed_tasks(self):
+        self.client.force_login(self.user)
+        page=self.client.get('/',{'project':self.project.pk})
+        self.assertContains(page,'Мои задачи')
+        self.assertContains(page,'Задачи проекта')
+        self.assertEqual(page.context['task_count'],1)
+        self.assertEqual(page.context['project_tasks_page'].paginator.count,3)
+        self.assertContains(page,'Other persons task')
+        self.assertContains(page,'My completed task')
+        self.assertNotContains(page,'Inaccessible stale task')
+
+    def test_no_selection_or_foreign_project_reveals_no_team_tasks(self):
+        self.client.force_login(self.user)
+        page=self.client.get('/')
+        self.assertIsNone(page.context['selected_project'])
+        self.assertEqual(page.context['project_tasks_page'].paginator.count,0)
+        from .models import Project
+        private=Project.objects.get(name='Hidden project')
+        page=self.client.get('/',{'project':private.pk})
+        self.assertIsNone(page.context['selected_project'])
+        self.assertEqual(page.context['project_tasks_page'].paginator.count,0)
+        self.assertNotContains(page,'Inaccessible stale task')
+
+
+
+class ColleagueConnectionTests(TestCase):
+    def setUp(self):
+        self.first=WorkspaceUser.objects.create_user(username='alice',email='alice@example.com')
+        self.second=WorkspaceUser.objects.create_user(username='bob',email='bob@example.com')
+        self.third=WorkspaceUser.objects.create_user(username='outsider',email='outsider@example.com')
+        self.client.force_login(self.first)
+
+    def request(self):
+        from .models import ColleagueConnection
+        self.client.post('/profile/colleagues/request/',{'colleague':'bob'})
+        return ColleagueConnection.objects.get()
+
+    def respond(self,link,action):
+        return self.client.post(f'/profile/colleagues/{link.pk}/respond/',{'action':action})
+
+    def test_search_and_two_sided_acceptance(self):
+        self.assertContains(self.client.get('/profile/',{'colleague':'@bob'}),'Добавить в коллеги')
+        link=self.request()
+        self.assertEqual(link.status,'pending')
+        self.assertEqual(len(self.client.get('/profile/').context['colleagues']),0)
+        self.client.force_login(self.second)
+        self.assertContains(self.client.get('/profile/'),'Входящие заявки')
+        self.assertRedirects(self.respond(link,'accept'),'/profile/')
+        self.assertEqual(self.client.get('/profile/').context['colleagues'][0]['person'],self.first)
+        self.client.force_login(self.first)
+        self.assertEqual(self.client.get('/profile/').context['colleagues'][0]['person'],self.second)
+
+    def test_no_self_unknown_inactive_or_duplicate_requests(self):
+        from .models import ColleagueConnection
+        inactive=WorkspaceUser.objects.create_user(username='inactivecolleague',email='inactivecolleague@example.com',is_active=False)
+        for nickname in ['alice','unknown',inactive.username,'']:
+            self.client.post('/profile/colleagues/request/',{'colleague':nickname})
+        self.assertFalse(ColleagueConnection.objects.exists())
+        link=self.request(); self.request()
+        self.client.force_login(self.second)
+        self.client.post('/profile/colleagues/request/',{'colleague':'alice'})
+        self.assertEqual(ColleagueConnection.objects.count(),1)
+        link.refresh_from_db(); self.assertEqual(link.status,'pending')
+
+    def test_only_recipient_accepts_and_third_party_cannot_respond(self):
+        link=self.request()
+        self.respond(link,'accept'); link.refresh_from_db(); self.assertEqual(link.status,'pending')
+        self.respond(link,'decline'); self.assertTrue(type(link).objects.filter(pk=link.pk).exists())
+        self.client.force_login(self.third)
+        for action in ['accept','decline','cancel','remove']:
+            self.assertEqual(self.respond(link,action).status_code,404)
+
+    def test_cancel_decline_and_removal(self):
+        from .models import ColleagueConnection
+        link=self.request(); self.respond(link,'cancel')
+        self.assertFalse(ColleagueConnection.objects.exists())
+        link=self.request(); self.client.force_login(self.second); self.respond(link,'decline')
+        self.assertFalse(ColleagueConnection.objects.exists())
+        self.client.force_login(self.first); link=self.request()
+        self.client.force_login(self.second); self.respond(link,'accept'); self.respond(link,'remove')
+        self.assertFalse(ColleagueConnection.objects.exists())
+        self.assertEqual(WorkspaceUser.objects.count(),3)
+
+    def test_database_constraints_and_csrf(self):
+        from .models import ColleagueConnection
+        from django.db import IntegrityError,transaction
+        from django.test import Client
+        link=self.request()
+        with self.assertRaises(IntegrityError),transaction.atomic():
+            ColleagueConnection.objects.create(user_low=link.user_low,user_high=link.user_high,requested_by=self.second)
+        with self.assertRaises(IntegrityError),transaction.atomic():
+            ColleagueConnection.objects.create(user_low=self.first,user_high=self.first,requested_by=self.first)
+        client=Client(enforce_csrf_checks=True); client.force_login(self.first)
+        self.assertEqual(client.post('/profile/colleagues/request/',{'colleague':'bob'}).status_code,403)
+        self.assertEqual(self.client.get('/profile/colleagues/request/').status_code,405)
+        self.client.logout()
+        self.assertEqual(self.client.post('/profile/colleagues/request/',{'colleague':'bob'}).status_code,302)
+
+
+
+class ProjectInvitationTests(TestCase):
+    def setUp(self):
+        from .models import Project, ColleagueConnection
+        self.owner=WorkspaceUser.objects.create_user(username='inviteowner',email='inviteowner@example.com')
+        self.peer=WorkspaceUser.objects.create_user(username='invitepeer',email='invitepeer@example.com')
+        self.other=WorkspaceUser.objects.create_user(username='inviteother',email='inviteother@example.com')
+        self.project=Project.objects.create(name='Invitation project',owner=self.owner)
+        self.foreign=Project.objects.create(name='Foreign project',owner=self.other)
+        self.link=ColleagueConnection.objects.create(user_low=self.owner,user_high=self.peer,requested_by=self.owner,status='accepted')
+        self.client.force_login(self.owner)
+
+    def send(self):
+        return self.client.post(f'/profile/colleagues/{self.peer.pk}/invite/',{'project':self.project.pk})
+
+    def test_invite_is_pending_until_recipient_accepts_with_role(self):
+        from .models import ProjectInvitation, Membership
+        from .views import project_participants
+        self.send(); self.send()
+        invitation=ProjectInvitation.objects.get()
+        self.assertFalse(Membership.objects.filter(project=self.project,user=self.peer).exists())
+        self.assertNotIn(self.peer,project_participants(self.project))
+        self.client.force_login(self.peer)
+        self.assertContains(self.client.get('/profile/'),'Приглашения в проекты')
+        url=f'/profile/invitations/{invitation.pk}/'
+        self.assertContains(self.client.get(url),'Принять приглашение')
+        self.assertEqual(self.client.post(url,{'role':'developer'}).status_code,200)
+        self.assertFalse(Membership.objects.filter(project=self.project,user=self.peer).exists())
+        self.assertEqual(self.client.post(url,{'role':'designer'}).status_code,302)
+        membership=Membership.objects.get(project=self.project,user=self.peer)
+        self.assertTrue(membership.is_confirmed)
+        self.assertEqual(membership.role,'designer')
+        self.assertIn(self.peer,project_participants(self.project))
+        self.assertFalse(ProjectInvitation.objects.exists())
+
+    def test_owner_and_colleague_restrictions(self):
+        from .models import ProjectInvitation
+        url=f'/profile/colleagues/{self.peer.pk}/invite/'
+        self.assertEqual(self.client.post(url,{'project':self.foreign.pk}).status_code,200)
+        self.assertFalse(ProjectInvitation.objects.exists())
+        self.link.status='pending';self.link.save()
+        self.assertEqual(self.send().status_code,404)
+        self.link.status='accepted';self.link.save();self.send()
+        invitation=ProjectInvitation.objects.get()
+        for user in [self.owner,self.other]:
+            self.client.force_login(user)
+            self.assertEqual(self.client.post(f'/profile/invitations/{invitation.pk}/',{'role':'designer'}).status_code,404)
+
+    def test_decline_and_already_member_and_menu(self):
+        from .models import ProjectInvitation, Membership
+        page=self.client.get('/profile/')
+        self.assertContains(page,'colleague-menu')
+        self.assertContains(page,'Пригласить в проект')
+        self.assertContains(page,'<details class="colleague-add" >',html=False)
+        self.send(); invitation=ProjectInvitation.objects.get()
+        self.client.force_login(self.peer)
+        self.client.post(f'/profile/invitations/{invitation.pk}/',{'action':'decline'})
+        self.assertFalse(ProjectInvitation.objects.exists())
+        self.assertFalse(Membership.objects.filter(project=self.project,user=self.peer).exists())
+        Membership.objects.create(project=self.project,user=self.peer,role='designer',is_confirmed=True)
+        self.client.force_login(self.owner);self.send()
+        self.assertFalse(ProjectInvitation.objects.exists())
+
+
+
+class ColleagueProfileTests(TestCase):
+    def setUp(self):
+        from .models import ColleagueConnection
+        self.viewer=WorkspaceUser.objects.create_user(username='profileviewer',email='viewer@example.com')
+        self.person=WorkspaceUser.objects.create_user(username='profilepeer',email='private@example.com',first_name='Иван',last_name='Петров',bio='<script>alert(1)</script>Разработчик')
+        self.link=ColleagueConnection.objects.create(user_low=self.viewer,user_high=self.person,requested_by=self.viewer,status='accepted')
+        self.url=f'/profile/colleagues/{self.person.pk}/'
+        self.client.force_login(self.viewer)
+
+    def test_profile_and_link_display_only_public_fields(self):
+        self.assertContains(self.client.get('/profile/'),f'href="{self.url}"')
+        page=self.client.get(self.url)
+        self.assertContains(page,'Иван Петров')
+        self.assertContains(page,'@profilepeer')
+        self.assertContains(page,'&lt;script&gt;')
+        self.assertNotContains(page,'<script>alert(1)</script>')
+        self.assertNotContains(page,'private@example.com')
+        self.assertEqual(self.client.post(self.url,{'bio':'changed'}).status_code,405)
+
+    def test_access_requires_active_accepted_colleague(self):
+        self.link.status='pending';self.link.save()
+        self.assertEqual(self.client.get(self.url).status_code,404)
+        self.link.status='accepted';self.link.save()
+        self.person.is_active=False;self.person.save()
+        self.assertEqual(self.client.get(self.url).status_code,404)
+        self.client.logout()
+        self.assertEqual(self.client.get(self.url).status_code,302)
+
+    def test_empty_profile_has_fallbacks_and_removal_revokes_access(self):
+        self.person.first_name='';self.person.last_name='';self.person.bio='';self.person.save()
+        self.assertContains(self.client.get(self.url),'Имя пока не указано')
+        self.assertContains(self.client.get(self.url),'Коллега пока не добавил информацию о себе.')
+        self.link.delete()
+        self.assertEqual(self.client.get(self.url).status_code,404)
+
+
+
+class NotificationMenuTests(TestCase):
+    def test_counts_only_incoming_pending_items_and_clears_after_response(self):
+        from .models import ColleagueConnection, Project, ProjectInvitation
+        viewer=WorkspaceUser.objects.create_user(username='notifyviewer',email='notifyviewer@example.com')
+        sender=WorkspaceUser.objects.create_user(username='notifysender',email='notifysender@example.com')
+        self.client.force_login(viewer)
+        self.assertContains(self.client.get('/profile/'),'Новых уведомлений нет.')
+        link=ColleagueConnection.objects.create(user_low=viewer,user_high=sender,requested_by=sender)
+        project=Project.objects.create(name='Notification project',owner=sender)
+        invitation=ProjectInvitation.objects.create(project=project,sender=sender,recipient=viewer)
+        page=self.client.get('/profile/')
+        self.assertContains(page,'aria-label="Уведомления: 2"')
+        self.assertContains(page,f'href="/profile/invitations/{invitation.pk}/"')
+        self.assertLess(page.content.index('Мои проекты ·'.encode()),page.content.index('Мой профиль'.encode()))
+        self.client.post(f'/profile/colleagues/{link.pk}/respond/',{'action':'accept'})
+        self.client.post(f'/profile/invitations/{invitation.pk}/',{'action':'decline'})
+        self.assertContains(self.client.get('/profile/'),'Новых уведомлений нет.')
+        self.client.force_login(sender)
+        self.assertContains(self.client.get('/projects/'),'aria-label="Уведомления: 0"')
+

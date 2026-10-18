@@ -1,0 +1,55 @@
+{% extends 'tasks/workspace_base.html' %}
+{% block title %}Личный кабинет — Team Control{% endblock %}
+{% block content %}
+<style>
+.profile-hero { display:flex; align-items:center; gap:20px; margin-bottom:28px; flex-wrap:wrap; }
+.profile-avatar { width:76px; height:76px; border-radius:22px; background:#eae6ff; color:#5145cd; display:grid; place-items:center; font-size:26px; font-weight:bold; flex-shrink:0; }
+.profile-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,380px); gap:24px; align-items:start; }
+.profile-content { min-width:0; display:grid; gap:24px; }
+.profile-account { display:grid; gap:6px; padding:14px 0; overflow-wrap:anywhere; }
+.profile-account dt { font-size:13px; color:#6b6e80; } .profile-account dd { margin:0 0 10px; }
+.profile-projects { list-style:none; margin:0; padding:0; } .profile-projects li { padding:16px 0; border-bottom:1px solid #eceef5; overflow-wrap:anywhere; }
+.profile-projects li:last-child { border:0; } .profile-projects a { font-weight:bold; }
+.profile-role { display:block; margin-top:6px; color:#6b6e80; font-size:14px; }
+.profile-task { border:1px solid #e5e7ef; border-radius:9px; padding:16px; margin-top:12px; overflow-wrap:anywhere; }
+.profile-task p { margin:8px 0 0; } .profile-tag { color:#5145cd; background:#f1effc; border-radius:12px; padding:4px 10px; font-size:13px; }
+.profile-pagination { margin-top:18px; justify-content:space-between; font-size:14px; }
+@media(max-width:800px) { .profile-layout { grid-template-columns:1fr; } }
+.colleague-row { display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:14px 0;border-bottom:1px solid #eceef5; } .colleague-row:last-child { border:0; } .colleague-name { overflow-wrap:anywhere; min-width:0; } .colleague-search { display:flex;align-items:end;gap:12px;flex-wrap:wrap; } .colleague-search .field { flex:1 1 180px;margin:0; } .colleague-section-heading { font-size:16px;margin:24px 0 4px; } .colleague-row button { padding:8px 12px;font-size:14px; }
+
+.colleague-card {background:#f8f9fd;border:1px solid #e7e9f3!important;border-radius:14px;padding:14px 16px;margin:10px 0;flex-wrap:nowrap;}
+.colleague-person {display:flex;align-items:center;gap:12px;min-width:0}.colleague-avatar {width:42px;height:42px;flex-shrink:0;border-radius:50%;display:grid;place-items:center;background:#e8e4ff;color:#5141ce;font-weight:700;}
+.colleague-add summary {cursor:pointer;color:#5141ce;margin:16px 0}.colleague-menu {position:relative;margin-left:auto;flex-shrink:0}.colleague-menu>summary {list-style:none;cursor:pointer;font-size:26px;line-height:32px;width:36px;text-align:center;border-radius:8px;}.colleague-menu>summary::-webkit-details-marker{display:none}.colleague-menu>summary:hover{background:#eceaf7}
+.colleague-menu-panel{position:absolute;right:0;top:38px;z-index:10;width:210px;background:white;border:1px solid #e7e9f3;border-radius:12px;padding:8px;box-shadow:0 8px 28px #22224420}.colleague-menu-panel a,.colleague-menu-panel button{display:block;box-sizing:border-box;width:100%;padding:10px 12px;text-align:left;border:0;background:none;font-size:14px;text-decoration:none;border-radius:8px}.colleague-menu-panel a:hover,.colleague-menu-panel button:hover{background:#f3f2fa}
+</style>
+<div class="profile-hero"><div class="profile-avatar" aria-hidden="true">{{ initials }}</div><div><h1>Личный кабинет</h1><div class="muted">{{ user.get_full_name|default:user.username }} · @{{ user.username }}</div></div></div>
+<div class="profile-layout">
+<div class="profile-content profile-work">
+<section class="card"><div class="toolbar" style="margin-bottom:0"><h2>Мои проекты · {{ project_page.paginator.count }}</h2><a href="{% url 'projects_list' %}">Все проекты</a></div>
+<ul class="profile-projects">{% for project in project_page %}<li><a href="{% url 'project_detail' project.pk %}">{{ project.name }}</a>
+<span class="profile-role">{% if project.my_memberships %}{{ project.my_memberships.0.role_description }}{% if not project.my_memberships.0.is_confirmed %} · Участие ещё не подтверждено{% endif %}{% elif project.owner_id == user.pk %}Владелец проекта{% else %}Роль не указана{% endif %}{% if project.owner_id == user.pk and project.my_memberships %} · Владелец{% endif %}</span></li>
+{% empty %}<li class="muted">У вас пока нет проектов. <a href="{% url 'project_search' %}">Найти команду</a> или <a href="{% url 'project_create' %}">создать проект</a>.</li>{% endfor %}</ul>
+{% if project_page.has_other_pages %}<nav class="actions profile-pagination" aria-label="Страницы проектов">{% if project_page.has_previous %}<a href="?projects_page={{ project_page.previous_page_number }}&tasks_page={{ task_page.number }}">Назад</a>{% endif %}<span>{{ project_page.number }} / {{ project_page.paginator.num_pages }}</span>{% if project_page.has_next %}<a href="?projects_page={{ project_page.next_page_number }}&tasks_page={{ task_page.number }}">Далее</a>{% endif %}</nav>{% endif %}
+</section>
+<section class="card"><h2>Назначенные мне задачи · {{ task_page.paginator.count }}</h2>
+{% for task in task_page %}<article class="profile-task"><div class="toolbar" style="margin:0;gap:10px"><strong><a href="{% url 'task_edit' task.column.board.project_id task.pk %}">{{ task.title }}</a></strong><span class="profile-tag">{{ task.column.name }}</span></div>
+<p class="muted"><a href="{% url 'project_detail' task.column.board.project_id %}">{{ task.column.board.project.name }}</a>{% if task.due_date %} · Срок: {{ task.due_date|date:'d.m.Y' }}{% endif %}</p>
+{% if task.description %}<p>{{ task.description|truncatechars:140 }}</p>{% endif %}</article>
+{% empty %}<p class="muted">На вас пока нет назначенных задач.</p>{% endfor %}
+{% if task_page.has_other_pages %}<nav class="actions profile-pagination" aria-label="Страницы задач">{% if task_page.has_previous %}<a href="?tasks_page={{ task_page.previous_page_number }}&projects_page={{ project_page.number }}">Назад</a>{% endif %}<span>{{ task_page.number }} / {{ task_page.paginator.num_pages }}</span>{% if task_page.has_next %}<a href="?tasks_page={{ task_page.next_page_number }}&projects_page={{ project_page.number }}">Далее</a>{% endif %}</nav>{% endif %}
+</section>
+</div>
+<div class="profile-content">
+<section class="card"><h2>Мой профиль</h2>
+<dl class="profile-account"><dt>Логин</dt><dd>{{ user.username }}</dd><dt>Электронная почта</dt><dd>{{ user.email|default:'Почта не указана' }}</dd><dt>В команде с</dt><dd>{{ user.date_joined|date:'d.m.Y' }}</dd></dl>
+<form method="post" novalidate>{% csrf_token %}
+{% if form.errors %}<p class="error" role="alert">Профиль не сохранён. Исправьте отмеченные поля.</p>{% endif %}
+{% for error in form.non_field_errors %}<p class="error">{{ error }}</p>{% endfor %}
+{% for field in form %}<div class="field">{{ field.label_tag }}{{ field }}{% for error in field.errors %}<p class="error" role="alert">{{ error }}</p>{% endfor %}</div>{% endfor %}
+<p class="muted" style="font-size:13px">О себе — до 500 символов.</p><button type="submit">Сохранить профиль</button>
+</form></section>
+{% include 'tasks/profile_colleagues.html' %}
+
+</div></div>
+{% endblock %}
+

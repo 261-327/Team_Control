@@ -1,0 +1,22 @@
+<section class="card" id="colleagues" aria-labelledby="colleagues-heading">
+<h2 id="colleagues-heading">Коллеги · {{ colleagues|length }}</h2>
+<details class="colleague-add" {% if colleague_search_form.is_bound %}open{% endif %}><summary>Добавить коллегу</summary><form method="get" action="{% url 'profile' %}#colleagues" class="colleague-search"><div class="field">{{ colleague_search_form.colleague.label_tag }}{{ colleague_search_form.colleague }}</div><button type="submit">Найти</button></form>
+{% for error in colleague_search_form.colleague.errors %}<p class="error" role="alert">{{ error }}</p>{% endfor %}
+{% if found_colleague %}<div class="colleague-row"><div class="colleague-name"><strong>{{ found_colleague.get_full_name|default:found_colleague.username }}</strong><div class="muted">@{{ found_colleague.username }}</div></div>
+{% if colleague_relationship.status == 'accepted' %}<span class="profile-tag">Уже коллеги</span>
+{% elif colleague_relationship %}<span class="muted">{% if colleague_relationship.requested_by_id == user.pk %}Заявка отправлена{% else %}У вас входящая заявка{% endif %}</span>
+{% else %}<form method="post" action="{% url 'colleague_request' %}">{% csrf_token %}<input type="hidden" name="colleague" value="{{ found_colleague.username }}"><button type="submit">Добавить в коллеги</button></form>{% endif %}</div>{% endif %}
+</details>
+{% if project_invitations %}<h3>Приглашения в проекты</h3>{% for invitation in project_invitations %}<div class="colleague-row"><strong>{{ invitation.project.name }}</strong><div class="actions"><a href="{% url 'project_invitation' invitation.pk %}">Принять приглашение</a><form method="post" action="{% url 'project_invitation' invitation.pk %}">{% csrf_token %}<button class="secondary" name="action" value="decline">Отклонить</button></form></div></div>{% endfor %}{% endif %}
+{% if incoming_colleague_requests %}<h3 class="colleague-section-heading">Входящие заявки · {{ incoming_colleague_requests|length }}</h3>
+{% for row in incoming_colleague_requests %}<div class="colleague-row"><div class="colleague-name"><strong>{{ row.person.get_full_name|default:row.person.username }}</strong><div class="muted">@{{ row.person.username }}</div></div>
+<form method="post" action="{% url 'colleague_response' row.connection.pk %}" class="actions">{% csrf_token %}<button type="submit" name="action" value="accept">Принять</button><button class="secondary" type="submit" name="action" value="decline">Отклонить</button></form></div>{% endfor %}{% endif %}
+{% if outgoing_colleague_requests %}<h3 class="colleague-section-heading">Отправленные заявки · {{ outgoing_colleague_requests|length }}</h3>
+{% for row in outgoing_colleague_requests %}<div class="colleague-row"><div class="colleague-name"><strong>{{ row.person.get_full_name|default:row.person.username }}</strong><div class="muted">@{{ row.person.username }} · Ожидает ответа</div></div>
+<form method="post" action="{% url 'colleague_response' row.connection.pk %}">{% csrf_token %}<button class="secondary" type="submit" name="action" value="cancel">Отменить заявку</button></form></div>{% endfor %}{% endif %}
+<h3 class="colleague-section-heading">Мои коллеги</h3>
+{% for row in colleagues %}<div class="colleague-row colleague-card"><a class="colleague-person" href="{% url 'colleague_profile' row.person.pk %}" style="flex:1;color:inherit;text-decoration:none"><span class="colleague-avatar" aria-hidden="true">{{ row.person.username|slice:":1"|upper }}</span><div class="colleague-name"><strong>{{ row.person.get_full_name|default:row.person.username }}</strong><div class="muted">@{{ row.person.username }}</div></div>
+</a><details class="colleague-menu"><summary aria-label="Действия с коллегой {{ row.person.username }}">⋯</summary><div class="colleague-menu-panel"><a href="{% url 'colleague_invite' row.person.pk %}">Пригласить в проект</a><form method="post" action="{% url 'colleague_response' row.connection.pk %}" data-confirm="Удалить {{ row.person.username }} из коллег?" onsubmit="return confirm(this.dataset.confirm)">{% csrf_token %}<button class="danger-button" type="submit" name="action" value="remove">Удалить из коллег</button></form></div></details></div>
+{% empty %}<p class="muted">Вы пока никого не добавили. После принятия заявки коллега появится здесь.</p>{% endfor %}
+</section>
+

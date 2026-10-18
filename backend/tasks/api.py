@@ -455,7 +455,7 @@ def projects(request):
         board = Board.objects.create(project=p, name="Основная доска")
         Column.objects.bulk_create(
             [
-                Column(board=board, name=label, position=i, workflow_status=status)
+                Column(board=board, name=label, position=i, workflow_status=status, is_completed=status == "done")
                 for i, (status, label) in enumerate(STATUSES.items())
             ]
         )
@@ -537,6 +537,7 @@ def column_for(p, status):
         board=board,
         name=STATUSES[status],
         workflow_status=status,
+        is_completed=status == "done",
         position=list(STATUSES).index(status),
     )
 
@@ -845,3 +846,4 @@ def frontend_redirect(request, path=""):
         + path
         + ("?" + request.META["QUERY_STRING"] if request.META.get("QUERY_STRING") else "")
     )
+

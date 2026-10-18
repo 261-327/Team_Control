@@ -210,6 +210,8 @@ class Column(models.Model):
     name = models.CharField(max_length=100, verbose_name="Название колонки")
     position = models.PositiveIntegerField(default=0, verbose_name="Порядковый номер")
 
+    is_completed = models.BooleanField(default=False, verbose_name='Завершает задачу')
+
     workflow_status = models.CharField(
         max_length=16,
         choices=[
@@ -316,3 +318,39 @@ class Invitation(models.Model):
         default="pending",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+
+class ColleagueConnection(models.Model):
+    """A single canonical pair represents both directions of a colleague relationship."""
+    user_low=models.ForeignKey(WorkspaceUser,on_delete=models.CASCADE,related_name='colleague_connections_low',verbose_name='Первый пользователь')
+    user_high=models.ForeignKey(WorkspaceUser,on_delete=models.CASCADE,related_name='colleague_connections_high',verbose_name='Второй пользователь')
+    requested_by=models.ForeignKey(WorkspaceUser,on_delete=models.CASCADE,related_name='sent_colleague_requests',verbose_name='Отправитель заявки')
+    status=models.CharField(max_length=10,choices=[('pending','Ожидает ответа'),('accepted','Коллеги')],default='pending',verbose_name='Статус')
+    created_at=models.DateTimeField(auto_now_add=True)
+    updated_at=models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label='tasks'
+        verbose_name='Связь коллег'
+        verbose_name_plural='Коллеги и заявки'
+        constraints=[
+            models.UniqueConstraint(fields=['user_low','user_high'],name='unique_colleague_pair'),
+            models.CheckConstraint(condition=models.Q(user_low__lt=models.F('user_high')),name='ordered_colleague_pair'),
+            models.CheckConstraint(condition=models.Q(requested_by=models.F('user_low')) | models.Q(requested_by=models.F('user_high')),name='colleague_requester_in_pair'),
+            models.CheckConstraint(condition=models.Q(status__in=['pending','accepted']),name='valid_colleague_status'),
+        ]
+
+    def __str__(self):
+        return f'{self.user_low} ↔ {self.user_high}: {self.get_status_display()}'
+
+
+class ProjectInvitation(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='colleague_invitations')
+    sender = models.ForeignKey(WorkspaceUser, on_delete=models.CASCADE, related_name='sent_project_invitations')
+    recipient = models.ForeignKey(WorkspaceUser, on_delete=models.CASCADE, related_name='received_project_invitations')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['project', 'recipient'], name='unique_project_invitation')]
+
