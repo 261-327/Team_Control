@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import WorkspaceUser, Project, Membership, Board, Column, Task
+from .models import WorkspaceUser, Project, Membership, Board, Column, Task, ColleagueConnection
 
 
 class MembershipInline(admin.TabularInline):
@@ -47,7 +47,7 @@ class BoardAdmin(admin.ModelAdmin):
 
 @admin.register(Column)
 class ColumnAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'board', 'position', 'max_tasks')
+    list_display = ('id', 'name', 'board', 'position', 'max_tasks', 'is_completed')
     list_editable = ('position',)
 
 
@@ -56,3 +56,12 @@ class TaskAdmin(admin.ModelAdmin):
     list_display = ('id', 'title', 'column', 'position', 'due_date')
     list_editable = ('column', 'position')
     filter_horizontal = ('assignees',)
+
+
+@admin.register(ColleagueConnection)
+class ColleagueConnectionAdmin(admin.ModelAdmin):
+    list_display=('user_low','user_high','requested_by','status','created_at')
+    list_filter=('status',)
+    search_fields=('user_low__username','user_high__username')
+    autocomplete_fields=('user_low','user_high','requested_by')
+    list_select_related=('user_low','user_high','requested_by')
