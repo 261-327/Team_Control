@@ -101,3 +101,13 @@ export type TaskInput = Pick<
 >;
 export type RoleInput = { profession: Profession; specialization: string; customRole: string };
 export type AssistantReply = { text: string; taskIds?: string[] };
+
+
+export type NotificationItem = {
+  id: string;
+  kind: "colleague" | "project" | "legacy_project";
+  title: string;
+  description: string;
+  createdAt: string;
+  projectId?: string;
+};
