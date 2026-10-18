@@ -300,3 +300,51 @@ class FrontendMigrationTests(TransactionTestCase):
         finally:
             MigrationExecutor(connection).migrate(latest)
 
+
+
+@override_settings(ROOT_URLCONF='config.urls', EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+                   EMAIL_HOST='test', DEFAULT_FROM_EMAIL='test@example.com')
+class OTPResendCooldownTests(TestCase):
+    def setUp(self):
+        self.user = WorkspaceUser.objects.create_user('resend-user', 'resend@example.com', 'Strong-pass-57!')
+
+    def call(self, path, data=None):
+        return self.client.post('/api/auth/' + path + '/', json.dumps(data or {}), content_type='application/json')
+
+    def test_resend_after_one_minute_replaces_code_and_resets_timer(self):
+        with patch('tasks.models.secrets.randbelow', return_value=111111):
+            response = self.call('login', {'username':self.user.username, 'password':'Strong-pass-57!'})
+        self.assertEqual(response.status_code, 200)
+        challenge = response.json()
+        self.assertEqual(challenge['expiresAt'] - challenge['resendAt'], 240000)
+        self.assertEqual(self.call('resend').status_code, 429)
+        self.assertEqual(len(mail.outbox), 1)
+        # 59 seconds since sending: still blocked.
+        WorkspaceUser.objects.filter(pk=self.user.pk).update(otp_expiry=timezone.now()+timedelta(minutes=4,seconds=1))
+        self.assertEqual(self.call('resend').status_code, 429)
+        # 61 seconds since sending: original code is unexpired, but resend is allowed.
+        WorkspaceUser.objects.filter(pk=self.user.pk).update(otp_expiry=timezone.now()+timedelta(minutes=3,seconds=59))
+        with patch('tasks.models.secrets.randbelow', return_value=222222):
+            response = self.call('resend')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(response.json()['expiresAt'] - response.json()['resendAt'], 240000)
+        self.assertEqual(self.call('resend').status_code, 429)
+        self.assertEqual(self.call('verify', {'code':'111111'}).status_code, 400)
+        self.assertEqual(self.call('verify', {'code':'222222'}).status_code, 200)
+
+    def test_registration_and_failed_resend_preserve_existing_challenge(self):
+        response = self.call('register', {'name':'Новый', 'username':'resend-new', 'email':'resend-new@example.com',
+            'password':'Strong-pass-57!', 'passwordConfirm':'Strong-pass-57!'})
+        self.assertEqual(response.status_code, 200)
+        user = WorkspaceUser.objects.get(username='resend-new')
+        self.assertFalse(user.is_active)
+        WorkspaceUser.objects.filter(pk=user.pk).update(otp_expiry=timezone.now()+timedelta(minutes=3,seconds=59))
+        user.refresh_from_db(); old_code, old_expiry = user.otp_code, user.otp_expiry
+        with patch('tasks.api.send_mail', side_effect=OSError('offline')):
+            self.assertEqual(self.call('resend').status_code, 503)
+        user.refresh_from_db()
+        self.assertEqual(user.otp_code, old_code)
+        self.assertEqual(user.otp_expiry, old_expiry)
+        self.assertEqual(self.call('resend').status_code, 200)
+        self.assertFalse(WorkspaceUser.objects.get(pk=user.pk).is_active)

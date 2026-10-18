@@ -330,8 +330,8 @@ def challenge_user(request):
 def auth_resend(request):
     with transaction.atomic():
         user = challenge_user(request)
-        if user.otp_expiry and user.otp_expiry > timezone.now():
-            raise APIError("Дождитесь окончания срока текущего кода.", "rate_limited", 429)
+        if user.otp_resend_at and user.otp_resend_at > timezone.now():
+            raise APIError("Повторная отправка доступна через 60 секунд после предыдущей.", "rate_limited", 429)
         send_code(user)
         return challenge_json(request, user, request.session["api_otp_mode"])
 
@@ -343,7 +343,7 @@ def auth_verify(request):
         if not user.otp_expiry or user.otp_expiry <= timezone.now():
             raise APIError("Срок кода истёк. Запросите новый код.")
         if user.otp_attempts >= 5:
-            raise APIError("Попытки исчерпаны. Дождитесь окончания срока кода и запросите новый.")
+            raise APIError("Попытки исчерпаны. Запросите новый код, когда станет доступна повторная отправка.")
         if not user.is_otp_valid(text(request.data, "code", 6)):
             user.otp_attempts += 1
             user.save(update_fields=["otp_attempts"])

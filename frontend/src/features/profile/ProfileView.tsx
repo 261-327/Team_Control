@@ -9,6 +9,8 @@ import { client } from "@/services/client";
 import { Avatar, Button, Field, FormError, useAction } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 
+import { ColleaguesView } from "./ColleaguesView";
+
 export function ProfileView() {
   const data = useReadyData();
   const user = data.users.find((u) => u.id === data.sessionId)!;
@@ -29,6 +31,7 @@ export function ProfileView() {
         </div>
       </div>
       <div className="profile-grid">
+        <div className="profile-sidebar">
         <section className="panel profile-summary">
           <div className="profile-cover">
             <span>✳</span>
@@ -69,6 +72,8 @@ export function ProfileView() {
           </Button>
           <FormError error={logoutAction.error} />
         </section>
+        <ColleaguesView />
+        </div>
         <section className="panel profile-form">
           <h2>Личная информация</h2>
           <p className="muted">Так тебя видят участники твоих проектов.</p>
