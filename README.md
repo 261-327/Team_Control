@@ -1,0 +1,105 @@
+# Сипи
+
+Рабочее пространство для проектной деятельности: проекты, команда, задачи, доска, обсуждения, материалы и календарь. Интерфейс — Next.js, API и авторизация — Django, данные — PostgreSQL или SQLite при локальном запуске.
+
+## Сервер команды
+
+Для запуска с существующими аккаунтами, PostgreSQL, SMTP и HTTPS используй [инструкцию серверного запуска](deploy/README.md). Пример настроек — [.env.server.example](.env.server.example). Серверная конфигурация запускает Gunicorn, Next.js и Nginx; локальные тестовые данные в неё не попадают.
+
+## Запуск без Docker
+
+Нужны Python 3.11+ и Node.js 20.9+ (рекомендуется Node.js 24 LTS).
+
+Из корня репозитория:
+
+```sh
+./start.sh
+```
+
+Скрипт установит зависимости в `backend/.venv` и `frontend/node_modules`, применит миграции и запустит оба сервиса.
+
+- **Интерфейс:** http://127.0.0.1:3000
+- **Django:** http://127.0.0.1:8000 — перенаправляет на интерфейс.
+- **Админка:** http://127.0.0.1:8000/admin/
+
+**Это отдельная локальная база**, а не база команды. Данные сохраняются в `backend/local.sqlite3`; аккаунты ребят из другого PostgreSQL автоматически здесь не появятся. Тестовые пользователи и проекты автоматически не создаются. Создай аккаунт через «Создать аккаунт». После логина и пароля нужен код: по умолчанию локальные письма выводятся в терминал, где запущен Django. Код действует 5 минут, разрешено 5 попыток; новый код можно получить после истечения предыдущего.
+
+Остановка обоих сервисов: `Ctrl+C`. Старый `./start-frontend.sh` теперь тоже запускает оба сервиса.
+
+Чтобы открыть админку, создай администратора в другом терминале:
+
+```sh
+DB_ENGINE=sqlite backend/.venv/bin/python backend/manage.py createsuperuser
+```
+
+Если в `backend/.env` задан другой `DB_NAME`, используй его и в этой команде.
+
+## Запуск всей командой через Docker
+
+Из корня репозитория:
+
+```sh
+docker compose up --build
+```
+
+Или привычной командой из `backend`:
+
+```sh
+cd backend
+docker compose up --build
+```
+
+Для второго варианта нужен Docker Compose 2.20+ с поддержкой `include`.
+
+- **Интерфейс:** http://localhost:8000
+- **Админка Django:** http://localhost:8001/admin/
+- **Письма с кодами:** `docker compose logs -f backend`
+
+Compose запускает PostgreSQL, применяет миграции, поднимает Django и собранный Next.js. Браузер обращается к одному адресу; `/api` проксируется в Django вместе с session/CSRF cookies. Данные PostgreSQL остаются в том же томе `backend_postgres_data`, который использовал прежний Compose. Удалять этот том для обновления не нужно.
+
+Это конфигурация для локальной разработки команды. Для общего сервера с доменом используй `compose.server.yaml` по [серверной инструкции](deploy/README.md).
+
+## Настройка почты
+
+`./start.sh` читает `backend/.env`. Пример полей — в `backend/.env.example`. Для отправки реальных писем укажи SMTP-параметры и:
+
+```dotenv
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+```
+
+Для Docker помести эти переменные в `.env` в каталоге, из которого запускаешь Compose, или передай их через окружение. Пароли в `.env` для `start.sh` заключай в одинарные кавычки: это файл переменных shell. Конфиденциальные файлы не включаются в образы.
+
+Приглашение в проект создаётся как ссылка для указанной почты. Её передаёт руководитель; автоматическая рассылка приглашений не реализована.
+
+## Запуск сервисов отдельно
+
+```sh
+# Терминал 1, корень репозитория
+DB_ENGINE=sqlite EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend \
+  backend/.venv/bin/python backend/manage.py migrate
+DB_ENGINE=sqlite EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend \
+  backend/.venv/bin/python backend/manage.py runserver
+
+# Терминал 2
+cd frontend
+npm ci
+npm run dev
+```
+
+По умолчанию серверная часть Next.js обращается к `http://127.0.0.1:8000`. Другой адрес можно задать в `frontend/.env.local` как `DJANGO_API_URL`; в браузер эта переменная не передаётся. Один `python manage.py runserver` не собирает Next.js: для нового интерфейса нужен и фронтенд. Общие команды выше запускают оба.
+
+Старые Django-шаблоны сохранены по `/legacy/`, с прежними именами URL для совместимости. Основной пользовательский интерфейс — Next.js.
+
+## Проверки
+
+```sh
+backend/.venv/bin/python backend/manage.py test tasks --settings=config.test_settings
+cd frontend
+npm run lint
+npx tsc --noEmit
+npm run build
+```
+
+Сквозные браузерные тесты работают с настоящим Django, отдельной SQLite-базой и письмами в отдельном временном каталоге. Порядок запуска — в [frontend/docs/integration-checklist.md](frontend/docs/integration-checklist.md).
+
+API и правила доступа: [frontend/docs/api-handoff.md](frontend/docs/api-handoff.md).

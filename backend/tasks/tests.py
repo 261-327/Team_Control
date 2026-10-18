@@ -818,7 +818,6 @@ class ProjectExitTests(TestCase):
         self.assertEqual(self.client.post(self.leave).status_code,302)
 
     def test_cleanup_rolls_back_if_membership_removal_fails(self):
-        from .models import Project
         self.client.force_login(self.owner)
         with patch('tasks.views.Membership.objects.filter',side_effect=RuntimeError('failure')):
             with self.assertRaises(RuntimeError):
@@ -979,7 +978,7 @@ class NumericProjectDeletionTests(TestCase):
         user=WorkspaceUser.objects.create_user(username='modalowner',email='modalowner@example.com')
         project=Project.objects.create(name='Modal',owner=user)
         column=Column.objects.create(board=Board.objects.create(project=project,name='Board'),name='Todo')
-        task=Task.objects.create(title='<Task>',column=column)
+        Task.objects.create(title='<Task>',column=column)
         self.client.force_login(user)
         page=self.client.get(f'/projects/{project.pk}/')
         self.assertContains(page,'<dialog id="task-delete-dialog"')
@@ -1067,4 +1066,4 @@ class ExplicitMembershipMigrationTests(TransactionTestCase):
             self.assertEqual(Membership.objects.filter(user_id=other.pk,is_confirmed=False,custom_role='Researcher').count(),2)
             self.assertNotIn('role',[f.name for f in apps.get_model('tasks','WorkspaceUser')._meta.fields])
         finally:
-            MigrationExecutor(connection).migrate(after)
+            MigrationExecutor(connection).migrate(MigrationExecutor(connection).loader.graph.leaf_nodes())

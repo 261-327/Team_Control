@@ -2,3 +2,9 @@
 __pycache__/
 
 .tunnel.json
+
+.venv/
+*.sqlite3*
+staticfiles/
+
+.ruff_cache/

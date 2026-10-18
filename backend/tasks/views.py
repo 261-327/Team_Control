@@ -1,13 +1,12 @@
 import secrets
 import time
 from django.utils.crypto import constant_time_compare
-from smtplib import SMTPException, SMTPAuthenticationError, SMTPRecipientsRefused, SMTPSenderRefused
+from smtplib import SMTPException
 
 from django import forms
 from django.contrib import messages
 from django.conf import settings
 from django.contrib.auth import authenticate, login as django_login
-from django.contrib.auth.forms import UserCreationForm
 from django.core.mail import send_mail
 from django.db import transaction, IntegrityError
 from django.db.models import Q
@@ -19,40 +18,10 @@ from django.views.decorators.http import require_POST, require_http_methods
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone, translation
 from .models import WorkspaceUser, Project, Board, Column, Task, Membership
+from .forms import MembershipRoleForm, WorkspaceUserCreationForm
+from .mail import registration_mail_error
+from .memberships import remove_project_participant
 
-
-class WorkspaceUserCreationForm(UserCreationForm):
-    email = forms.EmailField(required=True, label='Электронная почта', error_messages={
-        'required': 'Укажите почту, на которую отправить код.',
-        'invalid': 'Введите корректный адрес почты, например name@example.com.',
-    })
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['username'].label = 'Логин'
-        self.fields['first_name'].label = 'Имя'
-        self.fields['last_name'].label = 'Фамилия'
-        self.fields['password1'].label = 'Пароль'
-        self.fields['password2'].label = 'Повторите пароль'
-        for field in self.fields.values():
-            field.error_messages['required'] = 'Заполните это поле.'
-        self.fields['email'].error_messages['required'] = 'Укажите почту, на которую отправить код.'
-        self.fields['username'].error_messages.update({
-            'unique': 'Этот логин уже занят. Выберите другой или войдите в существующий аккаунт.',
-            'invalid': 'Логин может содержать только буквы, цифры и символы @ . + - _.',
-        })
-        self.error_messages = {**self.error_messages, 'password_mismatch': 'Пароли не совпадают. Введите одинаковый пароль в обоих полях.'}
-
-
-    def clean_email(self):
-        email = self.cleaned_data['email'].strip().lower()
-        if WorkspaceUser.objects.annotate(normalized_email=Lower(Trim('email'))).filter(normalized_email=email).exists():
-            raise forms.ValidationError('Эта почта уже зарегистрирована. Войдите в существующий аккаунт или укажите другую почту.')
-        return email
-
-    class Meta(UserCreationForm.Meta):
-        model = WorkspaceUser
-        fields = UserCreationForm.Meta.fields + ('email', 'first_name', 'last_name')
 
 
 def send_registration_code(user):
@@ -66,16 +35,6 @@ def send_registration_code(user):
         raise SMTPException('Message was not sent')
 
 
-def registration_mail_error(exc):
-    if isinstance(exc, SMTPAuthenticationError):
-        return 'Не удалось отправить письмо: почтовый сервис отклонил авторизацию отправителя. Сообщите администратору сайта.'
-    if isinstance(exc, SMTPRecipientsRefused):
-        return 'Почтовый сервис отклонил адрес получателя. Проверьте указанную почту или используйте другой адрес.'
-    if isinstance(exc, SMTPSenderRefused):
-        return 'Почтовый сервис отклонил отправителя. Сообщите администратору сайта.'
-    if isinstance(exc, TimeoutError):
-        return 'Не удалось отправить письмо: почтовый сервис не ответил вовремя. Попробуйте позже.'
-    return 'Не удалось отправить письмо: почтовый сервис временно недоступен. Попробуйте позже.'
 
 
 @translation.override('ru')
@@ -94,6 +53,7 @@ def register_view(request):
                 with transaction.atomic():
                     user = form.save(commit=False)
                     user.is_active = False
+                    user.registration_pending = True
                     user.save()
                     send_registration_code(user)
             except IntegrityError:
@@ -150,10 +110,11 @@ def register_verify_view(request):
                 error = 'Попытки исчерпаны. Дождитесь окончания срока кода и запросите новый.'
             elif user.is_otp_valid(request.POST.get('code', '').strip()):
                 user.is_active = True
+                user.registration_pending = False
                 user.otp_code = None
                 user.otp_expiry = None
                 user.otp_attempts = 0
-                user.save(update_fields=['is_active', 'otp_code', 'otp_expiry', 'otp_attempts'])
+                user.save(update_fields=['is_active', 'registration_pending', 'otp_code', 'otp_expiry', 'otp_attempts'])
                 request.session.pop('registration_user_id', None)
                 request.session.pop('registration_password_hash', None)
                 # Email possession and password were established during registration.
@@ -257,11 +218,6 @@ def login_verify_view(request):
                      if user.otp_attempts >= 5 else 'Неверный код. Попробуйте ещё раз.')
     return render(request, 'tasks/login_verify.html', {'error': error})
 
-class MembershipRoleForm(forms.ModelForm):
-    class Meta:
-        model = Membership
-        fields = ('role', 'developer_specialization', 'custom_role')
-        labels = {'role': 'Ваша роль в проекте', 'custom_role': 'Своя роль в проекте'}
 
 
 class ProjectCreationForm(forms.ModelForm):
@@ -306,7 +262,7 @@ def project_create_view(request):
                 **{key: form.cleaned_data[key] for key in ('role','developer_specialization','custom_role')})
             board = Board.objects.create(project=project, name='Основная доска')
             Column.objects.bulk_create([
-                Column(board=board, name=name, position=position)
+                Column(board=board, name=name, position=position, workflow_status=['todo', 'in_progress', 'done'][position])
                 for position, name in enumerate(['К выполнению', 'В работе', 'Готово'])
             ])
         messages.success(request, 'Проект создан.')
@@ -436,7 +392,7 @@ def column_create_view(request, project_id, board_id):
                 messages.error(request, 'Статус с таким названием уже есть на этой доске.')
             else:
                 last = board.columns.order_by('-position', '-pk').first()
-                Column.objects.create(board=board, name=name, position=last.position + 1 if last else 0)
+                Column.objects.create(board=board, name=name, position=last.position + 1 if last else 0, workflow_status='')
                 messages.success(request, 'Новый статус добавлен.')
         else:
             for error in form.errors.get('name', []):
@@ -574,12 +530,6 @@ def project_join_view(request, project_id):
     return render(request, 'tasks/project_join.html', {'project': project, 'form': form})
 
 
-def remove_project_participant(project, user_id):
-    # Remove only assignments in this project; retain tasks, authorship and the account.
-    Task.assignees.through.objects.filter(
-        task__column__board__project=project, workspaceuser_id=user_id,
-    ).delete()
-    Membership.objects.filter(project=project,user_id=user_id).delete()
 
 
 @login_required(login_url='login_request')
