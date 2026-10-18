@@ -46,6 +46,7 @@ from .serializers import (
     invitation_json,
     project_json,
     public_project,
+    project_member_json,
     snapshot,
     status_key,
     task_json,
@@ -403,8 +404,18 @@ def directory(request):
     }
 
 
-@endpoint(("POST",))
+@endpoint(("GET", "POST"))
 def projects(request):
+    if request.method == "GET":
+        projects_qs = accessible(request.user).order_by(
+            "-created_at", "-pk"
+        )
+        return {
+            "projects": [
+                project_json(project)
+                for project in projects_qs
+            ]
+        }
     data = request.data
     name, description = text(data, "name", 255, True), text(data, "description", 10000)
     roles = role_values(data.get("role"))
@@ -462,12 +473,54 @@ def projects(request):
     return {"project": project_json(p), "snapshot": snapshot(request)}
 
 
-@endpoint(("DELETE",))
+
+@endpoint(("GET", "DELETE"))
 def project_detail(request, project_id):
+    if request.method == "GET":
+        project = project_for(request.user, project_id)
+        return {"project": project_json(project)}
+
     with transaction.atomic():
-        p = project_for(request.user, project_id, manage=True, lock=True)
-        p.delete()
+        project = project_for(
+            request.user,
+            project_id,
+            manage=True,
+            lock=True,
+        )
+        project.delete()
+
     return {"snapshot": snapshot(request)}
+
+
+@endpoint(("GET",))
+def project_members(request, project_id):
+    project = project_for(request.user, project_id)
+
+    memberships = list(
+        Membership.objects.filter(
+            project=project,
+            is_confirmed=True,
+        )
+        .select_related("user")
+        .order_by("pk")
+    )
+
+    members = [
+        project_member_json(project, membership)
+        for membership in memberships
+    ]
+
+    # Include the owner even if no Membership record exists.
+    if not any(
+        membership.user_id == project.owner_id
+        for membership in memberships
+    ):
+        members.append(project_member_json(project))
+
+    return {
+        "projectId": str(project.pk),
+        "members": members,
+    }
 
 
 @endpoint(("POST",))

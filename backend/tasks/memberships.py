@@ -1,3 +1,4 @@
+
 """Project membership changes keep the account and task history intact."""
 
 from django.db.models import Q
@@ -15,5 +16,37 @@ def remove_project_participant(project, user_id):
 
 def accessible(user):
     return Project.objects.filter(
-        Q(owner=user) | Q(memberships__user=user, memberships__is_confirmed=True)
+        Q(owner=user)
+        | Q(memberships__user=user, memberships__is_confirmed=True)
     ).distinct()
+
+
+def is_project_member(user, project):
+    """Return whether the user owns the project or has confirmed membership."""
+    if not user.is_authenticated:
+        return False
+
+    return (
+        project.owner_id == user.pk
+        or Membership.objects.filter(
+            project=project,
+            user=user,
+            is_confirmed=True,
+        ).exists()
+    )
+
+
+def can_manage_project(user, project):
+    """Return whether the user owns the project or is a coordinator."""
+    if not user.is_authenticated:
+        return False
+
+    if project.owner_id == user.pk:
+        return True
+
+    return Membership.objects.filter(
+        project=project,
+        user=user,
+        is_confirmed=True,
+        access_role="coordinator",
+    ).exists()
