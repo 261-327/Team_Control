@@ -1,0 +1,52 @@
+{% extends 'tasks/workspace_base.html' %}
+{% block title %}Мои задачи — Team Control{% endblock %}
+{% block content %}
+<style>
+.dashboard-heading { text-align:center; margin-bottom:24px; }
+.dashboard-filter { display:flex; align-items:end; justify-content:center; gap:12px; flex-wrap:wrap; max-width:360px; margin:0 auto 24px; padding:12px 16px; background:white; border:1px solid #e5e7ef; border-radius:14px; }
+.dashboard-filter .field { margin:0; width:100%; max-width:300px; text-align:center; } .dashboard-filter select { padding:8px 12px; text-align:center; text-align-last:center; }
+.dashboard-sections { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; align-items:start; }
+.dashboard-section { min-width:0; background:#edeff5; padding:22px; border-radius:16px; }
+.dashboard-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.dashboard-section-heading h2 { margin:0; font-size:22px; } .dashboard-count { background:white; color:#5145cd; padding:5px 11px; border-radius:14px; }
+.dashboard-task { background:white; border:1px solid #e3e5ee; border-radius:12px; padding:20px; margin-top:16px; overflow-wrap:anywhere; }
+.dashboard-task h3 { font-size:18px; line-height:1.4; margin:14px 0 10px; }
+.dashboard-task-top { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; font-size:13px; }
+.dashboard-status { background:#efedff; color:#5145cd; border-radius:14px; padding:5px 10px; }
+.dashboard-completed { background:#e7f5eb; color:#287142; }
+.dashboard-task p { font-size:14px; line-height:1.5; } .dashboard-overdue { color:#b42318; }
+.dashboard-empty { background:white; border-radius:10px; padding:24px; margin-top:16px; line-height:1.6; }
+.dashboard-pagination { margin-top:20px; font-size:14px; }
+@media(max-width:800px) { .dashboard-sections { grid-template-columns:1fr; } .dashboard-section { padding:18px; } }
+</style>
+<div class="dashboard-heading"><h1>Мои активные задачи</h1><p class="muted">Выберите проект, чтобы увидеть свои задачи и задачи команды.</p></div>
+<form method="get" class="dashboard-filter" id="dashboard-project-filter"><div class="field">{{ filter_form.project.label_tag }}{{ filter_form.project }}</div>
+{% for error in filter_form.project.errors %}<p class="error" role="alert">{{ error }}</p>{% endfor %}</form>
+<div class="dashboard-sections">
+<section class="dashboard-section" aria-labelledby="my-tasks-heading"><div class="dashboard-section-heading"><h2 id="my-tasks-heading">Мои задачи</h2><span class="dashboard-count">{{ task_count }}</span></div>
+<p class="muted">Назначенные мне активные задачи{% if selected_project %} в проекте «{{ selected_project.name }}»{% else %} из всех проектов{% endif %}.</p>
+{% for task in my_tasks %}<article class="dashboard-task"><div class="dashboard-task-top"><a href="{% url 'project_detail' task.column.board.project_id %}">{{ task.column.board.project.name }}</a><span class="dashboard-status">{{ task.column.name }}</span></div>
+<h3><a href="{% url 'task_edit' task.column.board.project_id task.pk %}">{{ task.title }}</a></h3>{% if task.description %}<p>{{ task.description|truncatechars:160 }}</p>{% endif %}
+{% if task.due_date %}<p class="muted {% if task.is_overdue %}dashboard-overdue{% endif %}">{% if task.is_overdue %}Просрочено · {% else %}Срок · {% endif %}{{ task.due_date|date:'d.m.Y' }}</p>{% endif %}
+<a href="{% url 'task_edit' task.column.board.project_id task.pk %}">Открыть задачу →</a></article>
+{% empty %}<div class="dashboard-empty muted">Назначенных вам активных задач{% if selected_project %} в этом проекте{% endif %} пока нет.</div>{% endfor %}
+</section>
+<section class="dashboard-section" aria-labelledby="project-tasks-heading"><div class="dashboard-section-heading"><h2 id="project-tasks-heading">Задачи проекта</h2>{% if selected_project %}<span class="dashboard-count">{{ project_tasks_page.paginator.count }}</span>{% endif %}</div>
+{% if selected_project %}<p class="muted">Все задачи проекта «{{ selected_project.name }}», включая завершённые.</p>
+{% for task in project_tasks_page %}<article class="dashboard-task"><div class="dashboard-task-top"><span class="muted">{{ selected_project.name }}</span><span class="dashboard-status {% if task.column.is_completed %}dashboard-completed{% endif %}">{{ task.column.name }}</span></div>
+<h3><a href="{% url 'task_edit' selected_project.pk task.pk %}">{{ task.title }}</a></h3>{% if task.description %}<p>{{ task.description|truncatechars:160 }}</p>{% endif %}
+<p class="muted">Исполнитель: {% for assignee in task.assignees.all %}{{ assignee.get_full_name|default:assignee.username }}{% if not forloop.last %}, {% endif %}{% empty %}не назначен{% endfor %}</p>
+<a href="{% url 'task_edit' selected_project.pk task.pk %}">Открыть задачу →</a></article>
+{% empty %}<div class="dashboard-empty muted">В этом проекте пока нет задач.</div>{% endfor %}
+{% if project_tasks_page.has_other_pages %}<nav class="actions dashboard-pagination" aria-label="Страницы задач проекта">{% if project_tasks_page.has_previous %}<a href="?project={{ selected_project.pk }}&tasks_page={{ project_tasks_page.previous_page_number }}">Назад</a>{% endif %}<span>{{ project_tasks_page.number }} / {{ project_tasks_page.paginator.num_pages }}</span>{% if project_tasks_page.has_next %}<a href="?project={{ selected_project.pk }}&tasks_page={{ project_tasks_page.next_page_number }}">Далее</a>{% endif %}</nav>{% endif %}
+<p style="margin-top:20px"><a href="{% url 'project_detail' selected_project.pk %}">Открыть доску проекта →</a></p>
+{% else %}<div class="dashboard-empty muted">Выберите проект в списке выше — здесь появятся задачи его участников.</div>{% endif %}
+</section>
+</div>
+<script>
+(() => {
+    const form = document.getElementById('dashboard-project-filter');
+    const select = form.querySelector('select[name="project"]');
+    select.addEventListener('change', () => form.requestSubmit());
+})();
+</script>{% endblock %}

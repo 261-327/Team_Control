@@ -10,7 +10,7 @@ from django.contrib.auth import authenticate, login as django_login
 from django.contrib.auth.forms import UserCreationForm
 from django.core.mail import send_mail
 from django.db import transaction, IntegrityError
-from django.db.models import Q
+from django.db.models import Q, Prefetch, F
 from django.core.paginator import Paginator
 from django.db.models.functions import Lower, Trim
 from django.shortcuts import render, redirect, get_object_or_404
@@ -18,7 +18,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_http_methods
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone, translation
-from .models import WorkspaceUser, Project, Board, Column, Task, Membership
+from .models import WorkspaceUser, Project, Board, Column, Task, Membership, ColleagueConnection, ProjectInvitation
 
 
 class WorkspaceUserCreationForm(UserCreationForm):
@@ -176,10 +176,45 @@ def project_participants(project):
     return WorkspaceUser.objects.filter(Q(pk=project.owner_id) | Q(memberships__project=project, memberships__is_confirmed=True)).distinct().order_by('username')
 
 
+class DashboardFilterForm(forms.Form):
+    project=forms.ModelChoiceField(queryset=Project.objects.none(),required=False,label='Проект',empty_label='Все проекты',
+        error_messages={'invalid_choice':'Выберите проект, в котором вы участвуете.'})
+
+    def __init__(self,*args,user,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.fields['project'].queryset=accessible_projects(user).order_by('name','pk')
+
+
 def home_view(request):
     if not request.user.is_authenticated:
         return render(request, 'tasks/welcome.html')
-    return render(request, 'tasks/home.html', {'projects': accessible_projects(request.user).order_by('-created_at', '-pk')})
+    form=DashboardFilterForm(request.GET,user=request.user)
+    tasks=Task.objects.filter(assignees=request.user,column__is_completed=False,
+        column__board__project__in=accessible_projects(request.user)).select_related('column__board__project').distinct()
+    if form.is_valid():
+        if form.cleaned_data['project']:
+            tasks=tasks.filter(column__board__project=form.cleaned_data['project'])
+    else:
+        tasks=tasks.none()
+    tasks=tasks.order_by(F('due_date').asc(nulls_last=True),'-updated_at','pk')
+    my_tasks=list(tasks)
+    selected_project=form.cleaned_data.get('project') if form.is_valid() else None
+    project_tasks=Task.objects.none()
+    if selected_project:
+        project_tasks=Task.objects.filter(column__board__project=selected_project).select_related(
+            'column__board__project').prefetch_related('assignees').order_by('column__board_id','column__position','position','pk')
+    project_page=Paginator(project_tasks,10).get_page(request.GET.get('tasks_page'))
+    now=timezone.now()
+    for task in my_tasks:
+        task.is_overdue=bool(task.due_date and task.due_date < now)
+    return render(request,'tasks/dashboard.html',{'my_tasks':my_tasks,'task_count':len(my_tasks),
+        'filter_form':form,'selected_project':selected_project,'project_tasks_page':project_page})
+
+
+
+@login_required(login_url='login_request')
+def projects_list_view(request):
+    return render(request,'tasks/home.html',{'projects':accessible_projects(request.user).select_related('owner').order_by('-created_at','-pk')})
 
 
 def login_request_view(request):
@@ -306,7 +341,7 @@ def project_create_view(request):
                 **{key: form.cleaned_data[key] for key in ('role','developer_specialization','custom_role')})
             board = Board.objects.create(project=project, name='Основная доска')
             Column.objects.bulk_create([
-                Column(board=board, name=name, position=position)
+                Column(board=board, name=name, position=position, is_completed=name == 'Готово')
                 for position, name in enumerate(['К выполнению', 'В работе', 'Готово'])
             ])
         messages.success(request, 'Проект создан.')
@@ -416,7 +451,7 @@ def task_edit_view(request, project_id, task_id):
 class ColumnCreationForm(forms.ModelForm):
     class Meta:
         model = Column
-        fields = ('name',)
+        fields = ('name','is_completed')
         error_messages = {'name': {
             'required': 'Введите название статуса.',
             'max_length': 'Название статуса должно содержать не больше 100 символов.',
@@ -436,7 +471,7 @@ def column_create_view(request, project_id, board_id):
                 messages.error(request, 'Статус с таким названием уже есть на этой доске.')
             else:
                 last = board.columns.order_by('-position', '-pk').first()
-                Column.objects.create(board=board, name=name, position=last.position + 1 if last else 0)
+                Column.objects.create(board=board, name=name, position=last.position + 1 if last else 0, is_completed=form.cleaned_data['is_completed'])
                 messages.success(request, 'Новый статус добавлен.')
         else:
             for error in form.errors.get('name', []):
@@ -728,3 +763,183 @@ def column_delete_view(request, project_id, column_id):
                     return redirect('project_detail', project_id=project.pk)
     return render(request, 'tasks/column_delete.html', {'project': project, 'column': column, 'form': form,
         'task_count': count, 'last_column': last_column})
+
+
+class ProfileForm(forms.ModelForm):
+    class Meta:
+        model = WorkspaceUser
+        fields = ('first_name', 'last_name', 'bio')
+        labels = {'first_name':'Имя', 'last_name':'Фамилия', 'bio':'О себе'}
+        widgets = {'first_name':forms.TextInput(attrs={'autocomplete':'given-name'}),
+                   'last_name':forms.TextInput(attrs={'autocomplete':'family-name'}),
+                   'bio':forms.Textarea(attrs={'rows':5,'maxlength':500,'placeholder':'Расскажите о себе и своём опыте'})}
+        error_messages = {'first_name':{'max_length':'Имя должно содержать не больше 150 символов.'},
+                          'last_name':{'max_length':'Фамилия должна содержать не больше 150 символов.'},
+                          'bio':{'max_length':'Описание должно содержать не больше 500 символов.'}}
+
+
+@login_required(login_url='login_request')
+@require_http_methods(['GET','POST'])
+@translation.override('ru')
+def profile_view(request):
+    form=ProfileForm(request.POST if request.method=='POST' else None,instance=request.user)
+    if request.method=='POST' and form.is_valid():
+        profile=form.save(commit=False)
+        # Do not overwrite password, OTP or account privileges loaded earlier in the request.
+        profile.save(update_fields=['first_name','last_name','bio'])
+        messages.success(request,'Данные профиля сохранены.')
+        return redirect('profile')
+    projects=accessible_projects(request.user).prefetch_related(Prefetch('memberships',
+        queryset=Membership.objects.filter(user=request.user),to_attr='my_memberships')).order_by('-created_at','-pk')
+    tasks=Task.objects.filter(assignees=request.user,column__board__project__in=accessible_projects(request.user)).select_related(
+        'column__board__project').distinct().order_by('-updated_at','-pk')
+    project_page=Paginator(projects,8).get_page(request.GET.get('projects_page'))
+    task_page=Paginator(tasks,10).get_page(request.GET.get('tasks_page'))
+    initials=''.join(part[0] for part in [request.user.first_name,request.user.last_name] if part) or request.user.username[:2]
+    context={'form':form,'project_page':project_page,'task_page':task_page,'initials':initials.upper()}
+    context.update(colleague_profile_context(request))
+    return render(request,'tasks/profile.html',context)
+
+
+class ColleagueSearchForm(forms.Form):
+    colleague=forms.CharField(max_length=150,label='Никнейм коллеги',error_messages={
+        'required':'Введите никнейм пользователя.', 'max_length':'Никнейм не должен быть длиннее 150 символов.'})
+
+
+def find_colleague(username):
+    users=WorkspaceUser.objects.filter(is_active=True)
+    user=users.filter(username=username).first()
+    if not user and username.startswith('@'):
+        user=users.filter(username=username[1:]).first()
+    return user
+
+
+def colleague_profile_context(request):
+    links=ColleagueConnection.objects.filter(Q(user_low=request.user)|Q(user_high=request.user)).select_related(
+        'user_low','user_high','requested_by').order_by('-updated_at','-pk')
+    colleagues=[]; incoming=[]; outgoing=[]
+    for link in links:
+        other=link.user_high if link.user_low_id==request.user.pk else link.user_low
+        row={'person':other,'connection':link}
+        if link.status=='accepted': colleagues.append(row)
+        elif link.requested_by_id==request.user.pk: outgoing.append(row)
+        else: incoming.append(row)
+    form=ColleagueSearchForm(request.GET if 'colleague' in request.GET else None)
+    found=None; relationship=None
+    if form.is_bound and form.is_valid():
+        found=find_colleague(form.cleaned_data['colleague'])
+        if not found:
+            form.add_error('colleague','Пользователь с таким никнеймом не найден.')
+        elif found.pk==request.user.pk:
+            form.add_error('colleague','Себя добавить в коллеги нельзя.'); found=None
+        else:
+            low,high=sorted([request.user.pk,found.pk])
+            relationship=ColleagueConnection.objects.filter(user_low_id=low,user_high_id=high).first()
+    return {'colleague_search_form':form,'found_colleague':found,'colleague_relationship':relationship,
+        'project_invitations':ProjectInvitation.objects.filter(recipient=request.user).select_related('project','sender'), 'colleagues':colleagues,'incoming_colleague_requests':incoming,'outgoing_colleague_requests':outgoing}
+
+
+@login_required(login_url='login_request')
+@require_POST
+def colleague_request_view(request):
+    form=ColleagueSearchForm(request.POST)
+    if not form.is_valid():
+        messages.error(request,'Введите никнейм пользователя длиной до 150 символов.')
+        return redirect('profile')
+    recipient=find_colleague(form.cleaned_data['colleague'])
+    if not recipient:
+        messages.error(request,'Пользователь с таким никнеймом не найден.')
+    elif recipient.pk==request.user.pk:
+        messages.error(request,'Себя добавить в коллеги нельзя.')
+    else:
+        low,high=sorted([request.user.pk,recipient.pk])
+        with transaction.atomic():
+            # Lock both users in a stable order to serialize simultaneous opposite requests.
+            locked=list(WorkspaceUser.objects.select_for_update().filter(pk__in=[low,high],is_active=True).order_by('pk'))
+            if len(locked)!=2:
+                messages.error(request,'Пользователь больше недоступен.')
+                return redirect('profile')
+            link,created=ColleagueConnection.objects.get_or_create(user_low_id=low,user_high_id=high,defaults={'requested_by':request.user})
+            if created:
+                messages.success(request,'Заявка пользователю '+recipient.username+' отправлена.')
+            elif link.status=='accepted':
+                messages.info(request,'Вы уже коллеги.')
+            elif link.requested_by_id==request.user.pk:
+                messages.info(request,'Заявка уже отправлена. Ожидайте ответа.')
+            else:
+                messages.info(request,'Этот пользователь уже отправил вам заявку. Примите её в разделе входящих заявок.')
+    return redirect('profile')
+
+
+@login_required(login_url='login_request')
+@require_POST
+def colleague_response_view(request,connection_id):
+    with transaction.atomic():
+        link=get_object_or_404(ColleagueConnection.objects.select_for_update().filter(
+            Q(user_low=request.user)|Q(user_high=request.user)),pk=connection_id)
+        action=request.POST.get('action')
+        sender=link.requested_by_id==request.user.pk
+        if action=='accept' and link.status=='pending' and not sender:
+            link.status='accepted'; link.save(update_fields=['status','updated_at'])
+            messages.success(request,'Заявка принята. Пользователь добавлен в коллеги.')
+        elif action=='decline' and link.status=='pending' and not sender:
+            link.delete(); messages.success(request,'Заявка отклонена.')
+        elif action=='cancel' and link.status=='pending' and sender:
+            link.delete(); messages.success(request,'Заявка отменена.')
+        elif action=='remove' and link.status=='accepted':
+            link.delete(); messages.success(request,'Пользователь удалён из коллег.')
+        else:
+            messages.error(request,'Это действие недоступно для данной заявки.')
+    return redirect('profile')
+
+
+@login_required(login_url='login_request')
+@require_http_methods(['GET', 'POST'])
+def colleague_invite_view(request, user_id):
+    recipient = get_object_or_404(WorkspaceUser, pk=user_id, is_active=True)
+    low, high = sorted([request.user.pk, recipient.pk])
+    get_object_or_404(ColleagueConnection, user_low_id=low, user_high_id=high, status='accepted')
+    class InvitationForm(forms.Form):
+        project = forms.ModelChoiceField(label='Ваш проект', queryset=Project.objects.filter(owner=request.user).exclude(pk__in=Membership.objects.filter(user=recipient, is_confirmed=True).values('project_id')).order_by('name'), empty_label='Выберите проект')
+    form = InvitationForm(request.POST if request.method == 'POST' else None)
+    if request.method == 'POST' and form.is_valid():
+        with transaction.atomic():
+            project = get_object_or_404(Project.objects.select_for_update(), pk=form.cleaned_data['project'].pk, owner=request.user)
+            if Membership.objects.filter(project=project, user=recipient, is_confirmed=True).exists():
+                messages.info(request, 'Коллега уже участвует в проекте.')
+            else:
+                _, created = ProjectInvitation.objects.get_or_create(project=project, recipient=recipient, defaults={'sender':request.user})
+                messages.success(request, 'Приглашение отправлено.' if created else 'Приглашение уже отправлено.')
+        return redirect('profile')
+    return render(request, 'tasks/colleague_invite.html', {'form':form, 'recipient':recipient})
+
+
+@login_required(login_url='login_request')
+@require_http_methods(['GET', 'POST'])
+def project_invitation_view(request, invitation_id):
+    with transaction.atomic():
+        invitation = get_object_or_404(ProjectInvitation.objects.select_for_update(), pk=invitation_id, recipient=request.user)
+        project = get_object_or_404(Project.objects.select_for_update(), pk=invitation.project_id, owner_id=invitation.sender_id)
+        if request.method == 'POST' and request.POST.get('action') == 'decline':
+            invitation.delete()
+            messages.success(request, 'Приглашение отклонено.')
+            return redirect('profile')
+        form = MembershipRoleForm(request.POST if request.method == 'POST' else None)
+        if request.method == 'POST' and form.is_valid():
+            membership = Membership.objects.filter(project=project, user=request.user).first()
+            if not membership or not membership.is_confirmed:
+                Membership.objects.update_or_create(project=project, user=request.user, defaults={
+                    **{name:form.cleaned_data[name] for name in ('role','developer_specialization','custom_role')}, 'is_confirmed':True})
+            invitation.delete()
+            messages.success(request, 'Вы присоединились к проекту.')
+            return redirect('project_detail', project_id=project.pk)
+    return render(request, 'tasks/project_invitation.html', {'form':form, 'project':project})
+
+
+@login_required(login_url='login_request')
+@require_http_methods(['GET'])
+def colleague_profile_view(request, user_id):
+    person = get_object_or_404(WorkspaceUser, pk=user_id, is_active=True)
+    low, high = sorted([request.user.pk, person.pk])
+    get_object_or_404(ColleagueConnection, user_low_id=low, user_high_id=high, status='accepted')
+    return render(request, 'tasks/colleague_profile.html', {'person':person})

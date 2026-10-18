@@ -1,10 +1,17 @@
 from django.contrib import admin
 from django.urls import path
 from django.contrib.auth.views import LogoutView
-from tasks.views import column_edit_view, column_delete_view, project_delete_view, task_delete_view, project_leave_view, project_remove_member_view, project_search_view, project_join_view, column_limit_view, column_create_view, task_move_view, task_edit_view, task_create_view, project_create_view, project_detail_view, register_verify_view, register_view, home_view, login_request_view, login_verify_view
+from tasks.views import colleague_profile_view, colleague_invite_view, project_invitation_view, colleague_request_view, colleague_response_view, projects_list_view, profile_view, column_edit_view, column_delete_view, project_delete_view, task_delete_view, project_leave_view, project_remove_member_view, project_search_view, project_join_view, column_limit_view, column_create_view, task_move_view, task_edit_view, task_create_view, project_create_view, project_detail_view, register_verify_view, register_view, home_view, login_request_view, login_verify_view
 
 urlpatterns = [
+    path('profile/colleagues/<int:user_id>/', colleague_profile_view, name='colleague_profile'),
+    path('profile/colleagues/<int:user_id>/invite/', colleague_invite_view, name='colleague_invite'),
+    path('profile/invitations/<int:invitation_id>/', project_invitation_view, name='project_invitation'),
     path('', home_view, name='home'),
+    path('projects/', projects_list_view, name='projects_list'),
+    path('profile/colleagues/request/', colleague_request_view, name='colleague_request'),
+    path('profile/colleagues/<int:connection_id>/respond/', colleague_response_view, name='colleague_response'),
+    path('profile/', profile_view, name='profile'),
     path('logout/', LogoutView.as_view(next_page='home'), name='logout'),
     path('projects/<int:project_id>/boards/<int:board_id>/columns/new/', column_create_view, name='column_create'),
     path('projects/<int:project_id>/tasks/<int:task_id>/move/', task_move_view, name='task_move'),
