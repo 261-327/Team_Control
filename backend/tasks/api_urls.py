@@ -1,7 +1,12 @@
 from django.urls import path
-from . import api
+from . import api, colleagues_api, notifications_api
 
 urlpatterns = [
+    path("notifications/", notifications_api.notifications),
+    path("notifications/<str:kind>/<str:notification_id>/respond/", notifications_api.respond_notification),
+    path("colleagues/<int:connection_id>/invite/", colleagues_api.invite_colleague),
+    path("colleagues/", colleagues_api.colleagues),
+    path("colleagues/<int:connection_id>/respond/", colleagues_api.colleague_response),
     path("health/", api.health),
     path("bootstrap/", api.bootstrap),
     path("auth/login/", api.auth_login),

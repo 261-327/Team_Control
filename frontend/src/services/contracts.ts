@@ -1,5 +1,6 @@
 import type {
   AssistantReply,
+  NotificationItem,
   Invitation,
   Material,
   Project,
@@ -28,6 +29,8 @@ export interface DataClient {
     passwordConfirm: string;
   }): Promise<AuthChallenge>;
   logout(): Promise<void>;
+  getNotifications(): Promise<{ notifications: NotificationItem[] }>;
+  respondNotification(kind: NotificationItem["kind"], id: string, action: "accept" | "decline", role?: RoleInput): Promise<{ notifications: NotificationItem[] }>;
   updateProfile(name: string, bio: string): Promise<void>;
   createTask(input: TaskInput): Promise<Task>;
   updateTask(id: string, input: TaskInput): Promise<void>;

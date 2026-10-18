@@ -99,7 +99,7 @@ def challenge_json(request, user, mode):
         "email": user.email,
         "mode": mode,
         "expiresAt": int(user.otp_expiry.timestamp() * 1000),
-        "resendAt": int(user.otp_expiry.timestamp() * 1000),
+        "resendAt": int(user.otp_resend_at.timestamp() * 1000),
         "delivery": "console"
         if settings.EMAIL_BACKEND.endswith("console.EmailBackend")
         else "email",

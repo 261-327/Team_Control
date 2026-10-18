@@ -58,6 +58,11 @@ class WorkspaceUser(AbstractUser):
         self.save()
         return code
 
+    @property
+    def otp_resend_at(self):
+        # Codes live for five minutes; sending again is allowed after one minute.
+        return self.otp_expiry - timedelta(minutes=4) if self.otp_expiry else None
+
     def is_otp_valid(self, code):
         """Проверяет корректность и срок действия кода"""
         if (
