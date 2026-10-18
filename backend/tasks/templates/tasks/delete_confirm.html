@@ -19,3 +19,4 @@
 {% if deleting_project %}<a class="button secondary" href="{% url 'projects_list' %}">Отмена</a>{% else %}<a class="button secondary" href="{% url 'task_edit' project.pk task.pk %}">Отмена</a>{% endif %}</div>
 </form></section>
 {% endblock %}
+

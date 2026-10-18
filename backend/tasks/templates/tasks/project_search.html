@@ -15,3 +15,4 @@
 {% empty %}<p class="muted">Доступных проектов с таким названием нет. Проекты, в которых вы уже участвуете, находятся в разделе «Мои проекты».</p>{% endfor %}</div>
 {% if page.has_other_pages %}<nav class="actions" aria-label="Страницы результатов" style="margin-top:20px">{% if page.has_previous %}<a href="?q={{ query|urlencode }}&page={{ page.previous_page_number }}">Назад</a>{% endif %}<span>{{ page.number }} / {{ page.paginator.num_pages }}</span>{% if page.has_next %}<a href="?q={{ query|urlencode }}&page={{ page.next_page_number }}">Далее</a>{% endif %}</nav>{% endif %}
 {% endif %}{% endblock %}
+

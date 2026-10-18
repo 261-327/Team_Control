@@ -260,7 +260,7 @@ class ProjectCreationTests(TestCase):
         self.assertEqual(project.description, 'Our goal')
         self.assertRedirects(response, f'/projects/{project.pk}/')
         self.assertEqual(list(project.boards.get().columns.values_list('name', flat=True)), ['К выполнению', 'В работе', 'Готово'])
-        self.assertContains(self.client.get('/projects/'), 'Our project')
+        self.assertContains(self.client.get('/'), 'Our project')
 
     def test_invalid_name_and_optional_description(self):
         from .models import Project
@@ -275,7 +275,7 @@ class ProjectCreationTests(TestCase):
         from .models import Project
         project = Project.objects.create(name='Secret project', owner=self.other)
         self.client.force_login(self.user)
-        self.assertNotContains(self.client.get('/projects/'), 'Secret project')
+        self.assertNotContains(self.client.get('/'), 'Secret project')
         self.assertEqual(self.client.get(f'/projects/{project.pk}/').status_code, 404)
 
     def test_creation_is_atomic(self):
@@ -644,7 +644,7 @@ class ProjectMembershipTests(TestCase):
         self.assertContains(self.client.get('/projects/search/', {'q': 'find this'}), 'Find This Project')
         self.assertEqual(self.client.get(f'/projects/{self.project.pk}/').status_code, 404)
         self.assertRedirects(self.client.post(self.join_url,{'role':'designer'}), f'/projects/{self.project.pk}/')
-        self.assertContains(self.client.get('/projects/'), 'Find This Project')
+        self.assertContains(self.client.get('/'), 'Find This Project')
         page = self.client.get(f'/projects/{self.project.pk}/')
         self.assertContains(page, 'newmember')
         self.assertContains(page, 'membershipowner')
@@ -775,7 +775,7 @@ class ProjectExitTests(TestCase):
         self.assertRedirects(self.client.post(self.leave),'/')
         self.assert_removed_only_from_this_project()
         self.assertEqual(self.client.get(f'/projects/{self.project.pk}/').status_code,404)
-        self.assertNotContains(self.client.get('/projects/'),'Exit project')
+        self.assertNotContains(self.client.get('/'),'Exit project')
 
     def test_owner_can_remove_member(self):
         self.client.force_login(self.owner)
@@ -818,7 +818,6 @@ class ProjectExitTests(TestCase):
         self.assertEqual(self.client.post(self.leave).status_code,302)
 
     def test_cleanup_rolls_back_if_membership_removal_fails(self):
-        from .models import Project
         self.client.force_login(self.owner)
         with patch('tasks.views.Membership.objects.filter',side_effect=RuntimeError('failure')):
             with self.assertRaises(RuntimeError):
@@ -979,7 +978,7 @@ class NumericProjectDeletionTests(TestCase):
         user=WorkspaceUser.objects.create_user(username='modalowner',email='modalowner@example.com')
         project=Project.objects.create(name='Modal',owner=user)
         column=Column.objects.create(board=Board.objects.create(project=project,name='Board'),name='Todo')
-        task=Task.objects.create(title='<Task>',column=column)
+        Task.objects.create(title='<Task>',column=column)
         self.client.force_login(user)
         page=self.client.get(f'/projects/{project.pk}/')
         self.assertContains(page,'<dialog id="task-delete-dialog"')
@@ -1006,8 +1005,8 @@ class MembershipModelAndAdminTests(TestCase):
         second.role='analyst'; second.save()
         first.refresh_from_db(); self.assertEqual(first.role,'developer')
         self.client.force_login(self.user)
-        self.assertContains(self.client.get('/projects/'),'Backend Team')
-        self.assertContains(self.client.get('/projects/'),'Design Team')
+        self.assertContains(self.client.get('/'),'Backend Team')
+        self.assertContains(self.client.get('/'),'Design Team')
 
     def test_admin_can_inspect_both_teams_and_the_same_user(self):
         Membership.objects.create(user=self.user,project=self.first,role='designer',is_confirmed=True)
@@ -1068,6 +1067,7 @@ class ExplicitMembershipMigrationTests(TransactionTestCase):
             self.assertNotIn('role',[f.name for f in apps.get_model('tasks','WorkspaceUser')._meta.fields])
         finally:
             MigrationExecutor(connection).migrate(MigrationExecutor(connection).loader.graph.leaf_nodes())
+
 
 
 class PersonalProfileTests(TestCase):
@@ -1141,6 +1141,7 @@ class PersonalProfileTests(TestCase):
         self.assertEqual(len(self.client.get('/profile/',{'tasks_page':2}).context['task_page']),3)
 
 
+
 class ActiveTaskDashboardTests(TestCase):
     def setUp(self):
         from .models import Project,Board,Column,Task
@@ -1203,6 +1204,7 @@ class ActiveTaskDashboardTests(TestCase):
         self.assertFalse(columns.get(name='К выполнению').is_completed)
 
 
+
 class DashboardSectionsTests(ActiveTaskDashboardTests):
     def test_selected_project_tasks_include_team_and_completed_tasks(self):
         self.client.force_login(self.user)
@@ -1226,6 +1228,7 @@ class DashboardSectionsTests(ActiveTaskDashboardTests):
         self.assertIsNone(page.context['selected_project'])
         self.assertEqual(page.context['project_tasks_page'].paginator.count,0)
         self.assertNotContains(page,'Inaccessible stale task')
+
 
 
 class ColleagueConnectionTests(TestCase):
@@ -1302,6 +1305,7 @@ class ColleagueConnectionTests(TestCase):
         self.assertEqual(self.client.post('/profile/colleagues/request/',{'colleague':'bob'}).status_code,302)
 
 
+
 class ProjectInvitationTests(TestCase):
     def setUp(self):
         from .models import Project, ColleagueConnection
@@ -1365,6 +1369,7 @@ class ProjectInvitationTests(TestCase):
         self.assertFalse(ProjectInvitation.objects.exists())
 
 
+
 class ColleagueProfileTests(TestCase):
     def setUp(self):
         from .models import ColleagueConnection
@@ -1401,6 +1406,7 @@ class ColleagueProfileTests(TestCase):
         self.assertEqual(self.client.get(self.url).status_code,404)
 
 
+
 class NotificationMenuTests(TestCase):
     def test_counts_only_incoming_pending_items_and_clears_after_response(self):
         from .models import ColleagueConnection, Project, ProjectInvitation
@@ -1420,3 +1426,4 @@ class NotificationMenuTests(TestCase):
         self.assertContains(self.client.get('/profile/'),'Новых уведомлений нет.')
         self.client.force_login(sender)
         self.assertContains(self.client.get('/projects/'),'aria-label="Уведомления: 0"')
+

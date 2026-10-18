@@ -19,3 +19,4 @@
 </a><details class="colleague-menu"><summary aria-label="Действия с коллегой {{ row.person.username }}">⋯</summary><div class="colleague-menu-panel"><a href="{% url 'colleague_invite' row.person.pk %}">Пригласить в проект</a><form method="post" action="{% url 'colleague_response' row.connection.pk %}" data-confirm="Удалить {{ row.person.username }} из коллег?" onsubmit="return confirm(this.dataset.confirm)">{% csrf_token %}<button class="danger-button" type="submit" name="action" value="remove">Удалить из коллег</button></form></div></details></div>
 {% empty %}<p class="muted">Вы пока никого не добавили. После принятия заявки коллега появится здесь.</p>{% endfor %}
 </section>
+

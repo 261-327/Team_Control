@@ -1,41 +1,5 @@
-services:
-  db:
-    image: postgres:15-alpine
-    container_name: django_db
-    environment:
-      POSTGRES_DB: team_control_db
-      POSTGRES_USER: postgres_user
-      POSTGRES_PASSWORD: postgres_password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: django_backend
-    command: python manage.py runserver 0.0.0.0:8000
-    volumes:
-      - .:/app
-    ports:
-      - "8000:8000"
-    environment:
-      - DB_NAME=team_control_db
-      - DB_USER=postgres_user
-      - DB_PASSWORD=postgres_password
-      - DB_HOST=db
-      - DB_PORT=5432
-      - EMAIL_HOST=${EMAIL_HOST:-}
-      - EMAIL_PORT=${EMAIL_PORT:-587}
-      - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
-      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
-      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-true}
-      - EMAIL_USE_SSL=${EMAIL_USE_SSL:-false}
-      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-}
-    depends_on:
-      - db
-
-volumes:
-  postgres_data:
+# Compatibility with the previous command: cd backend && docker compose up --build
+# Both entry points share the same services and the existing PostgreSQL volume.
+name: backend
+include:
+  - ../compose.yaml

@@ -14,3 +14,4 @@ def workspace_notifications(context):
     invitations = list(ProjectInvitation.objects.filter(recipient=user).select_related('project','sender'))
     return {'notification_count':len(colleagues)+len(invitations), 'notification_colleagues':colleagues,
             'notification_invitations':invitations}
+

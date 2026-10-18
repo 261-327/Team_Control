@@ -16,3 +16,4 @@ class Migration(migrations.Migration):
         migrations.AddField(model_name='column',name='is_completed',field=models.BooleanField(default=False,verbose_name='Завершает задачу')),
         migrations.RunPython(mark_completed_columns,migrations.RunPython.noop),
     ]
+
