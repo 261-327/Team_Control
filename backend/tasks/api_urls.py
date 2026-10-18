@@ -12,6 +12,10 @@ urlpatterns = [
     path("profile/", api.profile),
     path("directory/", api.directory),
     path("projects/", api.projects),
+    path(
+    "projects/<int:project_id>/members/",
+    api.project_members,
+),
     path("projects/<int:project_id>/", api.project_detail),
     path("projects/<int:project_id>/join/", api.join_project),
     path("projects/<int:project_id>/leave/", api.leave_project),
