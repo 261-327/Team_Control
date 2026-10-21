@@ -1,0 +1,5 @@
+<resources>
+    <style name="Theme.SIPI_AI" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <!-- можно оставить цвета, если они есть -->
+    </style>
+</resources>
