@@ -130,3 +130,12 @@ export type AssistantHistory = {
   turns: AssistantTurn[];
   capabilities: { model: string; chatReady: boolean; imagesReady: boolean; local: boolean };
 };
+
+export type NotificationItem = {
+  id: string;
+  kind: "colleague" | "project" | "legacy_project";
+  title: string;
+  description: string;
+  createdAt: string;
+  projectId?: string;
+};

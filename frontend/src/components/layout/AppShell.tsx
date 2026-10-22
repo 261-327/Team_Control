@@ -15,7 +15,9 @@ const AssistantPanel = dynamic(() =>
   import("@/features/assistant/AssistantPanel").then((module) => module.AssistantPanel),
 );
 import type { Task } from "@/types/domain";
-import { dateLabel, urgency } from "@/lib/format";
+import { urgency } from "@/lib/format";
+
+import { NotificationsBell } from "./NotificationsBell";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const data = useData();
@@ -24,7 +26,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobile, setMobile] = useState(false);
   const [search, setSearch] = useState(false);
   const [query, setQuery] = useState("");
-  const [notifications, setNotifications] = useState(false);
   const [help, setHelp] = useState(false);
   const [assistant, setAssistant] = useState<{ message?: string } | null>(null);
   const [taskForm, setTaskForm] = useState<{
@@ -292,14 +293,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <span>Поиск по пространству</span>
                 <kbd>⌘ K</kbd>
               </button>
-              <button
-                className="notification-button icon-button"
-                aria-label="Уведомления"
-                onClick={() => setNotifications(true)}
-              >
-                <Icon name="bell" size={20} />
-                {attention.length > 0 && <i />}
-              </button>
+              <NotificationsBell key={data.sessionId} attention={attention} />
               <Link className="topbar-avatar" href="/profile" aria-label="Открыть профиль">
                 <Avatar user={user} />
               </Link>
@@ -432,46 +426,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </>
             )}
           </div>
-        </Modal>
-      )}
-      {notifications && (
-        <Modal
-          title="Центр внимания"
-          description="Важное по твоим проектам"
-          onClose={() => setNotifications(false)}
-          sheet
-        >
-          {attention.length ? (
-            attention.map((t) => (
-              <Link
-                className="notification-item"
-                href={`/projects/${t.projectId}/tasks/${t.id}`}
-                key={t.id}
-                onClick={() => setNotifications(false)}
-              >
-                <span
-                  className={`notification-icon ${t.status === "in_review" ? "lilac" : "peach"}`}
-                >
-                  <Icon name={t.status === "in_review" ? "review" : "clock"} />
-                </span>
-                <div>
-                  <strong>{t.title}</strong>
-                  <p>
-                    {t.status === "in_review"
-                      ? "Ожидает твоей проверки"
-                      : `Срок прошёл · ${dateLabel(t.deadlineAt)}`}
-                  </p>
-                </div>
-                <Icon name="chevron" size={17} />
-              </Link>
-            ))
-          ) : (
-            <EmptyState
-              icon="checkCircle"
-              title="Нет новых уведомлений"
-              description="Здесь появятся срочные задачи и работы на проверке."
-            />
-          )}
         </Modal>
       )}
       {help && (

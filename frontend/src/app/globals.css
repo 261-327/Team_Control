@@ -8705,3 +8705,275 @@ button.stat-card:hover {
     font-size: 16px;
   }
 }
+
+/* Keep colleagues aligned with the account card, independently of the edit form. */
+.profile-sidebar {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.profile-colleagues {
+  padding: 20px;
+  min-width: 0;
+  overflow: visible;
+}
+.profile-colleagues-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 16px;
+}
+.profile-colleagues-heading h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.profile-colleagues-count {
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 8px;
+  background: #f4f2fa;
+  color: #706a85;
+  font-size: 12px;
+}
+.profile-colleague-add {
+  margin-bottom: 12px;
+}
+.profile-colleague-add > summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  list-style: none;
+  cursor: pointer;
+  padding: 10px;
+  border: 1px dashed #dedce7;
+  border-radius: 10px;
+  color: #6b647b;
+  font-size: 12px;
+}
+.profile-colleague-add > summary::marker,
+.profile-colleague-menu > summary::marker {
+  content: "";
+}
+.profile-colleague-add > summary::-webkit-details-marker,
+.profile-colleague-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.profile-colleague-add > summary:hover {
+  background: #f8f7fc;
+}
+.profile-colleague-add .field input {
+  width: 100%;
+  min-width: 0;
+}
+.profile-colleague-submit {
+  width: 100%;
+}
+.profile-colleagues > h3 {
+  margin: 20px 0 4px;
+  font-size: 12px;
+  color: #777382;
+  font-weight: 500;
+}
+.profile-colleagues > p {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 12px 0 0;
+  overflow-wrap: anywhere;
+}
+.profile-colleague-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0eef5;
+}
+.profile-colleague-row:last-of-type {
+  border-bottom: 0;
+}
+.profile-colleague-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  background: none;
+  border: 0;
+  text-align: left;
+  color: inherit;
+  border-radius: 8px;
+}
+.profile-colleague-profile:hover .profile-colleague-person strong {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.profile-colleague-avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: #eee8ff;
+  color: #7761ba;
+  font-size: 13px;
+}
+.profile-colleague-person {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  text-align: left;
+}
+.profile-colleague-person strong {
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-colleague-person > .muted {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-colleague-pending {
+  flex-wrap: wrap;
+}
+.profile-colleague-pending > div {
+  width: 100%;
+}
+.profile-colleague-pending .btn {
+  min-height: 30px;
+  padding: 6px 9px;
+  font-size: 11px;
+}
+.profile-colleague-menu {
+  position: relative;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.profile-colleague-menu > summary {
+  display: grid;
+  place-items: center;
+  list-style: none;
+  cursor: pointer;
+  width: 30px;
+  height: 32px;
+  border-radius: 8px;
+  color: #8a8493;
+  font-size: 23px;
+  line-height: 1;
+}
+.profile-colleague-menu > summary:hover,
+.profile-colleague-menu[open] > summary {
+  background: #f3f1f8;
+}
+.profile-colleague-menu-panel {
+  position: absolute;
+  top: 38px;
+  right: 0;
+  width: 205px;
+  padding: 6px;
+  border: 1px solid #eae7f0;
+  border-radius: 12px;
+  background: var(--panel, #fff);
+  box-shadow: 0 8px 28px #29233316;
+  z-index: 20;
+}
+.profile-colleague-menu-panel > button {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  text-align: left;
+  padding: 10px;
+  font-size: 12px;
+  color: inherit;
+}
+.profile-colleague-menu-panel > button:hover {
+  background: #f7f5fa;
+}
+.profile-colleague-menu-panel > .profile-colleague-remove {
+  color: #b64c5f;
+}
+.profile-colleagues summary:focus-visible,
+.profile-colleague-profile:focus-visible {
+  outline: 2px solid #8e7cba;
+  outline-offset: 3px;
+}
+@media (max-width: 700px) {
+  .profile-colleagues {
+    padding: 20px;
+  }
+}
+
+.notification-button .notification-badge {
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  display: grid;
+  place-items: center;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border: 2px solid var(--panel, #fff);
+  border-radius: 10px;
+  background: #e3aa27;
+  color: #332811;
+  font-size: 10px;
+  font-weight: 700;
+}
+.notification-request {
+  padding: 18px 0;
+  border-bottom: 1px solid #eeecf3;
+}
+.notification-request-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.notification-request-heading > div {
+  min-width: 0;
+}
+.notification-request-heading strong {
+  display: block;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.notification-request-heading p {
+  margin: 6px 0 0;
+  color: #85818e;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.notification-request-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 14px 0 0 50px;
+}
+.notification-request-actions .btn {
+  min-height: 32px;
+  padding: 7px 12px;
+  font-size: 12px;
+}
+.notification-notice {
+  padding: 12px;
+  border-radius: 10px;
+  background: #f1f7ee;
+  font-size: 13px;
+}
+@media (max-width: 480px) {
+  .notification-request-actions {
+    margin-left: 0;
+  }
+}

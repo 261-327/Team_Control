@@ -99,7 +99,7 @@ def challenge_json(request, user, mode):
         "email": user.email,
         "mode": mode,
         "expiresAt": int(user.otp_expiry.timestamp() * 1000),
-        "resendAt": int(user.otp_expiry.timestamp() * 1000),
+        "resendAt": int(user.otp_resend_at.timestamp() * 1000),
         "delivery": "console"
         if settings.EMAIL_BACKEND.endswith("console.EmailBackend")
         else "email",
@@ -259,3 +259,32 @@ def snapshot(request):
         invitations=[invitation_json(i) for i in invitations],
     )
     return result
+
+
+def project_member_json(project, membership=None):
+    """Serialize one project member using the snapshot membership format."""
+    if membership is None:
+        user = project.owner
+        profession = "other"
+        specialization = ""
+        custom_role = "Руководитель"
+        access_role = ""
+    else:
+        user = membership.user
+        profession = membership.role
+        specialization = membership.developer_specialization
+        custom_role = membership.custom_role
+        access_role = membership.access_role
+
+    return {
+        "projectId": str(project.pk),
+        "userId": str(user.pk),
+        "role": (
+            "leader"
+            if project.owner_id == user.pk
+            else ("teacher" if access_role == "teacher" else "member")
+        ),
+        "profession": profession,
+        "specialization": specialization,
+        "customRole": custom_role,
+    }

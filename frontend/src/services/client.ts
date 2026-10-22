@@ -14,6 +14,7 @@ import type {
   AssistantDraft,
   AssistantTurn,
   AssistantHistory,
+  NotificationItem,
 } from "@/types/domain";
 
 const empty = (): Snapshot => ({
@@ -159,6 +160,18 @@ class HttpClient implements DataClient {
     this.revision++;
     this.publish(data);
   };
+  getNotifications = () => this.request<{ notifications: NotificationItem[] }>("notifications");
+  respondNotification = (
+    kind: NotificationItem["kind"],
+    id: string,
+    action: "accept" | "decline",
+    role?: RoleInput,
+  ) =>
+    this.mutate<{ notifications: NotificationItem[] }>(
+      `notifications/${kind}/${id}/respond`,
+      "POST",
+      { action, role },
+    );
   updateProfile = async (name: string, bio: string) => {
     await this.mutate("profile", "PATCH", { name, bio });
   };
