@@ -1,5 +1,8 @@
 import type {
-  AssistantReply,
+  AssistantMode,
+  AssistantDraft,
+  AssistantTurn,
+  AssistantHistory,
   Invitation,
   Material,
   Project,
@@ -59,5 +62,15 @@ export interface DataClient {
   ): Promise<void>;
   deleteMaterial(id: string): Promise<void>;
   updateColumn(projectId: string, id: Status, name: string, limit: number): Promise<void>;
-  askAssistant(message: string, projectId?: string): Promise<AssistantReply>;
+  assistantHistory(projectId?: string): Promise<AssistantHistory>;
+  clearAssistantHistory(projectId?: string): Promise<void>;
+  askAssistant(
+    message: string,
+    mode: AssistantMode,
+    requestId: string,
+    projectId?: string,
+  ): Promise<AssistantTurn>;
+  assistantTurn(id: string): Promise<AssistantTurn>;
+  cancelAssistantTurn(id: string): Promise<AssistantTurn>;
+  confirmAssistantTasks(id: string, tasks: AssistantDraft[]): Promise<AssistantTurn>;
 }

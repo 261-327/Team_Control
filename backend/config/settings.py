@@ -61,7 +61,10 @@ if os.environ.get("DB_ENGINE") == "sqlite":
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": os.environ.get("DB_NAME", str(BASE_DIR / "local.sqlite3")),
-            "OPTIONS": {"timeout": 20},
+            # The web process and assistant workers share this local database.
+            # Acquire the writer lock before reading inside atomic(), rather than
+            # failing instantly while upgrading a DEFERRED read transaction.
+            "OPTIONS": {"timeout": 20, "transaction_mode": "IMMEDIATE"},
         }
     }
 else:
@@ -136,3 +139,10 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL") or EMAIL_HOST_USER or 
 
 if os.environ.get("EMAIL_FILE_PATH"):
     EMAIL_FILE_PATH = os.environ["EMAIL_FILE_PATH"]
+
+# All inference is local: there is intentionally no paid provider fallback.
+ASSISTANT_OLLAMA_URL = os.environ.get("ASSISTANT_OLLAMA_URL", "http://127.0.0.1:11434")
+ASSISTANT_MODEL = os.environ.get("ASSISTANT_MODEL", "qwen3:4b")
+ASSISTANT_TIMEOUT = int(os.environ.get("ASSISTANT_TIMEOUT", "240"))
+ASSISTANT_IMAGES_ENABLED = os.environ.get("ASSISTANT_IMAGES_ENABLED", "false").lower() == "true"
+ASSISTANT_IMAGE_MODEL = os.environ.get("ASSISTANT_IMAGE_MODEL", "stabilityai/sdxl-turbo")

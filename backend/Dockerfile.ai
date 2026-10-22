@@ -1,0 +1,10 @@
+FROM python:3.11-slim
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 HF_HOME=/models/cache
+COPY requirements.txt requirements-ai.txt ./
+RUN pip install --no-cache-dir -r requirements-ai.txt \
+    && useradd --create-home --uid 10001 sipi \
+    && mkdir -p /models && chown sipi:sipi /models
+COPY --chown=sipi:sipi . .
+USER sipi
+CMD ["python", "manage.py", "assistant_worker", "--kind", "logo"]

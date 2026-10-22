@@ -248,13 +248,17 @@ class APITests(TestCase):
         response = browser.post('/api/auth/login/', body, content_type='application/json', HTTP_X_CSRFTOKEN=token, HTTP_ORIGIN='https://other.example.org', **gateway)
         self.assertEqual(response.status_code, 403)
 
-    def test_assistant_uses_real_visible_tasks_without_inventing_ai(self):
-        tid = self.create_task(assignee=self.owner)
-        Task.objects.filter(pk=tid).update(due_date=timezone.now() + timedelta(days=1))
-        self.assertEqual(self.call('assistant', {'message': 'Что горит?'}).json()['taskIds'], [tid])
+    def test_assistant_history_is_scoped_and_reports_model_availability(self):
+        from .models import AssistantThread, AssistantTurn
+        thread = AssistantThread.objects.create(user=self.owner, project=self.project)
+        AssistantTurn.objects.create(thread=thread, message='Вопрос', status='succeeded', result={'text': 'Ответ'})
+        with patch('tasks.assistant_api.model_ready', return_value=False):
+            data = self.client.get('/api/assistant/?projectId=' + str(self.project.pk)).json()
+        self.assertEqual(len(data['turns']), 1)
+        self.assertFalse(data['capabilities']['chatReady'])
         self.client.force_login(self.stranger)
-        self.assertEqual(self.call('assistant', {'message': 'Что горит?'}).json()['taskIds'], [])
-        self.assertIn('не подключён', self.call('assistant', {'message': 'Напиши код'}).json()['text'])
+        self.assertEqual(self.client.get('/api/assistant/?projectId=' + str(self.project.pk)).status_code, 404)
+
 
 
 from django.test import TransactionTestCase

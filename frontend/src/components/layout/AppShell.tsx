@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useData } from "@/providers/DataProvider";
@@ -10,7 +11,9 @@ import { canManage, canOverview } from "@/lib/permissions";
 import { Avatar, Button, EmptyState, IconButton, LoadingState, Logo, Modal } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { TaskForm } from "@/features/tasks/TaskForm";
-import { AssistantPanel } from "@/features/assistant/AssistantPanel";
+const AssistantPanel = dynamic(() =>
+  import("@/features/assistant/AssistantPanel").then((module) => module.AssistantPanel),
+);
 import type { Task } from "@/types/domain";
 import { dateLabel, urgency } from "@/lib/format";
 
@@ -178,9 +181,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <strong>Московский Политех</strong>
               <span>Проектная деятельность</span>
             </div>
-            <Icon name="down" size={14} />
           </div>
-          <span className="nav-caption">РАБОЧЕЕ ПРОСТРАНСТВО</span>
+          <span className="nav-caption">Пространство</span>
           <nav>
             {nav.map((item) => (
               <Link
@@ -198,8 +200,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
           </nav>
+          <button
+            className="sidebar-assistant-entry"
+            onClick={() => {
+              closeNav();
+              setAssistant({});
+            }}
+          >
+            <span>
+              <Icon name="sparkles" size={18} />
+            </span>
+            <div>
+              <strong>Сипи AI</strong>
+              <small>Помощник по проектам</small>
+            </div>
+            <Icon name="arrow" size={16} />
+          </button>
           <div className="sidebar-project-title">
-            <span className="nav-caption">МОИ ПРОЕКТЫ</span>
+            <span className="nav-caption">Проекты</span>
             <Link href="/projects/new" title="Создать проект" aria-label="Создать проект">
               <Icon name="plus" size={16} />
             </Link>
@@ -219,13 +237,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {!data.projects.length && <p className="sidebar-empty">Здесь появятся твои проекты</p>}
           </nav>
           <div className="sidebar-bottom">
-            <div className="semester-card">
-              <span className="semester-label">
-                <Icon name="sun" size={16} /> Осенний семестр
-              </span>
-              <strong>2026 / 2027</strong>
-              <span>Проектная деятельность</span>
-            </div>
             <button className="nav-item" onClick={() => setHelp(true)}>
               <Icon name="help" size={19} />
               <span>Помощь и о проекте</span>

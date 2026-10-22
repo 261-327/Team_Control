@@ -1,6 +1,14 @@
 import type { ReactNode } from "react";
 
 const paths: Record<string, ReactNode> = {
+  image: (
+    <>
+      {" "}
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <circle cx="8" cy="8" r="1.5" />
+      <path d="m3 17 6-6 4 4 3-3 5 5" />
+    </>
+  ),
   home: (
     <>
       <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z" />

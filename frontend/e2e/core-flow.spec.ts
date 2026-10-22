@@ -98,7 +98,7 @@ test("real OTP rejects wrong codes, resumes after reload, and logout clears priv
   expect((await bootstrap(page)).projects).toEqual([]);
 });
 
-test("server errors preserve drafts; assistant uses real tasks; no demo accounts remain", async ({
+test("server errors preserve drafts; assistant opens scoped conversation; no demo accounts remain", async ({
   page,
 }) => {
   await register(page);
@@ -122,8 +122,9 @@ test("server errors preserve drafts; assistant uses real tasks; no demo accounts
   await form.getByRole("button", { name: "Создать задачу", exact: true }).click();
   await expect(form).toHaveCount(0);
   await page.getByRole("button", { name: "Открыть ИИ-помощника", exact: true }).click();
-  await page.getByRole("button", { name: "Срочные задачи", exact: true }).click();
-  await expect(page.locator(".chat-tasks")).toContainText("Сохранить черновик при ошибке");
+  await expect(page.getByRole("heading", { name: "С чего начнём?", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Контекст", { exact: true })).toHaveValue(pid);
+  await expect(page.getByRole("button", { name: "Черновик задач", exact: true })).toBeVisible();
   expect(
     (await bootstrap(page)).tasks.filter((t: { projectId: string }) => t.projectId === pid),
   ).toHaveLength(1);
