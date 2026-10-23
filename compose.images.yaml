@@ -1,0 +1,43 @@
+# Optional local image generation. Combine with compose.yaml OR compose.server.yaml.
+# CPU works slowly; use compose.images-gpu.yaml if the Linux host has NVIDIA support.
+services:
+  backend:
+    environment:
+      ASSISTANT_IMAGES_ENABLED: "true"
+  image-init:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.ai
+    command: [python, manage.py, download_image_model]
+    volumes:
+      - image_models:/models
+  image-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.ai
+    restart: unless-stopped
+    command: [python, manage.py, assistant_worker, --kind, logo]
+    environment:
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-team_control_db}
+      DB_USER: ${DB_USER:-postgres_user}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres_password}
+      DB_SSLMODE: ${DB_SSLMODE:-prefer}
+      ASSISTANT_OLLAMA_URL: http://ollama:11434
+      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-qwen3:4b}
+      ASSISTANT_IMAGES_ENABLED: "true"
+      ASSISTANT_IMAGE_MODEL: /models/sdxl-turbo
+    volumes:
+      - image_models:/models:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      model-init:
+        condition: service_completed_successfully
+      image-init:
+        condition: service_completed_successfully
+volumes:
+  image_models:

@@ -1,0 +1,10 @@
+# Requires NVIDIA Container Toolkit on the Linux server. No public inference port.
+services:
+  image-worker:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

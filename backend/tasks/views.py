@@ -4,13 +4,12 @@ from .memberships import remove_project_participant
 import secrets
 import time
 from django.utils.crypto import constant_time_compare
-from smtplib import SMTPException, SMTPAuthenticationError, SMTPRecipientsRefused, SMTPSenderRefused
+from smtplib import SMTPException
 
 from django import forms
 from django.contrib import messages
 from django.conf import settings
 from django.contrib.auth import authenticate, login as django_login
-from django.contrib.auth.forms import UserCreationForm
 from django.core.mail import send_mail
 from django.db import transaction, IntegrityError
 from django.db.models import Q, Prefetch, F

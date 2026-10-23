@@ -18,7 +18,7 @@ from django.core.mail import send_mail
 from django.core.validators import URLValidator, validate_email
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
@@ -93,7 +93,7 @@ def endpoint(methods=("GET",), public=False):
                         raise APIError("Ожидается объект JSON.")
                 request.data = body
                 result = fn(request, *args, **kwargs)
-                return result if isinstance(result, JsonResponse) else JsonResponse(result or {})
+                return result if isinstance(result, HttpResponse) else JsonResponse(result or {})
             except APIError as exc:
                 return error(exc.message, exc.code, exc.status)
             except Http404:
@@ -605,8 +605,28 @@ def status_tasks(p, status):
     )
 
 
-def task_input(data, p):
-    assignee_id = identifier(data.get("assigneeId", ""))
+def task_input(data, p, *, allow_unassigned=False):
+    assignee_id = data.get("assigneeId", "")
+    if allow_unassigned and not assignee_id:
+        assignee = None
+    else:
+        assignee = task_assignee(p, identifier(assignee_id))
+    due = text(data, "deadlineAt", 50)
+    try:
+        due = parse_datetime(due) if due else None
+    except ValueError:
+        raise APIError("Укажите корректный срок.")
+    if data.get("deadlineAt") and (due is None or timezone.is_naive(due)):
+        raise APIError("Укажите корректный срок с часовым поясом.")
+    return {
+        "title": text(data, "title", 255, True),
+        "description": text(data, "description", 10000),
+        "due_date": due,
+        "tag": text(data, "tag", 60),
+    }, assignee
+
+
+def task_assignee(p, assignee_id):
     assignee = get_object_or_404(
         WorkspaceUser.objects.filter(
             Q(pk=p.owner_id)
@@ -621,19 +641,7 @@ def task_input(data, p):
     )
     if assignee.account_type == "teacher":
         raise APIError("Назначьте задачу участнику команды.")
-    due = text(data, "deadlineAt", 50)
-    try:
-        due = parse_datetime(due) if due else None
-    except ValueError:
-        raise APIError("Укажите корректный срок.")
-    if data.get("deadlineAt") and (due is None or timezone.is_naive(due)):
-        raise APIError("Укажите корректный срок с часовым поясом.")
-    return {
-        "title": text(data, "title", 255, True),
-        "description": text(data, "description", 10000),
-        "due_date": due,
-        "tag": text(data, "tag", 60),
-    }, assignee
+    return assignee
 
 
 def log_event(task, user, message):
@@ -863,33 +871,6 @@ def invitation_detail(request, invitation_id):
             invitation.status = "accepted"
         invitation.save(update_fields=["status"])
     return {"snapshot": snapshot(request)}
-
-
-@endpoint(("POST",))
-def assistant(request):
-    message = text(request.data, "message", 4000, True).lower()
-    qs = Task.objects.filter(
-        column__board__project__in=accessible(request.user), assignees=request.user
-    ).exclude(column__workflow_status="done")
-    if request.data.get("projectId"):
-        p = project_for(request.user, request.data["projectId"])
-        qs = qs.filter(column__board__project=p)
-    # Real deadline summaries work without an external model. No invented AI replies.
-    if any(word in message for word in ("недел", "срок", "горит", "срочн", "дедлайн")):
-        tasks = list(
-            qs.filter(due_date__lte=timezone.now() + timedelta(days=7)).order_by("due_date", "pk")[
-                :20
-            ]
-        )
-        return {
-            "text": "Ближайшие сроки по вашим задачам:"
-            if tasks
-            else "На ближайшие семь дней задач со сроком нет.",
-            "taskIds": [str(t.pk) for t in tasks],
-        }
-    return {
-        "text": "ИИ-агент пока не подключён. Уже можно посмотреть срочные задачи и сроки на неделю."
-    }
 
 
 def frontend_redirect(request, path=""):

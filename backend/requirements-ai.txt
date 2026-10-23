@@ -1,0 +1,9 @@
+-r requirements.txt
+# Optional local image worker; never imported by regular web requests.
+torch==2.14.1
+diffusers==0.41.0
+transformers==5.20.2
+accelerate==1.15.0
+sentencepiece==0.2.2
+protobuf==7.36.2
+Pillow==13.0.0

@@ -3,3 +3,6 @@
 !.env.example
 !.env.*.example
 .DS_Store
+
+# Downloaded local AI runtimes and weights (never push to Git).
+.runtime/

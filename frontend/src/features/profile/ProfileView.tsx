@@ -32,47 +32,47 @@ export function ProfileView() {
       </div>
       <div className="profile-grid">
         <div className="profile-sidebar">
-        <section className="panel profile-summary">
-          <div className="profile-cover">
-            <span>✳</span>
-            <i />
-          </div>
-          <Avatar user={user} size="lg" />
-          <h2>{user.name}</h2>
-          <p>{user.email}</p>
-          <span className="role-badge role-member">
-            {user.kind === "teacher"
-              ? "Преподаватель"
-              : user.kind === "staff"
-                ? "Координатор"
-                : "Студент"}
-          </span>
-          <div className="profile-stat">
-            <div>
-              <strong>{data.projects.length}</strong>
-              <span>проекта</span>
+          <section className="panel profile-summary">
+            <div className="profile-cover">
+              <span>✳</span>
+              <i />
             </div>
-            <div>
-              <strong>{data.tasks.filter((t) => t.assigneeId === user.id).length}</strong>
-              <span>задач</span>
+            <Avatar user={user} size="lg" />
+            <h2>{user.name}</h2>
+            <p>{user.email}</p>
+            <span className="role-badge role-member">
+              {user.kind === "teacher"
+                ? "Преподаватель"
+                : user.kind === "staff"
+                  ? "Координатор"
+                  : "Студент"}
+            </span>
+            <div className="profile-stat">
+              <div>
+                <strong>{data.projects.length}</strong>
+                <span>проекта</span>
+              </div>
+              <div>
+                <strong>{data.tasks.filter((t) => t.assigneeId === user.id).length}</strong>
+                <span>задач</span>
+              </div>
             </div>
-          </div>
-          <Button
-            variant="ghost"
-            loading={logoutAction.busy}
-            onClick={() =>
-              void logoutAction.run(
-                () => client.logout(),
-                () => router.push("/login"),
-              )
-            }
-          >
-            <Icon name="logout" size={17} />
-            Выйти из аккаунта
-          </Button>
-          <FormError error={logoutAction.error} />
-        </section>
-        <ColleaguesView />
+            <Button
+              variant="ghost"
+              loading={logoutAction.busy}
+              onClick={() =>
+                void logoutAction.run(
+                  () => client.logout(),
+                  () => router.push("/login"),
+                )
+              }
+            >
+              <Icon name="logout" size={17} />
+              Выйти из аккаунта
+            </Button>
+            <FormError error={logoutAction.error} />
+          </section>
+          <ColleaguesView />
         </div>
         <section className="panel profile-form">
           <h2>Личная информация</h2>

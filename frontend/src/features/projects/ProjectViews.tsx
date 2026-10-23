@@ -33,21 +33,39 @@ import type { Profession, RoleInput, Status } from "@/types/domain";
 
 export function ProjectsView() {
   const data = useReadyData();
+  const ui = useUi();
   const [query, setQuery] = useState("");
   const projects = data.projects.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()));
   return (
     <>
       <div className="page-heading">
         <div>
-          <h1>
-            Мои проекты<span className="heading-dot">.</span>
-          </h1>
+          <h1>Мои проекты</h1>
           <p>Проекты, в которых ты участвуешь.</p>
         </div>
         <Link className="btn btn-primary" href="/projects/new">
           <Icon name="plus" size={18} />
           Создать проект
         </Link>
+      </div>
+      <div className="projects-workspace-summary">
+        <div>
+          <strong>{data.projects.length}</strong>
+          <span>
+            {plural(data.projects.length, ["проект", "проекта", "проектов"]).replace(/^\d+\s*/, "")}{" "}
+            в пространстве
+          </span>
+        </div>
+        <p>Команда, задачи и материалы — в каждом проекте.</p>
+        <button
+          onClick={() =>
+            ui.openAssistant(
+              "Создай проект «Название» — здесь опиши идею. Добавь 5 задач для начала работы.",
+            )
+          }
+        >
+          <Icon name="sparkles" size={17} /> Создать с помощником <Icon name="arrow" size={16} />
+        </button>
       </div>
       <div className="project-list-toolbar">
         <div className="search-field">

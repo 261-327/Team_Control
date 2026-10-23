@@ -1,5 +1,5 @@
 from django.urls import path
-from . import api, colleagues_api, notifications_api
+from . import api, assistant_api, colleagues_api, notifications_api
 
 urlpatterns = [
     path("notifications/", notifications_api.notifications),
@@ -34,5 +34,8 @@ urlpatterns = [
     path("tasks/<int:task_id>/comments/", api.comments),
     path("materials/<int:material_id>/", api.material_detail),
     path("invitations/<uuid:invitation_id>/", api.invitation_detail),
-    path("assistant/", api.assistant),
+    path("assistant/", assistant_api.assistant),
+    path("assistant/turns/<uuid:turn_id>/", assistant_api.turn_detail),
+    path("assistant/turns/<uuid:turn_id>/confirm/", assistant_api.confirm_tasks),
+    path("assistant/turns/<uuid:turn_id>/image/", assistant_api.image),
 ]
