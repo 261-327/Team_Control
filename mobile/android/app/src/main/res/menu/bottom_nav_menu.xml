@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/nav_urgent"
+        android:icon="@drawable/ic_priority_high"
+        android:title="@string/tab_urgent" />
+
+    <item
+        android:id="@+id/nav_in_progress"
+        android:icon="@drawable/ic_autorenew"
+        android:title="@string/tab_in_progress" />
+
+    <item
+        android:id="@+id/nav_review"
+        android:icon="@drawable/ic_assignment"
+        android:title="@string/tab_review" />
+
+    <item
+        android:id="@+id/nav_backlog"
+        android:icon="@drawable/ic_bookmark"
+        android:title="@string/tab_backlog" />
+
+</menu>

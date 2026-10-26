@@ -1,8 +1,13 @@
-.env
-.env.*
-!.env.example
-!.env.*.example
+*.iml
+.gradle
+/local.properties
+/.idea
 .DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
 
 # Downloaded local AI runtimes and weights (never push to Git).
 .runtime/

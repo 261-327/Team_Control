@@ -1,5 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.SIPI_AI" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <!-- можно оставить цвета, если они есть -->
+    <style name="Theme.SIPI_AI" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/mustard</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorPrimaryInverse">@color/mustard</item>
+        <item name="colorSecondaryContainer">@color/mustard_soft</item>
+        <item name="colorOnSecondaryContainer">@color/text_primary</item>
+        <item name="android:windowBackground">@color/beige</item>
+        <item name="android:statusBarColor">@color/beige</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <style name="CalendarWeekday">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">@color/text_hint</item>
     </style>
 </resources>
