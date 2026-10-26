@@ -7,6 +7,8 @@ services:
       POSTGRES_DB: team_control_db
       POSTGRES_USER: postgres_user
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres_password}
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
