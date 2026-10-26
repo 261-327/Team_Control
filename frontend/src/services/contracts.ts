@@ -1,5 +1,8 @@
 import type {
-  AssistantReply,
+  AssistantMode,
+  AssistantDraft,
+  AssistantTurn,
+  AssistantHistory,
   NotificationItem,
   Invitation,
   Material,
@@ -30,7 +33,12 @@ export interface DataClient {
   }): Promise<AuthChallenge>;
   logout(): Promise<void>;
   getNotifications(): Promise<{ notifications: NotificationItem[] }>;
-  respondNotification(kind: NotificationItem["kind"], id: string, action: "accept" | "decline", role?: RoleInput): Promise<{ notifications: NotificationItem[] }>;
+  respondNotification(
+    kind: NotificationItem["kind"],
+    id: string,
+    action: "accept" | "decline",
+    role?: RoleInput,
+  ): Promise<{ notifications: NotificationItem[] }>;
   updateProfile(name: string, bio: string): Promise<void>;
   createTask(input: TaskInput): Promise<Task>;
   updateTask(id: string, input: TaskInput): Promise<void>;
@@ -62,5 +70,15 @@ export interface DataClient {
   ): Promise<void>;
   deleteMaterial(id: string): Promise<void>;
   updateColumn(projectId: string, id: Status, name: string, limit: number): Promise<void>;
-  askAssistant(message: string, projectId?: string): Promise<AssistantReply>;
+  assistantHistory(projectId?: string): Promise<AssistantHistory>;
+  clearAssistantHistory(projectId?: string): Promise<void>;
+  askAssistant(
+    message: string,
+    mode: AssistantMode,
+    requestId: string,
+    projectId?: string,
+  ): Promise<AssistantTurn>;
+  assistantTurn(id: string): Promise<AssistantTurn>;
+  cancelAssistantTurn(id: string): Promise<AssistantTurn>;
+  confirmAssistantTasks(id: string, tasks: AssistantDraft[]): Promise<AssistantTurn>;
 }

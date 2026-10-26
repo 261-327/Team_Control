@@ -100,8 +100,36 @@ export type TaskInput = Pick<
   "projectId" | "title" | "description" | "assigneeId" | "deadlineAt" | "tag"
 >;
 export type RoleInput = { profession: Profession; specialization: string; customRole: string };
-export type AssistantReply = { text: string; taskIds?: string[] };
-
+export type AssistantMode = "chat" | "tasks" | "logo";
+export type AssistantDraft = Omit<TaskInput, "projectId">;
+export type AssistantReply = {
+  text: string;
+  created?: {
+    kind: "create_project" | "create_tasks";
+    projectId: string;
+    projectName: string;
+    href: string;
+    tasks: { id: string; title: string; href: string }[];
+  };
+  taskIds?: string[];
+  drafts?: AssistantDraft[];
+  sources?: { title: string; href: string }[];
+  imageUrl?: string;
+};
+export type AssistantTurn = {
+  id: string;
+  message: string;
+  mode: AssistantMode;
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+  reply: AssistantReply;
+  error: string;
+  createdAt: string;
+  confirmedAt: string;
+};
+export type AssistantHistory = {
+  turns: AssistantTurn[];
+  capabilities: { model: string; chatReady: boolean; imagesReady: boolean; local: boolean };
+};
 
 export type NotificationItem = {
   id: string;

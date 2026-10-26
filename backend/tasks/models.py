@@ -359,3 +359,39 @@ class ProjectInvitation(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=['project', 'recipient'], name='unique_project_invitation')]
 
+class AssistantThread(models.Model):
+    user = models.ForeignKey(WorkspaceUser, on_delete=models.CASCADE)
+    project = models.ForeignKey(Project, null=True, blank=True, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "project"], name="assistant_project_thread"),
+            models.UniqueConstraint(fields=["user"], condition=models.Q(project=None),
+                                    name="assistant_personal_thread"),
+        ]
+
+
+class AssistantTurn(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    thread = models.ForeignKey(AssistantThread, related_name="turns", on_delete=models.CASCADE)
+    message = models.TextField(max_length=4000)
+    mode = models.CharField(max_length=12, default="chat")
+    status = models.CharField(max_length=12, default="queued", db_index=True)
+    result = models.JSONField(default=dict)
+    scope = models.JSONField(default=list)
+    error = models.CharField(max_length=500, blank=True)
+    image = models.BinaryField(null=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    started_at = models.DateTimeField(null=True)
+    finished_at = models.DateTimeField(null=True)
+    confirmed_at = models.DateTimeField(null=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+
+class AssistantWorker(models.Model):
+    id = models.CharField(primary_key=True, max_length=50)
+    kind = models.CharField(max_length=12)
+    heartbeat = models.DateTimeField(default=timezone.now)

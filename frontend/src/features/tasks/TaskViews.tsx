@@ -323,7 +323,9 @@ export function MyTasksView() {
         ? t.status === "done"
         : tab === "all"
           ? true
-          : t.status !== "done" && Date.parse(t.deadlineAt) < Date.parse(data.now) + 7 * 86400000,
+          : t.status !== "done" &&
+            !!t.deadlineAt &&
+            Date.parse(t.deadlineAt) < Date.parse(data.now) + 7 * 86400000,
     ),
     filters,
     data,
@@ -362,6 +364,18 @@ export function MyTasksView() {
   });
   return (
     <div className="dashboard">
+      <div className="workspace-greeting">
+        <span>
+          <Icon name="sun" size={17} />{" "}
+          {new Intl.DateTimeFormat("ru-RU", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            timeZone: "Europe/Moscow",
+          }).format(new Date(data.now))}
+        </span>
+        <span>Проектная деятельность</span>
+      </div>
       <div className="page-heading">
         <div>
           <h1>Мои задачи</h1>
@@ -400,6 +414,37 @@ export function MyTasksView() {
           </button>
         </section>
       )}
+      <section className="workspace-focus">
+        <div className="workspace-focus-copy">
+          <span className="workspace-eyebrow">Сипи AI</span>
+          <h2>Создать проект с помощником</h2>
+          <p>Опиши, что хотите сделать. Помощник создаст проект и добавит задачи на доску.</p>
+          <button
+            onClick={() =>
+              ui.openAssistant(
+                "Создай проект «Название» — здесь опиши идею. Добавь 5 задач для начала работы.",
+              )
+            }
+          >
+            Начать с помощником <Icon name="arrow" size={17} />
+          </button>
+        </div>
+        <div className="workspace-focus-art" aria-hidden="true">
+          <span className="focus-sun">
+            <Icon name="sun" size={54} />
+          </span>
+          <div className="focus-task">
+            <Icon name="checkCircle" size={18} />
+            <span>Идея проекта</span>
+            <i />
+          </div>
+          <div className="focus-task">
+            <Icon name="circle" size={18} />
+            <span>Первые задачи</span>
+            <i />
+          </div>
+        </div>
+      </section>
       <div className="stats-grid">
         {[
           {
@@ -578,7 +623,7 @@ export function MyTasksView() {
             </div>
             <div className="upcoming-list">
               {active
-                .filter((t) => urgency(t, data.now) !== "overdue")
+                .filter((t) => !!t.deadlineAt && urgency(t, data.now) !== "overdue")
                 .sort((a, b) => Date.parse(a.deadlineAt) - Date.parse(b.deadlineAt))
                 .slice(0, 3)
                 .map((t) => (
@@ -594,17 +639,6 @@ export function MyTasksView() {
                 ))}
               {!active.length && <p className="muted">Здесь появятся ближайшие дедлайны.</p>}
             </div>
-          </section>
-          <section className="ai-promo">
-            <span className="ai-promo-symbol">
-              <Icon name="sparkles" size={23} />
-            </span>
-            <h3>Помощник</h3>
-            <p>Сроки, план на неделю и черновики задач.</p>
-            <button onClick={() => ui.openAssistant()}>
-              Открыть чат
-              <Icon name="arrow" size={17} />
-            </button>
           </section>
         </aside>
       </div>

@@ -10,7 +10,10 @@ import type {
   Task,
   TaskInput,
   Material,
-  AssistantReply,
+  AssistantMode,
+  AssistantDraft,
+  AssistantTurn,
+  AssistantHistory,
   NotificationItem,
 } from "@/types/domain";
 
@@ -158,8 +161,17 @@ class HttpClient implements DataClient {
     this.publish(data);
   };
   getNotifications = () => this.request<{ notifications: NotificationItem[] }>("notifications");
-  respondNotification = (kind: NotificationItem["kind"], id: string, action: "accept" | "decline", role?: RoleInput) =>
-    this.mutate<{ notifications: NotificationItem[] }>(`notifications/${kind}/${id}/respond`, "POST", { action, role });
+  respondNotification = (
+    kind: NotificationItem["kind"],
+    id: string,
+    action: "accept" | "decline",
+    role?: RoleInput,
+  ) =>
+    this.mutate<{ notifications: NotificationItem[] }>(
+      `notifications/${kind}/${id}/respond`,
+      "POST",
+      { action, role },
+    );
   updateProfile = async (name: string, bio: string) => {
     await this.mutate("profile", "PATCH", { name, bio });
   };
@@ -240,7 +252,46 @@ class HttpClient implements DataClient {
   updateColumn = async (projectId: string, id: Status, name: string, limit: number) => {
     await this.mutate(`projects/${projectId}/columns/${id}`, "PATCH", { name, limit });
   };
-  askAssistant = (message: string, projectId?: string) =>
-    this.request<AssistantReply>("assistant", "POST", { message, projectId });
+  assistantHistory = (projectId?: string) =>
+    this.request<AssistantHistory>(
+      `assistant${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ""}`,
+    );
+  clearAssistantHistory = async (projectId?: string) => {
+    await this.request(
+      `assistant${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ""}`,
+      "DELETE",
+    );
+  };
+  askAssistant = async (
+    message: string,
+    mode: AssistantMode,
+    requestId: string,
+    projectId?: string,
+  ) =>
+    (
+      await this.request<{ turn: AssistantTurn }>("assistant", "POST", {
+        message,
+        projectId,
+        mode,
+        requestId,
+      })
+    ).turn;
+  assistantTurn = async (id: string) => {
+    const authRevision = this.authRevision;
+    const revision = this.revision;
+    const result = await this.request<{ turn: AssistantTurn; snapshot?: Database }>(
+      `assistant/turns/${id}`,
+    );
+    if (result.snapshot && authRevision === this.authRevision && revision === this.revision) {
+      this.revision++;
+      this.publish(result.snapshot);
+    }
+    return result.turn;
+  };
+  cancelAssistantTurn = async (id: string) =>
+    (await this.request<{ turn: AssistantTurn }>(`assistant/turns/${id}`, "DELETE")).turn;
+  confirmAssistantTasks = async (id: string, tasks: AssistantDraft[]) =>
+    (await this.mutate<{ turn: AssistantTurn }>(`assistant/turns/${id}/confirm`, "POST", { tasks }))
+      .turn;
 }
 export const client: DataClient = new HttpClient();

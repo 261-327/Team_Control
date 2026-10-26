@@ -4,6 +4,8 @@ import os
 from .settings import *
 from .settings import MIDDLEWARE as BASE_MIDDLEWARE
 
+
+
 SECRET_KEY = "test-only-not-for-serving-requests"
 DEBUG = False
 ALLOWED_HOSTS = ["testserver", "localhost", "127.0.0.1"]
