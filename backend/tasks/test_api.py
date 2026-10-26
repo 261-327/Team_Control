@@ -401,7 +401,8 @@ class APITests(TestCase):
         self.assertEqual(response.status_code, 404)
     def test_get_task_comments(self):
         task_id = self.create_task(title="Задача с комментариями")
-    
+        first_id = self.create_task(title="Первая задача")
+        second_id = self.create_task(title="Вторая задача")
         self.call(
             f"tasks/{task_id}/comments",
             {"text": "Первый комментарий"},
