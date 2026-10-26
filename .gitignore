@@ -1,3 +1,11 @@
+# Local environment files: never commit real secrets.
+.env
+.env.*
+!.env.example
+!.env.*.example
+/infra/.env
+
+# Android / Gradle / IDE build artifacts.
 *.iml
 .gradle
 /local.properties
@@ -12,6 +20,6 @@ local.properties
 # Downloaded local AI runtimes and weights (never push to Git).
 .runtime/
 
-# Python helper bytecode
+# Python helper bytecode.
 __pycache__/
 *.py[cod]
