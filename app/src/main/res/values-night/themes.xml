@@ -1,8 +1,0 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Базовая светлая тема должна быть DayNight -->
-    <style name="Theme.SipiSanzhapov" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Настройка основных цветов темы -->
-        <item name="colorPrimary">@color/sipe_yellow_dark</item>
-        <item name="android:statusBarColor">@color/white</item>
-    </style>
-</resources>
