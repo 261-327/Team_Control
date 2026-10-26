@@ -21,20 +21,27 @@ class RegisterActivity : AppCompatActivity() {
             val fullName = etFullName.text.toString().trim()
             val email = etEmail.text.toString().trim()
 
-            // Черновая проверка заполнения — пока просто Toast
             if (fullName.isEmpty() || email.isEmpty()) {
                 Toast.makeText(this, "Заполните все поля", Toast.LENGTH_SHORT).show()
             } else {
+                // Сохраняем ТО, ЧТО ВВЕЛ ПОЛЬЗОВАТЕЛЬ (переменные fullName и email)
+                val sharedPreferences = getSharedPreferences("UserPrefs", MODE_PRIVATE)
+                val editor = sharedPreferences.edit()
+                editor.putString("USER_NAME", fullName)  // Берем из поля ввода
+                editor.putString("USER_EMAIL", email)    // Берем из поля ввода
+                editor.apply()
+
                 Toast.makeText(
                     this,
                     "Регистрация: $fullName / $email",
                     Toast.LENGTH_SHORT
                 ).show()
+
                 val intent = Intent(this, MainActivity::class.java)
                 startActivity(intent)
                 finish()
+            }
+        }
                 // TODO: здесь будет логика регистрации (Firebase / API и т.п.)
             }
         }
-    }
-}

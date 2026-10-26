@@ -5,10 +5,8 @@
     <color name="sipe_yellow_dark">#F57C00</color>
     <color name="sipe_dark_text">#333333</color>
     <color name="sipe_background">#F0F2F5</color>
-    <color name="task_urgent">#FF5252</color>       <!-- Красный для срочных -->
-    <color name="task_in_progress">#448AFF</color>  <!-- Синий/желтый в процессе -->
-    <color name="task_unimportant">#B0BEC5</color>  <!-- Серый для неважных -->
-    <color name="purple_200">#FFBB86FC</color>
+
+    <color name="window_background">#FF000000</color>
     <color name="purple_500">#FF6200EE</color>
     <color name="purple_700">#FF3700B3</color>
     <color name="teal_200">#FF03DAC5</color>
@@ -22,4 +20,21 @@
     <color name="text_hint">#9C948A</color>
     <color name="field_bg">#FAF7F1</color>
     <color name="field_stroke">#E4DCCB</color>
+    <color name="task_urgent">#F3C4BC</color>       <!-- пастельный коралловый: срочные -->
+    <color name="task_in_progress">#F6E6B4</color>  <!-- пастельный мустард: в процессе -->
+    <color name="task_review">#C9DCC8</color>       <!-- пастельный шалфей: на проверке -->
+    <color name="task_unimportant">#DDD8CE</color><!-- приглушённый теплый серый: неважные -->
+    <color name="on_primary">#FFFFFF</color>
+    <!-- Текст на карточках задач -->
+    <color name="card_text">#000000</color>
+
+    <!-- Обводки, разделители, фон картинок -->
+    <color name="divider">#D8D0C0</color>
+
+
+    <!-- Фон нижней панели навигации -->
+    <color name="nav_surface">#FFFFFF</color>
+
+
+
 </resources>

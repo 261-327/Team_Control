@@ -102,11 +102,11 @@
                 android:textSize="15sp" />
 
             <!-- Кнопка -->
-            <Button
+            <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/btnRegister"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
-                android:background="@drawable/bg_button"
+                android:background="#D4A537"
                 android:text="Зарегистрироваться"
                 android:textAllCaps="false"
                 android:textColor="@color/white"

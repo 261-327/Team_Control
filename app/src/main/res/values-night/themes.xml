@@ -1,7 +1,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.SipiSanzhapov" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+    <!-- Базовая светлая тема должна быть DayNight -->
+    <style name="Theme.SipiSanzhapov" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Настройка основных цветов темы -->
+        <item name="colorPrimary">@color/sipe_yellow_dark</item>
+        <item name="android:statusBarColor">@color/white</item>
     </style>
 </resources>

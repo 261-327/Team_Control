@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true"
+    android:background="@color/beige">
+
+    <!-- Верхняя панель со стрелкой назад -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbarCalendar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/beige"
+        app:navigationIcon="?attr/homeAsUpIndicator"
+        app:title="Календарь"
+        app:titleTextColor="@color/sipe_dark_text" />
+
+    <!-- Переключение месяцев -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp">
+
+        <ImageButton
+            android:id="@+id/btnPrevMonth"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_media_previous"
+            android:contentDescription="Предыдущий месяц"
+            app:tint="@color/sipe_dark_text" />
+
+        <TextView
+            android:id="@+id/tvMonthTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/sipe_dark_text" />
+
+        <ImageButton
+            android:id="@+id/btnNextMonth"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_media_next"
+            android:contentDescription="Следующий месяц"
+            app:tint="@color/sipe_dark_text" />
+    </LinearLayout>
+
+    <!-- Названия дней недели -->
+    <!-- Названия дней недели -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textSize="12sp"
+            android:textColor="@color/sipe_dark_text"
+            android:text="Пн" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textSize="12sp"
+            android:textColor="@color/sipe_dark_text"
+            android:text="Вт" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textSize="12sp"
+            android:textColor="@color/sipe_dark_text"
+            android:text="Ср" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textSize="12sp"
+            android:textColor="@color/sipe_dark_text"
+            android:text="Чт" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textSize="12sp"
+            android:textColor="@color/sipe_dark_text"
+            android:text="Пт" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textSize="12sp"
+            android:textColor="@color/sipe_dark_text"
+            android:text="Сб" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textSize="12sp"
+            android:textColor="@color/sipe_dark_text"
+            android:text="Вс" />
+    </LinearLayout>
+
+    <!-- Сетка дней месяца -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvDays"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:nestedScrollingEnabled="false" />
+
+    <!-- Разделитель -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="8dp"
+        android:background="#D8D0C0" />
+
+    <!-- Выбранная дата -->
+    <TextView
+        android:id="@+id/tvSelectedDate"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="8dp"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="@color/sipe_dark_text" />
+
+    <!-- Сообщение, если задач на день нет -->
+    <TextView
+        android:id="@+id/tvEmptyDay"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center_horizontal"
+        android:paddingTop="24dp"
+        android:text="На этот день задач нет"
+        android:textSize="14sp"
+        android:textColor="@color/sipe_dark_text"
+        android:visibility="gone" />
+
+    <!-- Задачи выбранного дня -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvDayTasks"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+</LinearLayout>

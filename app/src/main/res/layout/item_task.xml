@@ -8,7 +8,7 @@
     android:layout_marginVertical="8dp"
     app:cardCornerRadius="12dp"
     app:cardElevation="2dp"
-    app:strokeColor="#E0E0E0"
+    app:strokeColor="@color/divider"
     app:strokeWidth="1dp">
 
     <LinearLayout
@@ -16,6 +16,25 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="16dp">
+
+        <!-- Дата дедлайна -->
+        <TextView
+            android:id="@+id/tvDeadlineDate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="@color/card_text"
+            android:text="Сдать до: 30.10.2026 18:00" />
+
+        <!-- Сколько дней осталось -->
+        <TextView
+            android:id="@+id/tvTimeRemaining"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="@color/card_text"
+            android:text="Осталось 2 дня" />
 
         <!-- Заголовок задачи -->
         <TextView
@@ -25,7 +44,7 @@
             android:text="Сделать прототип"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="@color/sipe_dark_text" />
+            android:textColor="@color/card_text" />
 
         <!-- Описание задачи -->
         <TextView
@@ -35,9 +54,20 @@
             android:layout_marginTop="6dp"
             android:text="построить вкусно и точка"
             android:textSize="14sp"
-            android:textColor="#666666"
+            android:textColor="@color/card_text"
             android:maxLines="3"
             android:ellipsize="end" />
+        <TextView
+            android:id="@+id/tvShowMore"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Подробнее"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="@color/card_text"
+            android:visibility="gone" />
+
 
         <!-- Превью картинки (если прикреплена) -->
         <ImageView
@@ -46,11 +76,11 @@
             android:layout_height="150dp"
             android:layout_marginTop="10dp"
             android:scaleType="centerCrop"
-            android:background="#E0E0E0"
+            android:background="@color/divider"
             android:visibility="visible"
             android:contentDescription="Превью вложения" />
 
-        <!-- Нижняя строка: файлы и аватар -->
+        <!-- Нижняя строка: файлы, кнопка и аватар -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -65,7 +95,24 @@
                 android:layout_weight="1"
                 android:text="📎 IMG-001.png"
                 android:textSize="12sp"
-                android:textColor="#888888" />
+                android:textColor="@color/card_text" />
+
+            <Button
+                android:id="@+id/btnSubmitReview"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:text="На проверку"
+                android:textSize="12sp"
+                android:textColor="@color/on_primary"
+                android:backgroundTint="@color/sipe_yellow_dark"
+                android:visibility="gone" />
 
             <ImageView
                 android:id="@+id/ivAssignee"

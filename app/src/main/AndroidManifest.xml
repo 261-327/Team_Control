@@ -21,6 +21,10 @@
         </activity>
 
         <!-- Главная активность -->
+        <activity android:name=".ProfileActivity" />
+        <activity
+            android:name=".CalendarActivity"
+            android:exported="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true" />
