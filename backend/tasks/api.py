@@ -13,6 +13,7 @@ from smtplib import SMTPException
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.core.cache import cache
+from django.core.paginator import Paginator, EmptyPage
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.core.validators import URLValidator, validate_email
@@ -197,6 +198,90 @@ def project_for(user, project_id, manage=False, lock=False):
     if manage and not can_manage(user, project):
         raise APIError("Это действие доступно руководителю проекта.", "forbidden", 403)
     return project
+
+
+def pagination_params(request):
+    """
+    Читает параметры page и pageSize из URL.
+
+    По умолчанию:
+      page = 1
+      pageSize = 20
+
+    Максимальный размер страницы — 100 задач.
+    """
+
+    def positive_int(name, default, maximum=None):
+        raw = request.GET.get(name)
+
+        if raw is None:
+            return default
+
+        # Не принимаем пустые значения, отрицательные числа,
+        # дробные числа и другие некорректные значения.
+        if not raw.isascii() or not raw.isdigit():
+            raise APIError(
+                f"Параметр {name} должен быть положительным целым числом."
+            )
+
+        value = int(raw)
+
+        if value < 1:
+            raise APIError(
+                f"Параметр {name} должен быть не меньше 1."
+            )
+
+        if maximum is not None and value > maximum:
+            raise APIError(
+                f"Параметр {name} не должен превышать {maximum}."
+            )
+
+        return value
+
+    page = positive_int("page", 1)
+    page_size = positive_int("pageSize", 20, maximum=100)
+
+    return page, page_size
+
+
+def paginate_tasks(queryset, request):
+    """
+    Разбивает QuerySet задач на страницы.
+
+    Возвращает словарь с задачами и метаданными пагинации.
+    Передавать сюда нужно уже отфильтрованный по доступу QuerySet.
+    """
+    page_number, page_size = pagination_params(request)
+
+    # Сортировка должна быть стабильной, чтобы задачи не перескакивали
+    # между страницами при одинаковых position.
+    queryset = queryset.order_by("position", "pk")
+
+    paginator = Paginator(queryset, page_size)
+    total_tasks = paginator.count
+
+    try:
+        page_obj = paginator.page(page_number)
+    except EmptyPage:
+        raise APIError(
+            "Запрошенная страница не существует.",
+            "invalid_page",
+            400,
+        )
+
+    # task_json — существующий сериализатор проекта.
+    tasks_data = [task_json(task) for task in page_obj.object_list]
+
+    return {
+        "tasks": tasks_data,
+        "pagination": {
+            "page": page_number,
+            "pageSize": page_size,
+            "totalTasks": total_tasks,
+            "totalPages": paginator.num_pages if total_tasks else 0,
+        },
+    }
+
 
 
 @endpoint(public=True)
@@ -661,25 +746,131 @@ def tasks(request):
         log_event(t, request.user, "Создана задача")
     return {"task": task_json(t), "snapshot": snapshot(request)}
 
+@endpoint(("GET",))
+def project_tasks(request, project_id):
+    """
+    GET /api/projects/<project_id>/tasks/
 
-@endpoint(("PATCH", "DELETE"))
+    Возвращает задачи проекта, доступного текущему пользователю.
+    Поддерживает page и pageSize.
+    """
+
+    # Проверяем доступ пользователя к проекту.
+    # Для чтения manage=True не нужен:
+    # обычному участнику не требуется быть руководителем.
+    project = project_for(request.user, project_id)
+
+    # Отбираем только задачи нужного проекта.
+    queryset = (
+        Task.objects.filter(
+            column__board__project=project
+        )
+        .select_related("column", "column__board")
+        .prefetch_related("assignees")
+    )
+
+    return paginate_tasks(queryset, request)
+
+
+@endpoint(("GET",))
+def my_tasks(request):
+    """
+    GET /api/me/tasks/
+
+    Возвращает задачи, назначенные текущему пользователю.
+    """
+
+    # Список проектов, доступных пользователю.
+    accessible_project_ids = accessible(request.user).values("pk")
+
+    # Выбираем только назначенные этому пользователю задачи,
+    # находящиеся в доступных ему проектах.
+    queryset = (
+        Task.objects.filter(
+            column__board__project_id__in=accessible_project_ids,
+            assignees=request.user,
+        )
+        .select_related("column", "column__board")
+        .prefetch_related("assignees")
+        .distinct()
+    )
+
+    return paginate_tasks(queryset, request)
+
+
+
+@endpoint(("GET", "PATCH", "DELETE"))
 def task_detail(request, task_id):
+    """
+    GET    — получить задачу;
+    PATCH  — изменить задачу;
+    DELETE — удалить задачу.
+    """
+
+    # GET — отдельная ветка только для чтения.
+    # Пользователю достаточно иметь доступ к проекту.
+    if request.method == "GET":
+        task = get_object_or_404(
+            Task.objects.select_related("column__board")
+            .prefetch_related("assignees"),
+            pk=task_id,
+        )
+
+        # Проверяем доступ, но не требуем права управления.
+        project_for(
+            request.user,
+            task.column.board.project_id,
+        )
+
+        return {"task": task_json(task)}
+
+    # PATCH и DELETE сохраняют прежние правила:
+    # нужны права управления проектом.
     with transaction.atomic():
-        t = get_object_or_404(Task.objects.select_related("column__board"), pk=task_id)
-        p = project_for(request.user, t.column.board.project_id, manage=True, lock=True)
+        task = get_object_or_404(
+            Task.objects.select_related("column__board"),
+            pk=task_id,
+        )
+
+        project = project_for(
+            request.user,
+            task.column.board.project_id,
+            manage=True,
+            lock=True,
+        )
+
         if request.method == "DELETE":
-            t.delete()
+            task.delete()
+
         else:
-            if str(request.data.get("projectId")) != str(p.pk):
+            if str(request.data.get("projectId")) != str(project.pk):
                 raise APIError("Нельзя перенести задачу в другой проект.")
-            values, assignee = task_input(request.data, p)
+
+            values, assignee = task_input(request.data, project)
+
             for key, value in values.items():
-                setattr(t, key, value)
-            t.save()
-            # Preserve legacy multiple assignees when only other fields were edited.
-            if t.assignees.order_by("pk").values_list("pk", flat=True).first() != assignee.pk:
-                t.assignees.set([assignee])
-            log_event(t, request.user, "Обновлены поля задачи")
+                setattr(task, key, value)
+
+            task.save()
+
+            # Сохраняем прежнее поведение для старых задач,
+            # в которых может быть несколько исполнителей.
+            first_assignee_id = (
+                task.assignees
+                .order_by("pk")
+                .values_list("pk", flat=True)
+                .first()
+            )
+
+            if first_assignee_id != assignee.pk:
+                task.assignees.set([assignee])
+
+            log_event(
+                task,
+                request.user,
+                "Обновлены поля задачи",
+            )
+
     return {"snapshot": snapshot(request)}
 
 
@@ -745,14 +936,62 @@ def move_task(request, task_id):
     return {"snapshot": snapshot(request)}
 
 
-@endpoint(("POST",))
+
+@endpoint(("GET", "POST"))
 def comments(request, task_id):
-    with transaction.atomic():
-        t = get_object_or_404(Task.objects.select_related("column__board"), pk=task_id)
-        project_for(request.user, t.column.board.project_id)
-        Comment.objects.create(
-            task=t, user=request.user, text=text(request.data, "text", 2000, True)
+    """
+    GET  — получить комментарии задачи;
+    POST — создать комментарий.
+    """
+
+    task = get_object_or_404(
+        Task.objects.select_related("column__board"),
+        pk=task_id,
+    )
+
+    # Комментарии доступны только тем, кто имеет доступ к проекту.
+    project_for(
+        request.user,
+        task.column.board.project_id,
+    )
+
+    if request.method == "GET":
+        comments_queryset = (
+            Comment.objects.filter(task=task)
+            .select_related("user")
+            .order_by("created_at", "pk")
         )
+
+        return {
+            "comments": [
+                {
+                    "id": str(comment.pk),
+                    "taskId": str(comment.task_id),
+                    "userId": str(comment.user_id or ""),
+                    "text": comment.text,
+                    "createdAt": (
+                        comment.created_at.isoformat()
+                        if comment.created_at
+                        else ""
+                    ),
+                }
+                for comment in comments_queryset
+            ]
+        }
+
+    # POST — прежнее создание комментария.
+    with transaction.atomic():
+        Comment.objects.create(
+            task=task,
+            user=request.user,
+            text=text(
+                request.data,
+                "text",
+                2000,
+                True,
+            ),
+        )
+
     return {"snapshot": snapshot(request)}
 
 
