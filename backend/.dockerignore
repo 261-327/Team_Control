@@ -5,8 +5,4 @@ __pycache__
 *.sqlite3*
 staticfiles
 .ruff_cache
-config/test_settings.py
-config/legacy_test_urls.py
-tasks/tests.py
-tasks/test_*.py
 requirements-dev.txt

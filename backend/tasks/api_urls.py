@@ -18,6 +18,14 @@ urlpatterns = [
     path("directory/", api.directory),
     path("projects/", api.projects),
     path(
+    "projects/<int:project_id>/tasks/",
+    api.project_tasks,
+),
+path(
+    "me/tasks/",
+    api.my_tasks,
+),
+    path(
     "projects/<int:project_id>/members/",
     api.project_members,
 ),
