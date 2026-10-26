@@ -257,9 +257,329 @@ class APITests(TestCase):
         self.assertEqual(len(data['turns']), 1)
         self.assertFalse(data['capabilities']['chatReady'])
         self.client.force_login(self.stranger)
-        self.assertEqual(self.client.get('/api/assistant/?projectId=' + str(self.project.pk)).status_code, 404)
 
 
+        self.assertEqual(self.call('assistant', {'message': 'Что горит?'}).json()['taskIds'], [])
+        self.assertIn('не подключён', self.call('assistant', {'message': 'Напиши код'}).json()['text'])
+    def test_get_project_tasks(self):
+        # Arrange — создаём две задачи
+        first_id = self.create_task(title="Первая задача")
+        second_id = self.create_task(title="Вторая задача")
+
+        # Act — запрашиваем задачи проекта
+        response = self.client.get(
+            f"/api/projects/{self.project.pk}/tasks/"
+        )
+
+        # Assert — проверяем результат
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertIn("tasks", data)
+
+        task_ids = {str(task["id"]) for task in data["tasks"]}
+
+        self.assertIn(str(first_id), task_ids)
+        self.assertIn(str(second_id), task_ids)
+        self.assertEqual(data["pagination"]["totalTasks"], 2)
+    def test_get_my_assigned_tasks(self):
+        # Создаём задачу, назначенную участнику
+        member_task_id = self.create_task(
+            title="Задача участника",
+            assignee=self.member,
+        )
+
+        # Создаём задачу, назначенную владельцу
+        owner_task_id = self.create_task(
+            title="Задача владельца",
+            assignee=self.owner,
+        )
+
+        # Входим именно как участник
+        self.client.force_login(self.member)
+
+        # Запрашиваем личные задачи
+        response = self.client.get("/api/me/tasks/")
+
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertIn("tasks", data)
+
+        task_ids = {str(task["id"]) for task in data["tasks"]}
+
+        self.assertIn(str(member_task_id), task_ids)
+        self.assertNotIn(str(owner_task_id), task_ids)
+    def test_project_tasks_pagination(self):
+        # Создаём три задачи
+        task_ids = {
+            str(self.create_task(title="Задача 1")),
+            str(self.create_task(title="Задача 2")),
+            str(self.create_task(title="Задача 3")),
+        }
+
+        # Получаем первую страницу: две задачи
+        response_page_1 = self.client.get(
+            f"/api/projects/{self.project.pk}/tasks/?page=1&pageSize=2"
+        )
+
+        self.assertEqual(response_page_1.status_code, 200)
+
+        data_page_1 = response_page_1.json()
+        self.assertEqual(len(data_page_1["tasks"]), 2)
+        self.assertEqual(data_page_1["pagination"]["page"], 1)
+        self.assertEqual(data_page_1["pagination"]["pageSize"], 2)
+        self.assertEqual(data_page_1["pagination"]["totalTasks"], 3)
+        self.assertEqual(data_page_1["pagination"]["totalPages"], 2)
+
+        # Получаем вторую страницу: оставшаяся задача
+        response_page_2 = self.client.get(
+            f"/api/projects/{self.project.pk}/tasks/?page=2&pageSize=2"
+        )
+
+        self.assertEqual(response_page_2.status_code, 200)
+
+        data_page_2 = response_page_2.json()
+        self.assertEqual(len(data_page_2["tasks"]), 1)
+
+        # Проверяем, что страницы не повторяют задачи
+        ids_page_1 = {
+            str(task["id"]) for task in data_page_1["tasks"]
+        }
+        ids_page_2 = {
+            str(task["id"]) for task in data_page_2["tasks"]
+        }
+
+        self.assertTrue(ids_page_1.isdisjoint(ids_page_2))
+        self.assertEqual(ids_page_1 | ids_page_2, task_ids)
+    def test_project_tasks_reject_invalid_pagination(self):
+        self.create_task(title="Единственная задача")
+
+        invalid_queries = [
+            "?page=abc",
+            "?page=0",
+            "?pageSize=0",
+            "?pageSize=101",
+            "?page=2&pageSize=20",
+        ]
+
+        for query in invalid_queries:
+            with self.subTest(query=query):
+                response = self.client.get(
+                    f"/api/projects/{self.project.pk}/tasks/{query}"
+                )
+
+                self.assertEqual(
+                    response.status_code,
+                    400,
+                    msg=f"Запрос {query} должен возвращать HTTP 400",
+                )
+    def test_foreign_user_cannot_read_project_tasks(self):
+        # Входим под пользователем, который не состоит в проекте
+        self.client.force_login(self.stranger)
+
+        # Пытаемся получить задачи чужого проекта
+        response = self.client.get(
+            f"/api/projects/{self.project.pk}/tasks/"
+        )
+
+        # Ожидаем отказ в доступе
+        self.assertEqual(response.status_code, 404)
+    def test_foreign_user_cannot_read_task_comments(self):
+        # Создаём задачу в нашем проекте
+        task_id = self.create_task(title="Приватная задача")
+
+        # Входим под посторонним пользователем
+        self.client.force_login(self.stranger)
+
+        # Пытаемся получить комментарии задачи
+        response = self.client.get(
+            f"/api/tasks/{task_id}/comments/"
+        )
+
+        # Проверяем, что доступ закрыт
+        self.assertEqual(response.status_code, 404)
+    def test_get_task_comments(self):
+        task_id = self.create_task(title="Задача с комментариями")
+        first_id = self.create_task(title="Первая задача")
+        second_id = self.create_task(title="Вторая задача")
+        self.call(
+            f"tasks/{task_id}/comments",
+            {"text": "Первый комментарий"},
+         )
+    
+        response = self.client.get(
+            f"/api/tasks/{task_id}/comments/"
+            )
+    
+        self.assertEqual(response.status_code, 200)
+    
+        data = response.json()
+        self.assertIn("comments", data)
+        self.assertTrue(
+            any(
+                comment.get("text") == "Первый комментарий"
+                for comment in data["comments"]
+            )
+        )
+    
+
+        # Act — запрашиваем задачи проекта
+        response = self.client.get(
+            f"/api/projects/{self.project.pk}/tasks/"
+        )
+
+        # Assert — проверяем результат
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertIn("tasks", data)
+
+        task_ids = {str(task["id"]) for task in data["tasks"]}
+
+        self.assertIn(str(first_id), task_ids)
+        self.assertIn(str(second_id), task_ids)
+        self.assertEqual(data["pagination"]["totalTasks"], 2)
+    def test_get_my_assigned_tasks(self):
+        # Создаём задачу, назначенную участнику
+        member_task_id = self.create_task(
+            title="Задача участника",
+            assignee=self.member,
+        )
+
+        # Создаём задачу, назначенную владельцу
+        owner_task_id = self.create_task(
+            title="Задача владельца",
+            assignee=self.owner,
+        )
+
+        # Входим именно как участник
+        self.client.force_login(self.member)
+
+        # Запрашиваем личные задачи
+        response = self.client.get("/api/me/tasks/")
+
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertIn("tasks", data)
+
+        task_ids = {str(task["id"]) for task in data["tasks"]}
+
+        self.assertIn(str(member_task_id), task_ids)
+        self.assertNotIn(str(owner_task_id), task_ids)
+    def test_project_tasks_pagination(self):
+        # Создаём три задачи
+        task_ids = {
+            str(self.create_task(title="Задача 1")),
+            str(self.create_task(title="Задача 2")),
+            str(self.create_task(title="Задача 3")),
+        }
+
+        # Получаем первую страницу: две задачи
+        response_page_1 = self.client.get(
+            f"/api/projects/{self.project.pk}/tasks/?page=1&pageSize=2"
+        )
+
+        self.assertEqual(response_page_1.status_code, 200)
+
+        data_page_1 = response_page_1.json()
+        self.assertEqual(len(data_page_1["tasks"]), 2)
+        self.assertEqual(data_page_1["pagination"]["page"], 1)
+        self.assertEqual(data_page_1["pagination"]["pageSize"], 2)
+        self.assertEqual(data_page_1["pagination"]["totalTasks"], 3)
+        self.assertEqual(data_page_1["pagination"]["totalPages"], 2)
+
+        # Получаем вторую страницу: оставшаяся задача
+        response_page_2 = self.client.get(
+            f"/api/projects/{self.project.pk}/tasks/?page=2&pageSize=2"
+        )
+
+        self.assertEqual(response_page_2.status_code, 200)
+
+        data_page_2 = response_page_2.json()
+        self.assertEqual(len(data_page_2["tasks"]), 1)
+
+        # Проверяем, что страницы не повторяют задачи
+        ids_page_1 = {
+            str(task["id"]) for task in data_page_1["tasks"]
+        }
+        ids_page_2 = {
+            str(task["id"]) for task in data_page_2["tasks"]
+        }
+
+        self.assertTrue(ids_page_1.isdisjoint(ids_page_2))
+        self.assertEqual(ids_page_1 | ids_page_2, task_ids)
+    def test_project_tasks_reject_invalid_pagination(self):
+        self.create_task(title="Единственная задача")
+
+        invalid_queries = [
+            "?page=abc",
+            "?page=0",
+            "?pageSize=0",
+            "?pageSize=101",
+            "?page=2&pageSize=20",
+        ]
+
+        for query in invalid_queries:
+            with self.subTest(query=query):
+                response = self.client.get(
+                    f"/api/projects/{self.project.pk}/tasks/{query}"
+                )
+
+                self.assertEqual(
+                    response.status_code,
+                    400,
+                    msg=f"Запрос {query} должен возвращать HTTP 400",
+                )
+    def test_foreign_user_cannot_read_project_tasks(self):
+        # Входим под пользователем, который не состоит в проекте
+        self.client.force_login(self.stranger)
+
+        # Пытаемся получить задачи чужого проекта
+        response = self.client.get(
+            f"/api/projects/{self.project.pk}/tasks/"
+        )
+
+        # Ожидаем отказ в доступе
+        self.assertEqual(response.status_code, 404)
+    def test_foreign_user_cannot_read_task_comments(self):
+        # Создаём задачу в нашем проекте
+        task_id = self.create_task(title="Приватная задача")
+
+        # Входим под посторонним пользователем
+        self.client.force_login(self.stranger)
+
+        # Пытаемся получить комментарии задачи
+        response = self.client.get(
+            f"/api/tasks/{task_id}/comments/"
+        )
+
+        # Проверяем, что доступ закрыт
+        self.assertEqual(response.status_code, 404)
+    def test_get_task_comments(self):
+        task_id = self.create_task(title="Задача с комментариями")
+    
+        self.call(
+            f"tasks/{task_id}/comments",
+            {"text": "Первый комментарий"},
+         )
+    
+        response = self.client.get(
+            f"/api/tasks/{task_id}/comments/"
+            )
+    
+        self.assertEqual(response.status_code, 200)
+    
+        data = response.json()
+        self.assertIn("comments", data)
+        self.assertTrue(
+            any(
+                comment.get("text") == "Первый комментарий"
+                for comment in data["comments"]
+            )
+        )
+    
 
 from django.test import TransactionTestCase
 
