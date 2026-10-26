@@ -6,3 +6,7 @@
 
 # Downloaded local AI runtimes and weights (never push to Git).
 .runtime/
+
+# Python helper bytecode
+__pycache__/
+*.py[cod]
