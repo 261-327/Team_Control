@@ -60,7 +60,26 @@ docker compose --env-file infra/.env logs --tail 100 db
 
 ## 4. Проверить сохранность данных
 
-Данные хранятся в именованном Docker volume `postgres_data`, а не в папке `infra`. Для проверки сохранности используй существующие учебные данные или создай тестовую запись только в тестовой базе. Не удаляй volume.
+Данные хранятся в именованном Docker volume `postgres_data`, а не в папке `infra`. Для проверки используй только локальную учебную базу. Подключись к PostgreSQL:
+
+```powershell
+docker compose --env-file infra/.env exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+В приглашении `psql` выполни тестовые SQL-команды:
+
+```sql
+CREATE TABLE IF NOT EXISTS infra_volume_check (
+    id integer PRIMARY KEY,
+    note text NOT NULL
+);
+INSERT INTO infra_volume_check (id, note)
+VALUES (1, 'volume-ok')
+ON CONFLICT (id) DO UPDATE SET note = EXCLUDED.note;
+SELECT * FROM infra_volume_check;
+```
+
+Проверь, что результат содержит `volume-ok`, затем выйди командой `\\q`.
 
 Останови и снова запусти контейнеры:
 
@@ -70,7 +89,13 @@ docker compose --env-file infra/.env up -d db
 docker compose --env-file infra/.env ps
 ```
 
-После перехода `db` в статус `healthy` данные должны сохраниться. Не используй `docker compose down -v` для проверки: параметр `-v` удаляет именованные тома и данные в них.
+После перехода `db` в статус `healthy` снова подключись командой выше и выполни:
+
+```sql
+SELECT * FROM infra_volume_check;
+```
+
+Запись `volume-ok` должна остаться. Не используй `docker compose down -v` для проверки: параметр `-v` удаляет именованные тома и данные в них.
 
 ## 5. Запуск всего приложения
 
