@@ -105,9 +105,21 @@ class PasswordResetAPITests(TestCase):
     @patch("tasks.api.send_mail", side_effect=OSError("SMTP unavailable"))
     def test_smtp_failure_does_not_change_password(self, send_mail_mock):
         response = self.request_reset()
-        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["message"], "Если аккаунт с такой подтверждённой почтой существует, мы отправили инструкции по восстановлению.")
         self.assertTrue(self.user.__class__.objects.get(pk=self.user.pk).check_password("Original-Strong-123!"))
 
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend", EMAIL_HOST="smtp.example.com")
+    @patch("tasks.api.get_connection")
+    def test_smtp_connection_failure_is_reported_without_email_enumeration(self, get_connection_mock):
+        connection = get_connection_mock.return_value
+        connection.open.side_effect = OSError("SMTP unavailable")
+        known = self.request_reset()
+        unknown = self.request_reset("unknown@example.com")
+        self.assertEqual(known.status_code, 503)
+        self.assertEqual(known.json(), unknown.json())
+        self.assertTrue(self.user.__class__.objects.get(pk=self.user.pk).check_password("Original-Strong-123!"))
     def test_expired_token_is_rejected(self):
         self.request_reset()
         uid, token = self.token_from_mail()
