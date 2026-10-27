@@ -6,7 +6,6 @@ from django.contrib.sessions.models import Session
 from django.core import mail
 from django.core.cache import cache
 from django.test import TestCase, override_settings
-from django.utils import timezone
 
 from .models import WorkspaceUser
 
@@ -109,7 +108,6 @@ class PasswordResetAPITests(TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertTrue(self.user.__class__.objects.get(pk=self.user.pk).check_password("Original-Strong-123!"))
 
-
     def test_expired_token_is_rejected(self):
         self.request_reset()
         uid, token = self.token_from_mail()
@@ -124,6 +122,7 @@ class PasswordResetAPITests(TestCase):
             self.assertEqual(self.request_reset().status_code, 200)
         limited = self.request_reset()
         self.assertEqual(limited.status_code, 429)
+
     def test_password_validators_are_applied(self):
         self.request_reset()
         uid, token = self.token_from_mail()
