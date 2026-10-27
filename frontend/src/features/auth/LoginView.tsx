@@ -220,6 +220,11 @@ function LoginForm({ register, data }: { register: boolean; data: Snapshot }) {
                     />
                   </Field>
                 )}
+                {!register && (
+                  <p className="auth-switch" style={{ textAlign: "right" }}>
+                    <Link href="/forgot-password">Забыли пароль?</Link>
+                  </p>
+                )}
                 <Field
                   label="Пароль"
                   hint={
