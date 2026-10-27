@@ -35,7 +35,7 @@ class PasswordResetAPITests(TestCase):
 
     def token_from_mail(self):
         message = mail.outbox[-1].body
-        match = re.search(r"https?://[^\\s]+", message)
+        match = re.search(r"https?://[^\s]+", message)
         self.assertIsNotNone(match)
         parsed = urlparse(match.group(0))
         query = parse_qs(parsed.query)
