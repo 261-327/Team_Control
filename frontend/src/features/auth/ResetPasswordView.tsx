@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, Suspense, useState } from "react";
+import { Suspense, useState } from "react";
+import type { FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { client } from "@/services/client";
 import { Button, Field, FormError, LoadingState, Logo } from "@/components/ui";
