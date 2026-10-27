@@ -510,7 +510,7 @@ def auth_password_reset_request(request):
             raise SMTPException("SMTP is not configured")
         sent = send_mail(
             "Восстановление пароля в Сипи",
-            f"Чтобы задать новый пароль, откройте ссылку (действует 30 минут):\\n{reset_url}\\nЕсли вы не запрашивали сброс, проигнорируйте письмо.",
+            f"Чтобы задать новый пароль, откройте ссылку (действует 30 минут):\n{reset_url}\nЕсли вы не запрашивали сброс, проигнорируйте письмо.",
             settings.DEFAULT_FROM_EMAIL,
             [user.email],
             fail_silently=False,
