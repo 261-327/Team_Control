@@ -6,6 +6,7 @@ independently of the controls displayed in the browser.
 
 import hashlib
 import json
+import logging
 from datetime import timedelta
 from functools import wraps
 from smtplib import SMTPException
@@ -18,7 +19,7 @@ from django.contrib.sessions.models import Session
 from django.core.cache import cache
 from django.core.paginator import Paginator, EmptyPage
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
+from django.core.mail import get_connection, send_mail
 from django.core.validators import URLValidator, validate_email
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -58,6 +59,9 @@ from .serializers import (
     task_json,
 )
 from .workflow import STATUSES
+
+
+logger = logging.getLogger(__name__)
 
 
 class APIError(Exception):
@@ -498,27 +502,42 @@ def auth_password_reset_request(request):
     if password_reset_rate_limited(request, email):
         raise APIError("Слишком много запросов. Попробуйте через 15 минут.", "rate_limited", 429)
 
+    mail_connection = None
+    if settings.EMAIL_BACKEND.endswith("smtp.EmailBackend"):
+        if not settings.EMAIL_HOST:
+            raise APIError("Отправка писем пока не настроена. Попробуйте позже.", "unavailable", 503)
+        try:
+            mail_connection = get_connection(fail_silently=False)
+            mail_connection.open()
+        except (SMTPException, OSError) as exc:
+            raise APIError(registration_mail_error(exc), "unavailable", 503)
+
     user = WorkspaceUser.objects.filter(email__iexact=email, is_active=True, registration_pending=False).first()
     if not user:
+        if mail_connection:
+            mail_connection.close()
         return PASSWORD_RESET_RESPONSE
 
     uid = urlsafe_base64_encode(force_bytes(user.pk))
     token = default_token_generator.make_token(user)
     reset_url = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
     try:
-        if settings.EMAIL_BACKEND.endswith("smtp.EmailBackend") and not settings.EMAIL_HOST:
-            raise SMTPException("SMTP is not configured")
         sent = send_mail(
             "Восстановление пароля в Сипи",
             f"Чтобы задать новый пароль, откройте ссылку (действует 30 минут):\n{reset_url}\nЕсли вы не запрашивали сброс, проигнорируйте письмо.",
             settings.DEFAULT_FROM_EMAIL,
             [user.email],
             fail_silently=False,
+            connection=mail_connection,
         )
         if sent != 1:
             raise SMTPException("Not sent")
     except (SMTPException, OSError) as exc:
-        raise APIError(registration_mail_error(exc), "unavailable", 503)
+        # Do not turn recipient-specific delivery errors into an account-existence oracle.
+        logger.warning("Password reset email delivery failed: %s", type(exc).__name__)
+    finally:
+        if mail_connection:
+            mail_connection.close()
     return PASSWORD_RESET_RESPONSE
 
 
