@@ -22,6 +22,8 @@ function ResetPasswordForm() {
     setError("");
     try {
       await client.confirmPasswordReset({ uid, token, password, passwordConfirm });
+      // The backend revokes every session; refresh the app snapshot before linking back to login.
+      await client.refresh();
       setDone(true);
       setPassword("");
       setPasswordConfirm("");
