@@ -479,15 +479,23 @@ PASSWORD_RESET_RESPONSE = {
 
 def password_reset_rate_limited(request, email):
     ip = request.META.get("REMOTE_ADDR", "")
-    digest = hashlib.sha256((email.lower() + "|" + ip).encode()).hexdigest()
-    key = "sipi-password-reset-" + digest
-    if cache.get(key, 0) >= 3:
-        return True
-    if not cache.add(key, 1, 900):
-        try:
-            return cache.incr(key) > 3
-        except ValueError:
-            cache.set(key, 1, 900)
+    email_digest = hashlib.sha256(email.lower().encode()).hexdigest()
+    ip_digest = hashlib.sha256(ip.encode()).hexdigest()
+    limits = (
+        ("sipi-password-reset-email-" + email_digest, 3),
+        ("sipi-password-reset-ip-" + ip_digest, 20),
+    )
+    for key, limit in limits:
+        if cache.get(key, 0) >= limit:
+            return True
+        if not cache.add(key, 1, 900):
+            try:
+                count = cache.incr(key)
+            except ValueError:
+                cache.set(key, 1, 900)
+                count = 1
+            if count > limit:
+                return True
     return False
 
 
