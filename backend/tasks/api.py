@@ -552,7 +552,7 @@ def auth_password_reset_request(request):
 def revoke_user_sessions(user):
     # Django's session auth hash also invalidates sessions on their next request;
     # delete persisted sessions as well so logout takes effect immediately.
-    for session in Session.objects.filter(expire_date__gt=timezone.now()).iterator():
+    for session in Session.objects.filter(expire_date__gt=timezone.now()):
         try:
             if str(session.get_decoded().get("_auth_user_id")) == str(user.pk):
                 session.delete()
