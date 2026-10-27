@@ -15,6 +15,7 @@ from .models import WorkspaceUser
     EMAIL_HOST="test",
     DEFAULT_FROM_EMAIL="team@example.com",
     PASSWORD_RESET_TIMEOUT=1800,
+    ROOT_URLCONF="config.urls",
 )
 class PasswordResetAPITests(TestCase):
     def setUp(self):
