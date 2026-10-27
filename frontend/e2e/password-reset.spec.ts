@@ -1,9 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { mailCode, mailPasswordResetLink, register } from "./helpers";
+import { api, mailCode, mailPasswordResetLink, register } from "./helpers";
 
 test("password reset requires the emailed token and then regular OTP login", async ({ page }) => {
   const person = await register(page);
+  await api(page, "auth/logout", {});
   await page.goto("/login");
+  await page.reload();
   await page.getByRole("link", { name: "Забыли пароль?" }).click();
   await expect(page).toHaveURL(/forgot-password$/);
   await page.getByLabel("Электронная почта").fill(person.email);
