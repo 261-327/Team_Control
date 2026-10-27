@@ -139,6 +139,10 @@ class HttpClient implements DataClient {
   requestCode = (username: string, password: string) =>
     this.request<AuthChallenge>("auth/login", "POST", { username, password });
   resendCode = () => this.request<AuthChallenge>("auth/resend", "POST", {});
+  requestPasswordReset = (email: string) =>
+    this.request<{ message: string }>("auth/password-reset", "POST", { email });
+  confirmPasswordReset = (input: { uid: string; token: string; password: string; passwordConfirm: string }) =>
+    this.request<{ message: string }>("auth/password-reset/confirm", "POST", input);
   register = (input: {
     name: string;
     username: string;
