@@ -61,11 +61,12 @@ class PasswordResetAPITests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
 
     def test_reset_changes_password_token_is_single_use_and_sessions_are_revoked(self):
-        self.client.force_login(self.user)
-        old_session_key = self.client.session.session_key
+        from django.test import Client
+        old_browser = Client()
+        old_browser.force_login(self.user)
+        old_session_key = old_browser.session.session_key
         self.assertTrue(Session.objects.filter(session_key=old_session_key).exists())
 
-        self.client.logout()
         self.request_reset()
         uid, token = self.token_from_mail()
         response = self.confirm(uid, token)
