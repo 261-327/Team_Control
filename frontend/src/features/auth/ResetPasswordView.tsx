@@ -35,6 +35,7 @@ function ResetPasswordForm() {
   }
 
   return (
+    <div className="auth-page" style={{ gridTemplateColumns: "minmax(0, 1fr)", minHeight: "100dvh" }}>
     <main className="auth-main">
       <div className="auth-mobile-logo"><Link href="/login"><Logo /></Link></div>
       <section className="auth-form" aria-labelledby="reset-title">
@@ -85,6 +86,7 @@ function ResetPasswordForm() {
         )}
       </section>
     </main>
+    </div>
   );
 }
 
