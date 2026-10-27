@@ -120,6 +120,13 @@ class PasswordResetAPITests(TestCase):
         self.assertEqual(known.status_code, 503)
         self.assertEqual(known.json(), unknown.json())
         self.assertTrue(self.user.__class__.objects.get(pk=self.user.pk).check_password("Original-Strong-123!"))
+
+    def test_invalid_token_attempts_are_limited(self):
+        self.request_reset()
+        uid, _token = self.token_from_mail()
+        for _ in range(10):
+            self.assertEqual(self.confirm(uid, "invalid-token").status_code, 400)
+        self.assertEqual(self.confirm(uid, "invalid-token").status_code, 429)
     def test_expired_token_is_rejected(self):
         self.request_reset()
         uid, token = self.token_from_mail()
