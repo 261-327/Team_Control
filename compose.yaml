@@ -4,13 +4,16 @@ services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: team_control_db
-      POSTGRES_USER: postgres_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres_password}
+      POSTGRES_DB: ${DB_NAME:?Set DB_NAME in infra/.env}
+      POSTGRES_USER: ${DB_USER:?Set DB_USER in infra/.env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in infra/.env}
+    # Publish the database only on this computer. DB_PORT is the host port.
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres_user -d team_control_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -19,20 +22,17 @@ services:
     command: sh -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
     environment: &local-env
       DB_HOST: db
-      DB_NAME: team_control_db
-      DB_USER: postgres_user
-      DB_PASSWORD: ${DB_PASSWORD:-postgres_password}
+      DB_NAME: ${DB_NAME:?Set DB_NAME in infra/.env}
+      DB_USER: ${DB_USER:?Set DB_USER in infra/.env}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in infra/.env}
+      DB_PORT: "5432"
       DJANGO_DEBUG: "true"
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-sipi-docker-local-development-only}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
-
-
       ASSISTANT_OLLAMA_URL: http://ollama:11434
       ASSISTANT_MODEL: ${ASSISTANT_MODEL:-qwen3:4b}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8000}
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
-
-
       EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
       EMAIL_HOST: ${EMAIL_HOST:-}
       EMAIL_PORT: ${EMAIL_PORT:-587}

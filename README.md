@@ -61,24 +61,26 @@ DB_ENGINE=sqlite backend/.venv/bin/python backend/manage.py createsuperuser
 
 ## Запуск всей командой через Docker
 
+Перед запуском PostgreSQL создай локальный `infra/.env` по [инструкции по базе данных](infra/README.md). Этот файл содержит локальные параметры и не должен попадать в Git.
+
 Из корня репозитория:
 
 ```sh
-docker compose up --build
+docker compose --env-file infra/.env up --build
 ```
 
-Или привычной командой из `backend`:
+Или из каталога `backend`:
 
 ```sh
 cd backend
-docker compose up --build
+docker compose --env-file ../infra/.env up --build
 ```
 
 Для второго варианта нужен Docker Compose 2.20+ с поддержкой `include`.
 
 - **Интерфейс:** http://localhost:8000
 - **Админка Django:** http://localhost:8001/admin/
-- **Письма с кодами:** `docker compose logs -f backend`
+- **Письма с кодами:** `docker compose --env-file infra/.env logs -f backend` (из корня репозитория)
 
 Compose запускает PostgreSQL, применяет миграции, поднимает Django и собранный Next.js. Браузер обращается к одному адресу; `/api` проксируется в Django вместе с session/CSRF cookies. Данные PostgreSQL остаются в том же томе `backend_postgres_data`, который использовал прежний Compose. Удалять этот том для обновления не нужно.
 
