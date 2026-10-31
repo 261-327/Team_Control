@@ -6,16 +6,20 @@ independently of the controls displayed in the browser.
 
 import hashlib
 import json
+import logging
 from datetime import timedelta
 from functools import wraps
 from smtplib import SMTPException
 
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import default_token_generator
+from django.contrib.sessions.models import Session
 from django.core.cache import cache
 from django.core.paginator import Paginator, EmptyPage
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
+from django.core.mail import get_connection, send_mail
 from django.core.validators import URLValidator, validate_email
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -24,6 +28,8 @@ from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.views.csrf import csrf_failure as default_csrf_failure
 from django.views.decorators.cache import never_cache
 
@@ -53,6 +59,9 @@ from .serializers import (
     task_json,
 )
 from .workflow import STATUSES
+
+
+logger = logging.getLogger(__name__)
 
 
 class APIError(Exception):
@@ -462,6 +471,136 @@ def auth_logout(request):
     logout(request)
     get_token(request)
     return snapshot(request)
+
+PASSWORD_RESET_RESPONSE = {
+    "message": "Если аккаунт с такой подтверждённой почтой существует, мы отправили инструкции по восстановлению."
+}
+
+
+def password_reset_rate_limited(request, email):
+    ip = request.META.get("REMOTE_ADDR", "")
+    email_digest = hashlib.sha256(email.lower().encode()).hexdigest()
+    ip_digest = hashlib.sha256(ip.encode()).hexdigest()
+    limits = (
+        ("sipi-password-reset-email-" + email_digest, 3),
+        ("sipi-password-reset-ip-" + ip_digest, 20),
+    )
+    for key, limit in limits:
+        if cache.get(key, 0) >= limit:
+            return True
+        if not cache.add(key, 1, 900):
+            try:
+                count = cache.incr(key)
+            except ValueError:
+                cache.set(key, 1, 900)
+                count = 1
+            if count > limit:
+                return True
+    return False
+
+
+@endpoint(("POST",), public=True)
+def auth_password_reset_request(request):
+    email = text(request.data, "email", 254, True).lower()
+    try:
+        validate_email(email)
+    except ValidationError:
+        # Keep malformed and unknown addresses on the same public response path.
+        return PASSWORD_RESET_RESPONSE
+    if password_reset_rate_limited(request, email):
+        raise APIError("Слишком много запросов. Попробуйте через 15 минут.", "rate_limited", 429)
+
+    mail_connection = None
+    if settings.EMAIL_BACKEND.endswith("smtp.EmailBackend"):
+        if not settings.EMAIL_HOST:
+            raise APIError("Отправка писем пока не настроена. Попробуйте позже.", "unavailable", 503)
+        try:
+            mail_connection = get_connection(fail_silently=False)
+            mail_connection.open()
+        except (SMTPException, OSError) as exc:
+            raise APIError(registration_mail_error(exc), "unavailable", 503)
+
+    user = WorkspaceUser.objects.filter(email__iexact=email, is_active=True, registration_pending=False).first()
+    if not user:
+        if mail_connection:
+            mail_connection.close()
+        return PASSWORD_RESET_RESPONSE
+
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = default_token_generator.make_token(user)
+    reset_url = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
+    try:
+        sent = send_mail(
+            "Восстановление пароля в Сипи",
+            f"Чтобы задать новый пароль, откройте ссылку (действует 30 минут):\n{reset_url}\nЕсли вы не запрашивали сброс, проигнорируйте письмо.",
+            settings.DEFAULT_FROM_EMAIL,
+            [user.email],
+            fail_silently=False,
+            connection=mail_connection,
+        )
+        if sent != 1:
+            raise SMTPException("Not sent")
+    except (SMTPException, OSError) as exc:
+        # Do not turn recipient-specific delivery errors into an account-existence oracle.
+        logger.warning("Password reset email delivery failed: %s", type(exc).__name__)
+    finally:
+        if mail_connection:
+            mail_connection.close()
+    return PASSWORD_RESET_RESPONSE
+
+
+def revoke_user_sessions(user):
+    # Django's session auth hash also invalidates sessions on their next request;
+    # delete persisted sessions as well so logout takes effect immediately.
+    for session in Session.objects.filter(expire_date__gt=timezone.now()):
+        try:
+            if str(session.get_decoded().get("_auth_user_id")) == str(user.pk):
+                session.delete()
+        except (ValueError, TypeError):
+            continue
+
+
+@endpoint(("POST",), public=True)
+def auth_password_reset_confirm(request):
+    uid = text(request.data, "uid", 128, True)
+    token = text(request.data, "token", 256, True)
+    password = request.data.get("password", "")
+    password_confirm = request.data.get("passwordConfirm", "")
+    if not isinstance(password, str) or not isinstance(password_confirm, str) or len(password) > 4096:
+        raise APIError("Проверьте новый пароль.")
+    try:
+        user_id = force_str(urlsafe_base64_decode(uid))
+        user = WorkspaceUser.objects.get(pk=user_id)
+    except (ValueError, TypeError, OverflowError, WorkspaceUser.DoesNotExist):
+        user = None
+
+    ip = request.META.get("REMOTE_ADDR", "")
+    key_material = f"{uid}|{ip}"
+    attempt_key = "sipi-password-reset-verify-" + hashlib.sha256(key_material.encode()).hexdigest()
+    if cache.get(attempt_key, 0) >= 10:
+        raise APIError("Слишком много попыток. Запросите новую ссылку позже.", "rate_limited", 429)
+    if not user or not user.is_active or user.registration_pending or not default_token_generator.check_token(user, token):
+        cache.add(attempt_key, 0, 900)
+        try:
+            cache.incr(attempt_key)
+        except ValueError:
+            cache.set(attempt_key, 1, 900)
+        raise APIError("Ссылка недействительна или срок её действия истёк. Запросите восстановление заново.", "invalid_token", 400)
+    if password != password_confirm:
+        raise APIError("Пароли не совпадают.")
+    try:
+        validate_password(password, user=user)
+    except ValidationError as exc:
+        raise APIError(" ".join(exc.messages))
+    with transaction.atomic():
+        user = WorkspaceUser.objects.select_for_update().get(pk=user.pk)
+        if not user.is_active or user.registration_pending or not default_token_generator.check_token(user, token):
+            raise APIError("Ссылка недействительна или срок её действия истёк. Запросите восстановление заново.", "invalid_token", 400)
+        user.set_password(password)
+        user.save(update_fields=["password"])
+        revoke_user_sessions(user)
+    cache.delete(attempt_key)
+    return {"message": "Пароль изменён. Войдите с новым паролем и подтвердите вход кодом из письма."}
 
 
 @endpoint(("PATCH",))

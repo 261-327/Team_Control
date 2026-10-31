@@ -23,6 +23,13 @@ export interface DataClient {
   refresh(): Promise<void>;
   requestCode(username: string, password: string): Promise<AuthChallenge>;
   resendCode(): Promise<AuthChallenge>;
+  requestPasswordReset(email: string): Promise<{ message: string }>;
+  confirmPasswordReset(input: {
+    uid: string;
+    token: string;
+    password: string;
+    passwordConfirm: string;
+  }): Promise<{ message: string }>;
   verifyCode(code: string): Promise<void>;
   register(input: {
     name: string;
