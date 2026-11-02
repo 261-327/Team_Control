@@ -1,17 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
     <color name="beige">#EDE4D3</color>
     <color name="mustard">#D4A537</color>
-    <color name="mustard_dark">#B8902E</color>
+    <color name="mustard_dark">#8C6A17</color>
+    <color name="mustard_soft">#F4E6BF</color>
+
     <color name="text_primary">#2E2A25</color>
+    <color name="text_secondary">#6F675D</color>
     <color name="text_hint">#9C948A</color>
     <color name="field_bg">#FAF7F1</color>
     <color name="field_stroke">#E4DCCB</color>
+
+    <color name="status_urgent">#C2453A</color>
+    <color name="status_urgent_bg">#F8DCD7</color>
+    <color name="status_in_progress">#8C6A17</color>
+    <color name="status_in_progress_bg">#F4E6BF</color>
+    <color name="status_review">#4F7A4D</color>
+    <color name="status_review_bg">#DCE8DA</color>
+    <color name="status_backlog">#6F675D</color>
+    <color name="status_backlog_bg">#ECE6DC</color>
 </resources>

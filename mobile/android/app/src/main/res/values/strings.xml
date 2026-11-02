@@ -1,3 +1,70 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="ru">
     <string name="app_name">SIPI_AI</string>
+
+    <string name="navigation_drawer_open">Открыть меню</string>
+    <string name="navigation_drawer_close">Закрыть меню</string>
+    <string name="action_search">Поиск</string>
+    <string name="action_notifications">Уведомления</string>
+    <string name="action_undo">Отменить</string>
+    <string name="main_logo_description">Логотип Сипи</string>
+
+    <string name="title_profile">Профиль</string>
+    <string name="title_calendar">Календарь</string>
+
+    <string name="tab_urgent">Срочно</string>
+    <string name="tab_in_progress">В процессе</string>
+    <string name="tab_review">На проверке</string>
+    <string name="tab_backlog">Сделанные</string>
+
+    <string name="status_urgent">Срочно</string>
+    <string name="status_in_progress">В процессе</string>
+    <string name="status_review">На проверке</string>
+    <string name="status_backlog">Сделано</string>
+
+    <string name="register_logo_description">Логотип SIPI AI</string>
+    <string name="register_title">Регистрация</string>
+    <string name="register_subtitle">Создайте новый аккаунт</string>
+    <string name="register_full_name_label">ФИО</string>
+    <string name="register_full_name_hint">Иванов Иван Иванович</string>
+    <string name="register_email_label">Почта</string>
+    <string name="register_email_hint">example@mail.ru</string>
+    <string name="register_submit">Зарегистрироваться</string>
+    <string name="register_error_empty_fields">Заполните все поля</string>
+    <string name="register_success">Регистрация: %1$s / %2$s</string>
+
+    <string name="tasks_empty">Задач нет</string>
+    <string name="tasks_empty_hint">Здесь появятся задачи с этим статусом</string>
+    <string name="tasks_count_one">%1$d задача</string>
+    <string name="tasks_count_few">%1$d задачи</string>
+    <string name="tasks_count_many">%1$d задач</string>
+
+    <string name="task_deadline">Сдать до %1$s</string>
+    <string name="task_sent_for_review">Отправлено на проверку</string>
+    <string name="task_submit_for_review">На проверку</string>
+    <string name="task_submitted">Задача отправлена на проверку</string>
+    <string name="task_show_more">Подробнее</string>
+    <string name="task_show_less">Свернуть</string>
+    <string name="task_assignee_description">Исполнитель</string>
+
+    <string name="deadline_expired">Дедлайн истёк</string>
+    <string name="deadline_last_day">Сегодня последний день</string>
+    <string name="deadline_days_left_one">Остался %1$d день</string>
+    <string name="deadline_days_left_few">Осталось %1$d дня</string>
+    <string name="deadline_days_left_many">Осталось %1$d дней</string>
+
+    <string name="calendar_prev_month">Предыдущий месяц</string>
+    <string name="calendar_next_month">Следующий месяц</string>
+    <string name="calendar_no_tasks">На этот день задач нет</string>
+    <string name="calendar_task_dot" translatable="false">•</string>
+    <string name="weekday_mon">Пн</string>
+    <string name="weekday_tue">Вт</string>
+    <string name="weekday_wed">Ср</string>
+    <string name="weekday_thu">Чт</string>
+    <string name="weekday_fri">Пт</string>
+    <string name="weekday_sat">Сб</string>
+    <string name="weekday_sun">Вс</string>
+
+    <string name="profile_avatar_description">Аватар профиля</string>
+    <string name="profile_name_missing">Имя не указано</string>
+    <string name="profile_email_missing">Email не указан</string>
 </resources>

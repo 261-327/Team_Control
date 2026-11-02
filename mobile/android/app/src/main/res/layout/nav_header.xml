@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/beige"
+    android:orientation="vertical"
+    android:paddingHorizontal="24dp"
+    android:paddingTop="24dp"
+    android:paddingBottom="20dp">
+
+    <ImageView
+        android:layout_width="110dp"
+        android:layout_height="32dp"
+        android:contentDescription="@string/main_logo_description"
+        android:scaleType="fitStart"
+        android:src="@drawable/logotip_sipi" />
+
+    <ImageView
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/bg_avatar"
+        android:contentDescription="@string/profile_avatar_description"
+        android:padding="12dp"
+        android:src="@drawable/ic_person"
+        app:tint="@color/mustard_dark" />
+
+    <TextView
+        android:id="@+id/tvHeaderName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:textColor="@color/text_primary"
+        android:textSize="17sp"
+        android:textStyle="bold"
+        tools:text="Иванов Иван Иванович" />
+
+    <TextView
+        android:id="@+id/tvHeaderEmail"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:textColor="@color/text_hint"
+        android:textSize="14sp"
+        tools:text="example@mail.ru" />
+
+</LinearLayout>

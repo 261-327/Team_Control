@@ -94,3 +94,25 @@ export async function seedTask(page: Page, projectId: string, title: string) {
   expect(response.ok()).toBe(true);
   return (await response.json()).task.id as string;
 }
+
+export async function mailPasswordResetLink(email: string) {
+  if (!mailPath) throw new Error("Set SIPI_TEST_MAIL_DIR to the isolated Django file-mail directory.");
+  let link = "";
+  await expect.poll(async () => {
+    const files = await Promise.all((await readdir(mailPath)).map(async (name) => ({
+      name, modified: (await stat(path.join(mailPath, name))).mtimeMs,
+    })));
+    for (const file of files.sort((a, b) => b.modified - a.modified)) {
+      const contents = await readFile(path.join(mailPath, file.name), "utf8");
+      for (const message of contents.split("--------------------").reverse()) {
+        if (!message.includes("To: " + email) || !message.includes("Восстановление пароля")) continue;
+        const body = message.includes("Content-Transfer-Encoding: base64")
+          ? Buffer.from(message.split("\n\n").pop()!.trim(), "base64").toString("utf8") : message;
+        const line = body.split("\n").find((item) => item.includes("reset-password?uid="));
+        if (line) { const start = line.indexOf("http"); if (start >= 0) { link = line.slice(start).trim().split(" ")[0]; return link; } }
+      }
+    }
+    return "";
+  }).toContain("reset-password?uid=");
+  return link;
+}
