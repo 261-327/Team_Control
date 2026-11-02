@@ -559,12 +559,168 @@ def projects(request):
 
 
 
-@endpoint(("GET", "DELETE"))
+
+@endpoint(("GET", "PATCH", "DELETE"))
 def project_detail(request, project_id):
     if request.method == "GET":
         project = project_for(request.user, project_id)
         return {"project": project_json(project)}
 
+    if request.method == "PATCH":
+        data = request.data
+
+        if "leaderId" not in data or "teacherId" not in data:
+            raise APIError(
+                "Укажите руководителя и преподавателя проекта."
+            )
+        if (
+                data["teacherId"] not in (None, "")
+                and identifier(data["leaderId"]) == identifier(data["teacherId"])
+        ):
+            raise APIError(
+                "Один человек не может одновременно быть руководителем и преподавателем проекта."
+            )
+
+        with transaction.atomic():
+            project = project_for(
+                request.user,
+                project_id,
+                manage=True,
+                lock=True,
+            )
+
+            # Only an active student can become the project leader.
+            leader = get_object_or_404(
+                WorkspaceUser,
+                pk=identifier(data["leaderId"]),
+                is_active=True,
+                account_type="student",
+            )
+
+            # An empty teacherId removes the teacher assignment.
+            teacher_id = data["teacherId"]
+            teacher = None
+            if teacher_id not in (None, ""):
+                teacher = get_object_or_404(
+                    WorkspaceUser,
+                    pk=identifier(teacher_id),
+                    is_active=True,
+                    account_type="teacher",
+                )
+
+            if leader and project.memberships.filter(
+                    user=leader,
+                    access_role="coordinator",
+            ).exists():
+                if not data.get("confirmCoordinatorDemotion", False):
+                    raise APIError(
+                        "Назначение координатора руководителем изменит его роль в этом проекте. Требуется подтверждение.",
+                        "coordinator_confirmation_required",
+                        409,
+                    )
+
+                # A single Membership cannot hold both access roles.
+                project.memberships.filter(
+                    user=leader,
+                    access_role="coordinator",
+                ).update(access_role="member")
+
+            if teacher and project.memberships.filter(
+                    user=teacher,
+                    access_role="coordinator",
+            ).exists():
+                raise APIError(
+                    "Сначала измените роль координатора этого пользователя.",
+                    "conflict",
+                    409,
+                )
+
+            old_leader_id = project.owner_id
+
+            if teacher and teacher.pk == leader.pk:
+                raise APIError(
+                    "Один человек не может одновременно быть руководителем и преподавателем проекта."
+                )
+
+            # Preserve the former leader as a regular participant.
+            if old_leader_id != leader.pk:
+                old_leader_membership, _ = Membership.objects.get_or_create(
+                    project=project,
+                    user_id=old_leader_id,
+                    defaults={
+                        "role": "other",
+                        "custom_role": "Участник",
+                        "is_confirmed": True,
+                    },
+                )
+                old_leader_membership.access_role = "member"
+                old_leader_membership.is_confirmed = True
+                old_leader_membership.role = "other"
+                old_leader_membership.developer_specialization = ""
+                old_leader_membership.custom_role = "Участник"
+                old_leader_membership.save()
+
+            # Update the project owner.
+            project.owner = leader
+            project.save(update_fields=["owner"])
+
+            # Ensure the new leader has a confirmed membership.
+            leader_membership, _ = Membership.objects.get_or_create(
+                project=project,
+                user=leader,
+                defaults={
+                    "role": "other",
+                    "custom_role": "Руководитель",
+                    "access_role": "member",
+                    "is_confirmed": True,
+                },
+            )
+            leader_membership.is_confirmed = True
+            leader_membership.role = "other"
+            leader_membership.developer_specialization = ""
+            leader_membership.custom_role = "Руководитель"
+            leader_membership.access_role = "member"
+            leader_membership.save()
+
+            # Demote the previous teacher without deleting their membership.
+            previous_teachers = Membership.objects.filter(
+                project=project,
+                access_role="teacher",
+            ).exclude(user=teacher)
+
+            for membership in previous_teachers:
+                membership.access_role = "member"
+                membership.is_confirmed = True
+                membership.role = "other"
+                membership.developer_specialization = ""
+                membership.custom_role = "Участник"
+                membership.save()
+
+            # Assign the new teacher, or leave the project without one.
+            if teacher:
+                teacher_membership, _ = Membership.objects.get_or_create(
+                    project=project,
+                    user=teacher,
+                    defaults={
+                        "role": "other",
+                        "custom_role": "Преподаватель",
+                        "access_role": "teacher",
+                        "is_confirmed": True,
+                    },
+                )
+                teacher_membership.access_role = "teacher"
+                teacher_membership.is_confirmed = True
+                teacher_membership.role = "other"
+                teacher_membership.developer_specialization = ""
+                teacher_membership.custom_role = "Преподаватель"
+                teacher_membership.save()
+
+        return {
+            "project": project_json(project),
+            "snapshot": snapshot(request),
+        }
+
+    # Keep the existing DELETE behavior.
     with transaction.atomic():
         project = project_for(
             request.user,
@@ -575,6 +731,7 @@ def project_detail(request, project_id):
         project.delete()
 
     return {"snapshot": snapshot(request)}
+
 
 
 @endpoint(("GET",))
