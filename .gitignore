@@ -23,3 +23,11 @@ local.properties
 # Python helper bytecode.
 __pycache__/
 *.py[cod]
+
+# Local environment variables and secrets (never commit these).
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example

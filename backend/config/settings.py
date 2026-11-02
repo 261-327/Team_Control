@@ -125,6 +125,8 @@ INSTALLED_APPS = [
     "tasks",
 ]
 AUTH_USER_MODEL = "tasks.WorkspaceUser"
+# Password-reset links expire after 30 minutes.
+PASSWORD_RESET_TIMEOUT = 1800
 
 # SMTP credentials are supplied through the environment, never committed.
 EMAIL_BACKEND = os.environ.get(
