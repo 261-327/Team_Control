@@ -1,11 +1,11 @@
-name: Backend membership checks
+name: Backend and frontend checks
 
 on:
   pull_request:
     paths: ['backend/**', 'frontend/**', '.github/workflows/backend-membership.yml']
   push:
     branches: [main]
-    paths: ['backend/**', '.github/workflows/backend-membership.yml']
+    paths: ['backend/**', 'frontend/**', '.github/workflows/backend-membership.yml']
 
 permissions:
   contents: read
