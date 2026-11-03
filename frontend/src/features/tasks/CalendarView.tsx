@@ -6,7 +6,7 @@ import { useReadyData } from "@/providers/DataProvider";
 import { useUi } from "@/providers/UiContext";
 import { Button, EmptyState, IconButton } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
-import { dayKey, dateLabel } from "@/lib/format";
+import { dayKey, dateLabel, plural } from "@/lib/format";
 import { createCalendar } from "@/lib/calendar";
 import { TaskList } from "./TaskViews";
 
@@ -135,7 +135,7 @@ export function CalendarView() {
                 <button
                   className="calendar-day-button"
                   onClick={() => setSelectedDay(selectedDay === key ? "" : key)}
-                  aria-label={`${dateLabel(iso)}, ${tasks.length} задач`}
+                  aria-label={`${dateLabel(iso)}, ${plural(tasks.length)}`}
                   aria-pressed={selectedDay === key}
                 >
                   {date.getUTCDate()}

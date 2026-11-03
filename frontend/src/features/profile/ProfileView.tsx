@@ -10,13 +10,14 @@ import { Avatar, Button, Field, FormError, useAction } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 
 import { RoleEditor } from "@/features/projects/RoleFields";
-import { professions } from "@/lib/format";
+import { professions, pluralWord } from "@/lib/format";
 
 import { ColleaguesView } from "./ColleaguesView";
 
 export function ProfileView() {
   const data = useReadyData();
   const user = data.users.find((u) => u.id === data.sessionId)!;
+  const taskCount = data.tasks.filter((t) => t.assigneeId === user.id).length;
   const [name, setName] = useState(user.name);
   const [editingRole, setEditingRole] = useState("");
   const [bio, setBio] = useState(user.bio);
@@ -56,11 +57,11 @@ export function ProfileView() {
             <div className="profile-stat">
               <div>
                 <strong>{data.projects.length}</strong>
-                <span>проекта</span>
+                <span>{pluralWord(data.projects.length, ["проект", "проекта", "проектов"])}</span>
               </div>
               <div>
-                <strong>{data.tasks.filter((t) => t.assigneeId === user.id).length}</strong>
-                <span>задач</span>
+                <strong>{taskCount}</strong>
+                <span>{pluralWord(taskCount)}</span>
               </div>
             </div>
             <Button

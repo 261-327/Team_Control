@@ -19,7 +19,7 @@ import {
   useAction,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
-import { dateLabel, professions, plural, statusIcon } from "@/lib/format";
+import { dateLabel, professions, plural, pluralWord, statusIcon } from "@/lib/format";
 import {
   defaultFilters,
   filterTasks,
@@ -55,8 +55,7 @@ export function ProjectsView() {
         <div>
           <strong>{data.projects.length}</strong>
           <span>
-            {plural(data.projects.length, ["проект", "проекта", "проектов"]).replace(/^\d+\s*/, "")}{" "}
-            в пространстве
+            {pluralWord(data.projects.length, ["проект", "проекта", "проектов"])} в пространстве
           </span>
         </div>
         <p>Команда, задачи и материалы — в каждом проекте.</p>
@@ -792,7 +791,7 @@ export function ProjectSettingsView() {
             <strong>{c.name}</strong>
             <span>
               {data.tasks.filter((t) => t.projectId === projectId && t.status === c.id).length} /{" "}
-              {c.limit} задач
+              {plural(c.limit)}
             </span>
             {manage && (
               <IconButton
