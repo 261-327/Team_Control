@@ -61,6 +61,12 @@ export interface DataClient {
     teacherId?: string,
   ): Promise<Project>;
   deleteProject(id: string): Promise<void>;
+  updateProjectAssignments(
+    id: string,
+    leaderId: string,
+    teacherId: string,
+    confirmCoordinatorDemotion?: boolean,
+  ): Promise<{ project: Project; snapshot: Snapshot }>;
   directory(
     query: string,
   ): Promise<Pick<Project, "id" | "name" | "description" | "color" | "symbol">[]>;

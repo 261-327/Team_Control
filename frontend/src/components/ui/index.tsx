@@ -273,6 +273,8 @@ export function ConfirmDialog({
   onConfirm,
   onClose,
   challenge,
+  hideIcon = false,
+  children,
 }: {
   title: string;
   description: string;
@@ -280,6 +282,8 @@ export function ConfirmDialog({
   onConfirm: () => Promise<unknown>;
   onClose: () => void;
   challenge?: string;
+  hideIcon?: boolean;
+  children?: React.ReactNode;
 }) {
   const action = useAction();
   const [confirmation, setConfirmation] = useState("");
@@ -291,9 +295,12 @@ export function ConfirmDialog({
           if (!challenge || confirmation === challenge) void action.run(onConfirm, onClose);
         }}
       >
-        <span className="confirm-icon">
-          <Icon name="trash" size={27} />
-        </span>
+        {!hideIcon && (
+          <span className="confirm-icon">
+            <Icon name="trash" size={27} />
+          </span>
+        )}
+        {children}
         {challenge && (
           <Field label={`Для подтверждения введите «${challenge}»`} required>
             <input

@@ -172,6 +172,275 @@ class APITests(TestCase):
         self.assertEqual([p['id'] for p in data['projects']], [pid])
         self.assertEqual(next(u for u in data['users'] if u['id'] == str(staff.pk))['scopeProjectIds'], [pid])
 
+    def test_coordinator_needs_confirmation_before_becoming_leader(self):
+        coordinator = WorkspaceUser.objects.create_user(
+            'project_coordinator',
+            'project_coordinator@example.com',
+            'Strong-pass-57!',
+            account_type='student',
+        )
+        Membership.objects.create(
+            project=self.project,
+            user=coordinator,
+            is_confirmed=True,
+            role='other',
+            custom_role='Координатор',
+            access_role='coordinator',
+        )
+
+        response = self.call(
+            f'projects/{self.project.pk}',
+            {
+                'leaderId': str(coordinator.pk),
+                'teacherId': str(self.teacher.pk),
+            },
+            'patch',
+        )
+
+        self.assertEqual(response.status_code, 409, response.content)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.owner_id, self.owner.pk)
+
+        response = self.call(
+            f'projects/{self.project.pk}',
+            {
+                'leaderId': str(coordinator.pk),
+                'teacherId': str(self.teacher.pk),
+                'confirmCoordinatorDemotion': True,
+            },
+            'patch',
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.owner_id, coordinator.pk)
+
+        membership = Membership.objects.get(
+            project=self.project,
+            user=coordinator,
+        )
+        self.assertEqual(membership.access_role, 'member')
+
+        # The coordinator's role in another project must remain unchanged.
+        other_project = Project.objects.create(
+            name='Другой проект',
+            owner=self.owner,
+        )
+        other_membership = Membership.objects.create(
+            project=other_project,
+            user=coordinator,
+            is_confirmed=True,
+            role='other',
+            custom_role='Координатор',
+            access_role='coordinator',
+        )
+
+        other_membership.refresh_from_db()
+        self.assertEqual(other_membership.access_role, 'coordinator')
+
+    def test_project_assignments_can_be_changed_atomically(self):
+        new_teacher = WorkspaceUser.objects.create_user(
+            'new_teacher',
+            'new_teacher@example.com',
+            'Strong-pass-57!',
+            account_type='teacher',
+        )
+
+        task_id = self.create_task(assignee=self.owner)
+
+        response = self.call(
+            f'projects/{self.project.pk}',
+            {
+                'leaderId': str(self.member.pk),
+                'teacherId': str(new_teacher.pk),
+            },
+            'patch',
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.owner_id, self.member.pk)
+
+        # The former leader remains a confirmed project participant.
+        old_leader_membership = Membership.objects.get(
+            project=self.project,
+            user=self.owner,
+        )
+        self.assertTrue(old_leader_membership.is_confirmed)
+        self.assertEqual(old_leader_membership.access_role, 'member')
+
+        # The new leader has a confirmed membership.
+        new_leader_membership = Membership.objects.get(
+            project=self.project,
+            user=self.member,
+        )
+        self.assertTrue(new_leader_membership.is_confirmed)
+
+        # The former teacher remains a participant, but is no longer a teacher.
+        old_teacher_membership = Membership.objects.get(
+            project=self.project,
+            user=self.teacher,
+        )
+        self.assertEqual(old_teacher_membership.access_role, 'member')
+
+        # The new teacher is assigned correctly.
+        new_teacher_membership = Membership.objects.get(
+            project=self.project,
+            user=new_teacher,
+        )
+        self.assertTrue(new_teacher_membership.is_confirmed)
+        self.assertEqual(new_teacher_membership.access_role, 'teacher')
+
+        # Changing assignments must not remove task assignments.
+        task = Task.objects.get(pk=task_id)
+        self.assertTrue(
+            task.assignees.filter(pk=self.owner.pk).exists()
+        )
+
+    def test_same_user_cannot_be_leader_and_teacher(self):
+        self.assertEqual(self.project.owner_id, self.owner.pk)
+        response = self.call(
+            f'projects/{self.project.pk}',
+            {
+                'leaderId': str(self.member.pk),
+                'teacherId': str(self.member.pk),
+            },
+            'patch',
+        )
+        self.assertEqual(response.status_code, 400, response.content.decode())
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.owner_id, self.owner.pk)
+
+    def test_inactive_student_cannot_become_project_leader(self):
+        inactive_student = WorkspaceUser.objects.create_user(
+            'inactive_student',
+            'inactive_student@example.com',
+            'Strong-pass-57!',
+            is_active=False,
+        )
+
+        response = self.call(
+            f'projects/{self.project.pk}',
+            {
+                'leaderId': str(inactive_student.pk),
+                'teacherId': str(self.teacher.pk),
+            },
+            'patch',
+        )
+
+        self.assertEqual(response.status_code, 404, response.content)
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.owner_id, self.owner.pk)
+
+    def test_wrong_account_types_cannot_be_assigned(self):
+        # A teacher cannot become the project leader.
+        response = self.call(
+            f'projects/{self.project.pk}',
+            {
+                'leaderId': str(self.teacher.pk),
+                'teacherId': str(self.owner.pk),
+            },
+            'patch',
+        )
+        self.assertEqual(response.status_code, 404, response.content)
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.owner_id, self.owner.pk)
+
+        # A student cannot be assigned as the teacher.
+        response = self.call(
+            f'projects/{self.project.pk}',
+            {
+                'leaderId': str(self.owner.pk),
+                'teacherId': str(self.member.pk),
+            },
+            'patch',
+        )
+        self.assertEqual(response.status_code, 404, response.content)
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.owner_id, self.owner.pk)
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.owner_id, self.owner.pk)
+
+    def test_coordinator_cannot_change_project_outside_scope(self):
+        coordinator = WorkspaceUser.objects.create_user(
+            'scoped_coordinator',
+            'scoped_coordinator@example.com',
+            'Strong-pass-57!',
+            account_type='staff',
+        )
+
+        # Create another project that this coordinator does not manage.
+        other_project = Project.objects.create(
+            name='Other project',
+            owner=self.member,
+        )
+        Membership.objects.create(
+            project=other_project,
+            user=self.member,
+            is_confirmed=True,
+            role='other',
+            custom_role='Руководитель',
+        )
+
+        self.client.force_login(coordinator)
+        response = self.call(
+            f'projects/{other_project.pk}',
+            {
+                'leaderId': str(self.member.pk),
+                'teacherId': str(self.teacher.pk),
+            },
+            'patch',
+        )
+
+        self.assertEqual(response.status_code, 404, response.content)
+
+        other_project.refresh_from_db()
+        self.assertEqual(other_project.owner_id, self.member.pk)
+
+    def test_stranger_cannot_change_project_assignments(self):
+        self.client.force_login(self.stranger)
+
+        response = self.call(
+            f'projects/{self.project.pk}',
+            {
+                'leaderId': str(self.member.pk),
+                'teacherId': str(self.teacher.pk),
+            },
+            'patch',
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.owner_id, self.owner.pk)
+
+
+    def test_project_teacher_can_be_unassigned(self):
+        response = self.call(
+            f'projects/{self.project.pk}',
+            {
+                'leaderId': str(self.owner.pk),
+                'teacherId': '',
+            },
+            'patch',
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+
+        teacher_membership = Membership.objects.get(
+            project=self.project,
+            user=self.teacher,
+        )
+        self.assertTrue(teacher_membership.is_confirmed)
+        self.assertEqual(teacher_membership.access_role, 'member')
+
     def test_real_registration_login_otp_resume_and_logout(self):
         self.client.logout()
         response = self.call('auth/register', {'name': 'Новый Студент', 'username': 'newstudent', 'email': 'newstudent@example.com', 'password': 'Secure-test-195!', 'passwordConfirm': 'Secure-test-195!'})

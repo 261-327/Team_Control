@@ -28,4 +28,4 @@ test("password reset requires the emailed token and then regular OTP login", asy
   await page.getByLabel("Шестизначный код").fill(await mailCode(person.email));
   await page.getByRole("button", { name: "Подтвердить и войти" }).click();
   await expect(page).toHaveURL(/my-tasks$/);
-}
+});

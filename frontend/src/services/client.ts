@@ -215,6 +215,21 @@ class HttpClient implements DataClient {
   deleteProject = async (id: string) => {
     await this.mutate(`projects/${id}`, "DELETE");
   };
+  updateProjectAssignments = async (
+    id: string,
+    leaderId: string,
+    teacherId: string,
+    confirmCoordinatorDemotion = false,
+  ) =>
+    await this.mutate<{ project: Project; snapshot: Snapshot }>(
+      `projects/${id}`,
+      "PATCH",
+      {
+        leaderId,
+        teacherId,
+        confirmCoordinatorDemotion,
+      },
+    );
   directory = async (query: string) =>
     (await this.request<{ projects: Project[] }>(`directory?q=${encodeURIComponent(query)}`))
       .projects;
