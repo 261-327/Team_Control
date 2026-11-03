@@ -6,6 +6,9 @@ independently of the controls displayed in the browser.
 
 import json
 import logging
+import os
+import uuid
+from urllib.parse import quote
 from datetime import timedelta
 from functools import wraps
 from smtplib import SMTPException
@@ -16,6 +19,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sessions.models import Session
 from django.core.paginator import Paginator, EmptyPage
+from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError
 from django.core.mail import get_connection, send_mail
 from django.core.validators import URLValidator, validate_email
@@ -1384,8 +1388,10 @@ def material_detail(request, material_id):
         m = get_object_or_404(Material, pk=material_id)
         project_for(request.user, m.project_id, manage=True)
         if request.method == "DELETE":
-            m.delete()
+            m.delete()  # pre_delete signal removes private bytes after the transaction commits.
         else:
+            if m.kind != "link":
+                raise APIError("Файловый материал нельзя редактировать как ссылку.")
             m.title, m.description, m.url = (
                 text(request.data, "title", 255, True),
                 text(request.data, "description", 2000),
@@ -1393,6 +1399,132 @@ def material_detail(request, material_id):
             )
             m.save(update_fields=["title", "description", "url"])
     return {"snapshot": snapshot(request)}
+
+
+
+MAX_PROJECT_FILE_SIZE = 10 * 1024 * 1024
+PROJECT_FILE_SIGNATURES = {
+    ".pdf": ("application/pdf", lambda data: data.startswith(b"%PDF-")),
+    ".png": ("image/png", lambda data: data.startswith(b"\x89PNG\r\n\x1a\n")),
+    ".jpg": ("image/jpeg", lambda data: data.startswith(b"\xff\xd8\xff")),
+    ".jpeg": ("image/jpeg", lambda data: data.startswith(b"\xff\xd8\xff")),
+}
+
+
+@never_cache
+def material_file_upload(request, project_id):
+    """Save an allow-listed file into private storage after checking its signature."""
+    if request.method != "POST":
+        response = error("Метод не поддерживается.", "method_not_allowed", 405)
+        response["Allow"] = "POST"
+        return response
+    if not request.user.is_authenticated:
+        return error("Войдите в аккаунт.", "unauthenticated", 401)
+    if not (request.content_type or "").startswith("multipart/form-data"):
+        return error("Отправьте файл через форму загрузки.", "validation", 400)
+
+    uploaded = request.FILES.get("file")
+    if uploaded is None:
+        return error("Выберите файл для загрузки.", "validation", 400)
+    if uploaded.size <= 0:
+        return error("Пустые файлы загружать нельзя.", "validation", 400)
+    if uploaded.size > MAX_PROJECT_FILE_SIZE:
+        return error("Размер файла не должен превышать 10 МБ.", "file_too_large", 413)
+
+    safe_input_name = uploaded.name.replace("\\", "/").rsplit("/", 1)[-1]
+    extension = os.path.splitext(safe_input_name)[1].lower()
+    signature = PROJECT_FILE_SIGNATURES.get(extension)
+    if signature is None:
+        return error("Разрешены только PDF, PNG и JPEG.", "unsupported_file_type", 415)
+    content_type, matches = signature
+    sample = uploaded.read(16)
+    uploaded.seek(0)
+    if not matches(sample):
+        return error("Содержимое файла не соответствует разрешённому формату.", "invalid_file", 415)
+
+    original_name = "".join(char for char in safe_input_name if ord(char) >= 32 and ord(char) != 127)
+    original_name = original_name[:255] or "file" + extension
+    title = request.POST.get("title", "").strip()[:255] or original_name
+    description = request.POST.get("description", "").strip()
+    if len(description) > 2000:
+        return error("Описание не должно превышать 2000 символов.", "validation", 400)
+
+    material = None
+    try:
+        with transaction.atomic():
+            project = project_for(request.user, project_id, manage=True, lock=True)
+            material = Material(
+                project=project,
+                created_by=request.user,
+                title=title,
+                description=description,
+                kind="file",
+                original_filename=original_name,
+                file_size=uploaded.size,
+                content_type=content_type,
+                url="",
+            )
+            # The storage key is random and never derived from the supplied filename.
+            material.file.save(
+                uuid.uuid4().hex + extension,
+                ContentFile(uploaded.read()),
+                save=False,
+            )
+            material.save()
+    except APIError as exc:
+        if material and material.file:
+            material.file.delete(save=False)
+        return error(exc.message, exc.code, exc.status)
+    except Http404:
+        if material and material.file:
+            material.file.delete(save=False)
+        return error("Проект не найден или недоступен.", "not_found", 404)
+    except Exception:
+        if material and material.file:
+            material.file.delete(save=False)
+        logger.exception("Project material upload failed")
+        return error(
+            "Не удалось сохранить файл. Проверьте свободное место и попробуйте снова.",
+            "storage_error",
+            507,
+        )
+
+    return JsonResponse({"snapshot": snapshot(request)})
+
+
+@never_cache
+def material_file_download(request, material_id):
+    if request.method != "GET":
+        response = error("Метод не поддерживается.", "method_not_allowed", 405)
+        response["Allow"] = "GET"
+        return response
+    if not request.user.is_authenticated:
+        return error("Войдите в аккаунт.", "unauthenticated", 401)
+    try:
+        material = get_object_or_404(Material, pk=material_id, kind="file")
+        project_for(request.user, material.project_id)
+        if not material.file:
+            raise Http404
+        with material.file.open("rb") as stored:
+            payload = stored.read(MAX_PROJECT_FILE_SIZE + 1)
+    except APIError as exc:
+        return error(exc.message, exc.code, exc.status)
+    except (Http404, OSError, ValueError):
+        return error("Файл не найден или доступ к проекту отозван.", "not_found", 404)
+
+    filename = material.original_filename or "download"
+    ascii_name = "".join(
+        char if 32 <= ord(char) < 127 and char not in '"\\' else "_"
+        for char in filename
+    )
+    response = HttpResponse(payload, content_type="application/octet-stream")
+    response["Content-Disposition"] = (
+        f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(filename, safe="")}'
+    )
+    response["Content-Length"] = str(len(payload))
+    response["X-Content-Type-Options"] = "nosniff"
+    response["Cache-Control"] = "private, no-store"
+    return response
 
 
 @endpoint(("POST",))

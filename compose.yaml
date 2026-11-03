@@ -41,6 +41,9 @@ services:
       EMAIL_USE_TLS: ${EMAIL_USE_TLS:-true}
       EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-sipi@localhost}
+      MEDIA_ROOT: /app/media
+    volumes:
+      - media_data:/app/media
     ports:
       - "8001:8000"
     depends_on:
@@ -97,3 +100,4 @@ services:
 volumes:
   postgres_data:
   ollama_models:
+  media_data:

@@ -155,6 +155,10 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# Private project uploads. Do not add a URL route that serves MEDIA_ROOT.
+MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", str(BASE_DIR / "media"))).resolve()
+DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},

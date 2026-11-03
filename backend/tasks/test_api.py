@@ -3,6 +3,7 @@ import re
 from datetime import timedelta
 from unittest.mock import patch
 from django.core import mail
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, Client, override_settings
 from django.utils import timezone
 from .models import WorkspaceUser, Project, Membership, Board, Column, Task, Comment, TaskEvent, Material, Invitation
@@ -782,3 +783,62 @@ class OTPResendCooldownTests(TestCase):
         self.assertEqual(user.otp_expiry, old_expiry)
         self.assertEqual(self.call('resend').status_code, 200)
         self.assertFalse(WorkspaceUser.objects.get(pk=user.pk).is_active)
+
+
+    def test_project_file_upload_download_is_private_and_membership_scoped(self):
+        content = b"%PDF-1.7\nteam-control-test"
+        upload = SimpleUploadedFile("brief.pdf", content, content_type="application/pdf")
+        response = self.client.post(
+            f"/api/projects/{self.project.pk}/materials/files/",
+            {"file": upload, "title": "Бриф", "description": "Требования"},
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        material = Material.objects.get(kind="file")
+        self.assertEqual(material.original_filename, "brief.pdf")
+        self.assertEqual(material.file_size, len(content))
+        self.assertTrue(material.file.storage.exists(material.file.name))
+
+        self.client.force_login(self.member)
+        download = self.client.get(f"/api/materials/{material.pk}/download/")
+        self.assertEqual(download.status_code, 200)
+        self.assertEqual(download["Content-Type"], "application/octet-stream")
+        self.assertIn("attachment", download["Content-Disposition"])
+        self.assertEqual(download.content, content)
+        self.assertEqual(download["X-Content-Type-Options"], "nosniff")
+
+        self.client.force_login(self.stranger)
+        self.assertEqual(self.client.get(f"/api/materials/{material.pk}/download/").status_code, 404)
+        self.client.force_login(self.member)
+        Membership.objects.filter(project=self.project, user=self.member).delete()
+        self.assertEqual(self.client.get(f"/api/materials/{material.pk}/download/").status_code, 404)
+
+    def test_project_file_upload_rejects_wrong_signature_type_and_size(self):
+        invalid = SimpleUploadedFile("fake.pdf", b"<html>not a pdf</html>", content_type="application/pdf")
+        response = self.client.post(
+            f"/api/projects/{self.project.pk}/materials/files/",
+            {"file": invalid, "title": "Подмена"},
+        )
+        self.assertEqual(response.status_code, 415)
+        self.assertFalse(Material.objects.filter(kind="file").exists())
+
+        svg = SimpleUploadedFile("active.svg", b"<svg xmlns='http://www.w3.org/2000/svg'/>", content_type="image/svg+xml")
+        self.assertEqual(
+            self.client.post(f"/api/projects/{self.project.pk}/materials/files/", {"file": svg}).status_code,
+            415,
+        )
+        too_large = SimpleUploadedFile(
+            "large.pdf", b"%PDF-" + b"x" * (10 * 1024 * 1024), content_type="application/pdf"
+        )
+        self.assertEqual(
+            self.client.post(f"/api/projects/{self.project.pk}/materials/files/", {"file": too_large}).status_code,
+            413,
+        )
+        self.assertFalse(Material.objects.filter(kind="file").exists())
+
+    def test_only_project_manager_can_upload_file_material(self):
+        self.client.force_login(self.member)
+        upload = SimpleUploadedFile("brief.pdf", b"%PDF-1.7\ntest", content_type="application/pdf")
+        self.assertEqual(
+            self.client.post(f"/api/projects/{self.project.pk}/materials/files/", {"file": upload}).status_code,
+            403,
+        )
