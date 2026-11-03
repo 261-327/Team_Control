@@ -962,6 +962,28 @@ def leave_project(request, project_id):
     return {"snapshot": snapshot(request)}
 
 
+@endpoint(("PATCH",))
+def update_my_role(request, project_id):
+    roles = role_values(request.data)
+    with transaction.atomic():
+        project = project_for(request.user, project_id, lock=True)
+        if project.owner_id == request.user.pk:
+            Membership.objects.get_or_create(
+                project=project, user=request.user,
+                defaults={**roles, "is_confirmed": True, "access_role": "member"},
+            )
+        membership = get_object_or_404(
+            Membership.objects.select_for_update(),
+            project=project, user=request.user, is_confirmed=True,
+        )
+        # Profession is editable; confirmation, ownership and access rights are not.
+        for field, value in roles.items():
+            setattr(membership, field, value)
+        membership.full_clean()
+        membership.save(update_fields=list(roles))
+    return {"snapshot": snapshot(request)}
+
+
 @endpoint(("DELETE",))
 def remove_member(request, project_id, user_id):
     with transaction.atomic():

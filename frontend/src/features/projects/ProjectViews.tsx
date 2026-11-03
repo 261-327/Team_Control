@@ -29,7 +29,10 @@ import {
 } from "@/features/tasks/TaskViews";
 import { TaskBoard } from "@/features/tasks/TaskBoard";
 import { useBoardPreference } from "@/lib/use-preference";
-import type { Profession, RoleInput, Status } from "@/types/domain";
+import type { Status } from "@/types/domain";
+
+import { RoleFields, initialRole, RoleEditor } from "./RoleFields";
+export { RoleFields, initialRole } from "./RoleFields";
 
 export function ProjectsView() {
   const data = useReadyData();
@@ -389,61 +392,6 @@ export function ColumnEditor({
     </Modal>
   );
 }
-export function RoleFields({
-  value,
-  onChange,
-}: {
-  value: RoleInput;
-  onChange: (value: RoleInput) => void;
-}) {
-  return (
-    <>
-      <Field label="Твоя роль в команде" required>
-        <select
-          value={value.profession}
-          onChange={(e) => onChange({ ...value, profession: e.target.value as Profession })}
-        >
-          {Object.entries(professions).map(([key, label]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </Field>
-      {value.profession === "developer" && (
-        <Field label="Направление разработки" required>
-          <select
-            value={value.specialization}
-            onChange={(e) => onChange({ ...value, specialization: e.target.value })}
-            required
-          >
-            <option value="">Выбери направление</option>
-            <option value="frontend">Фронтенд</option>
-            <option value="backend">Бэкенд</option>
-            <option value="ios">iOS</option>
-            <option value="android">Android</option>
-          </select>
-        </Field>
-      )}
-      {value.profession === "other" && (
-        <Field label="Своя роль" required>
-          <input
-            value={value.customRole}
-            onChange={(e) => onChange({ ...value, customRole: e.target.value })}
-            placeholder="Например, продакт-менеджер"
-            maxLength={100}
-            required
-          />
-        </Field>
-      )}
-    </>
-  );
-}
-export const initialRole: RoleInput = {
-  profession: "developer",
-  specialization: "frontend",
-  customRole: "",
-};
 export function CreateProjectView() {
   const data = useReadyData();
   const router = useRouter();
@@ -580,6 +528,7 @@ export function MembersView() {
   const data = useReadyData();
   const ui = useUi();
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState(false);
   const [remove, setRemove] = useState("");
   const members = data.memberships
     .filter((m) => m.projectId === projectId)
@@ -643,6 +592,15 @@ export function MembersView() {
                     ? "Преподаватель"
                     : "Участник"}
               </span>
+              {m.userId === data.sessionId && (
+                <Button
+                  className="member-edit-role"
+                  variant="secondary"
+                  onClick={() => setEditingRole(true)}
+                >
+                  Изменить роль
+                </Button>
+              )}
               {manage && m.role !== "leader" && (
                 <IconButton
                   icon="trash"
@@ -695,7 +653,10 @@ export function MembersView() {
           профессия и другие права.
         </p>
       </div>
-      {inviteOpen && <InviteDialog projectId={projectId} onClose={() => setInviteOpen(false)} />}{" "}
+      {editingRole && <RoleEditor projectId={projectId} onClose={() => setEditingRole(false)} />}
+      {inviteOpen && (
+        <InviteDialog projectId={projectId} onClose={() => setInviteOpen(false)} />
+      )}{" "}
       {remove && (
         <ConfirmDialog
           title="Убрать участника из команды?"

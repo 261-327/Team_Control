@@ -241,6 +241,9 @@ class HttpClient implements DataClient {
   directory = async (query: string) =>
     (await this.request<{ projects: Project[] }>(`directory?q=${encodeURIComponent(query)}`))
       .projects;
+  updateMyRole = async (projectId: string, role: RoleInput) => {
+    await this.mutate(`projects/${projectId}/my-role`, "PATCH", role);
+  };
   joinProject = async (id: string, role: RoleInput) => {
     await this.mutate(`projects/${id}/join`, "POST", { role });
   };

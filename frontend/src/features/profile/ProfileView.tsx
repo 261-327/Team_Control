@@ -9,12 +9,16 @@ import { client } from "@/services/client";
 import { Avatar, Button, Field, FormError, useAction } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 
+import { RoleEditor } from "@/features/projects/RoleFields";
+import { professions } from "@/lib/format";
+
 import { ColleaguesView } from "./ColleaguesView";
 
 export function ProfileView() {
   const data = useReadyData();
   const user = data.users.find((u) => u.id === data.sessionId)!;
   const [name, setName] = useState(user.name);
+  const [editingRole, setEditingRole] = useState("");
   const [bio, setBio] = useState(user.bio);
   const action = useAction();
   const logoutAction = useAction();
@@ -30,6 +34,7 @@ export function ProfileView() {
           <p>Имя, почта и роли в проектах.</p>
         </div>
       </div>
+      {editingRole && <RoleEditor projectId={editingRole} onClose={() => setEditingRole("")} />}
       <div className="profile-grid">
         <div className="profile-sidebar">
           <section className="panel profile-summary">
@@ -39,6 +44,7 @@ export function ProfileView() {
             </div>
             <Avatar user={user} size="lg" />
             <h2>{user.name}</h2>
+            <p className="profile-username">@{user.username}</p>
             <p>{user.email}</p>
             <span className="role-badge role-member">
               {user.kind === "teacher"
@@ -94,6 +100,9 @@ export function ProfileView() {
                 required
               />
             </Field>
+            <Field label="Никнейм" hint="По этому нику тебя можно найти и добавить в коллеги.">
+              <input value={user.username} readOnly autoComplete="username" />
+            </Field>
             <Field label="Электронная почта" hint="Чтобы изменить почту, обратись к администратору">
               <input type="email" value={user.email} readOnly />
             </Field>
@@ -119,20 +128,27 @@ export function ProfileView() {
             {data.memberships
               .filter((m) => m.userId === user.id)
               .map((m) => (
-                <Link key={m.projectId} href={`/projects/${m.projectId}`}>
-                  <span
-                    className={`project-dot ${data.projects.find((p) => p.id === m.projectId)?.color}`}
-                  />
-                  <strong>{data.projects.find((p) => p.id === m.projectId)?.name}</strong>
-                  <span>
-                    {m.role === "leader"
-                      ? "Руководитель"
-                      : m.role === "teacher"
-                        ? "Преподаватель"
-                        : "Участник"}
-                  </span>
-                  <Icon name="chevron" size={15} />
-                </Link>
+                <div className="profile-role-row" key={m.projectId}>
+                  <Link href={`/projects/${m.projectId}`}>
+                    <strong>{data.projects.find((p) => p.id === m.projectId)?.name}</strong>
+                    <span>
+                      {m.profession === "other" ? m.customRole : professions[m.profession]}
+                      {m.profession === "developer" && m.specialization
+                        ? ` · ${{ ios: "iOS", android: "Android", frontend: "Фронтенд", backend: "Бэкенд" }[m.specialization] || m.specialization}`
+                        : ""}
+                    </span>
+                    <span>
+                      {m.role === "leader"
+                        ? "Руководитель"
+                        : m.role === "teacher"
+                          ? "Преподаватель"
+                          : "Участник"}
+                    </span>
+                  </Link>
+                  <Button variant="secondary" onClick={() => setEditingRole(m.projectId)}>
+                    Изменить роль
+                  </Button>
+                </div>
               ))}
             {!data.memberships.some((m) => m.userId === user.id) && (
               <p className="muted">Здесь появятся роли после присоединения к проекту.</p>

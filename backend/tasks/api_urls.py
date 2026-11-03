@@ -35,6 +35,7 @@ path(
     path("projects/<int:project_id>/", api.project_detail),
     path("projects/<int:project_id>/join/", api.join_project),
     path("projects/<int:project_id>/leave/", api.leave_project),
+    path("projects/<int:project_id>/my-role/", api.update_my_role),
     path("projects/<int:project_id>/members/<int:user_id>/", api.remove_member),
     path("projects/<int:project_id>/columns/<str:status>/", api.update_column),
     path("projects/<int:project_id>/materials/", api.materials),

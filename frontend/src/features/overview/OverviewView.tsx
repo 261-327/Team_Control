@@ -65,7 +65,7 @@ export function OverviewView() {
           <div className="stat-card" key={s.label}>
             <div>
               <span>{s.label}</span>
-              <strong>{String(s.count).padStart(2, "0")}</strong>
+              <strong>{s.count}</strong>
             </div>
             <span className={`stat-icon ${s.tone}`}>
               <Icon name={s.icon} size={22} />

@@ -71,7 +71,8 @@ function AssistantChat({
   const [loadError, setLoadError] = useState("");
   const [pollError, setPollError] = useState("");
   const [mode, setMode] = useState<AssistantMode>("chat");
-  const [message, setMessage] = useState(initialMessage || "");
+  const [message, setMessage] = useState("");
+  const [promptHint, setPromptHint] = useState(initialMessage || "");
   const [clearOpen, setClearOpen] = useState(false);
   const [reload, setReload] = useState(0);
   const action = useAction();
@@ -285,7 +286,7 @@ function AssistantChat({
                   disabled={busy}
                   onClick={() => {
                     setMode(p.mode);
-                    setMessage(p.text);
+                    setPromptHint(p.text);
                     textarea.current?.focus();
                   }}
                 >
@@ -479,7 +480,10 @@ function AssistantChat({
               type="button"
               aria-pressed={mode === m.id}
               disabled={busy}
-              onClick={() => setMode(m.id)}
+              onClick={() => {
+                setMode(m.id);
+                setPromptHint("");
+              }}
             >
               <Icon name={m.icon} size={15} />
               {m.label}
@@ -523,11 +527,12 @@ function AssistantChat({
               }
             }}
             placeholder={
-              mode === "tasks"
+              promptHint ||
+              (mode === "tasks"
                 ? "Опиши проект и что нужно подготовить…"
                 : mode === "logo"
                   ? "Какой логотип ты представляешь?"
-                  : "Создай проект, добавь задачи или задай вопрос…"
+                  : "Создай проект, добавь задачи или задай вопрос…")
             }
             rows={2}
             maxLength={4000}

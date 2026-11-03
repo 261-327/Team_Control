@@ -1075,6 +1075,7 @@ select:focus {
   color: #665318;
 }
 .assistant-composer textarea {
+  color: var(--text);
   font-size: 15px;
   min-height: 92px;
   padding: 13px 55px 13px 14px;
@@ -1709,4 +1710,44 @@ select:focus {
   .assistant-orb {
     display: none;
   }
+}
+
+/* Role controls stay visible and wrap on narrow screens. */
+.profile-username {
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+.profile-role-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.profile-role-row > a {
+  display: grid;
+  gap: 4px;
+  flex: 1 1 190px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.profile-role-row > a > span {
+  color: var(--muted);
+  font-size: 14px;
+}
+.profile-role-row > .btn,
+.member-edit-role {
+  min-height: 44px;
+  flex-shrink: 0;
+}
+@media (max-width: 600px) {
+  .member-edit-role {
+    margin-left: 46px;
+  }
+}
+
+.assistant-composer textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
 }
