@@ -831,7 +831,7 @@ class ProjectFileMaterialTests(TestCase):
         self.assertEqual(download.status_code, 200)
         self.assertEqual(download["Content-Type"], "application/octet-stream")
         self.assertIn("attachment", download["Content-Disposition"])
-        self.assertEqual(download.content, content)
+        self.assertEqual(b"".join(download.streaming_content), content)
         self.assertEqual(download["X-Content-Type-Options"], "nosniff")
 
         self.client.force_login(self.stranger)
@@ -886,3 +886,63 @@ class ProjectFileMaterialTests(TestCase):
             ).status_code,
             403,
         )
+
+    def test_project_coordinator_can_upload_and_stranger_cannot(self):
+        coordinator = WorkspaceUser.objects.create_user(
+            "file-coordinator", "file-coordinator@example.com", "Strong-pass-57!"
+        )
+        Membership.objects.create(
+            project=self.project,
+            user=coordinator,
+            role="other",
+            custom_role="Координатор",
+            is_confirmed=True,
+            access_role="coordinator",
+        )
+        upload = SimpleUploadedFile(
+            "coordinator.pdf", b"%PDF-1.7\\ncoordinator", content_type="application/pdf"
+        )
+        self.client.force_login(coordinator)
+        response = self.client.post(
+            f"/api/projects/{self.project.pk}/materials/files/", {"file": upload}
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(
+            Material.objects.get(kind="file").created_by_id, coordinator.pk
+        )
+
+        self.client.force_login(self.stranger)
+        forbidden_upload = SimpleUploadedFile(
+            "stranger.pdf", b"%PDF-1.7\\nstranger", content_type="application/pdf"
+        )
+        response = self.client.post(
+            f"/api/projects/{self.project.pk}/materials/files/",
+            {"file": forbidden_upload},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(Material.objects.filter(kind="file").count(), 1)
+
+    def test_deleting_file_material_removes_private_storage_object(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                upload = SimpleUploadedFile(
+                    "delete-me.pdf", b"%PDF-1.7\\ndelete", content_type="application/pdf"
+                )
+                response = self.client.post(
+                    f"/api/projects/{self.project.pk}/materials/files/",
+                    {"file": upload},
+                )
+                self.assertEqual(response.status_code, 200, response.content)
+                material = Material.objects.get(kind="file")
+                storage = material.file.storage
+                stored_name = material.file.name
+                self.assertTrue(storage.exists(stored_name))
+
+                # TestCase wraps each test in a transaction; explicitly run on_commit
+                # callbacks to verify the storage object is removed after row deletion.
+                with self.captureOnCommitCallbacks(execute=True):
+                    material.delete()
+                self.assertFalse(storage.exists(stored_name))
+
