@@ -8,7 +8,6 @@ import json
 import logging
 import os
 import uuid
-from urllib.parse import quote
 from datetime import timedelta
 from functools import wraps
 from smtplib import SMTPException
@@ -25,7 +24,7 @@ from django.core.mail import get_connection, send_mail
 from django.core.validators import URLValidator, validate_email
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
@@ -1505,23 +1504,20 @@ def material_file_download(request, material_id):
         project_for(request.user, material.project_id)
         if not material.file:
             raise Http404
-        with material.file.open("rb") as stored:
-            payload = stored.read(MAX_PROJECT_FILE_SIZE + 1)
+        stored = material.file.open("rb")
     except APIError as exc:
         return error(exc.message, exc.code, exc.status)
     except (Http404, OSError, ValueError):
         return error("Файл не найден или доступ к проекту отозван.", "not_found", 404)
 
-    filename = material.original_filename or "download"
-    ascii_name = "".join(
-        char if 32 <= ord(char) < 127 and char not in (chr(34), chr(92)) else "_"
-        for char in filename
+    # FileResponse streams the private file; it does not buffer up to 10 MiB in RAM.
+    # Django builds a safe RFC 6266 Content-Disposition header for Unicode filenames.
+    response = FileResponse(
+        stored,
+        as_attachment=True,
+        filename=material.original_filename or "download",
+        content_type="application/octet-stream",
     )
-    response = HttpResponse(payload, content_type="application/octet-stream")
-    response["Content-Disposition"] = (
-        f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(filename, safe="")}'
-    )
-    response["Content-Length"] = str(len(payload))
     response["X-Content-Type-Options"] = "nosniff"
     response["Cache-Control"] = "private, no-store"
     return response
