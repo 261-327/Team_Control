@@ -29,6 +29,10 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
       { error: { message: "Публичный адрес сайта ещё не настроен." } },
       { status: 503 },
     );
+  // Vercel replaces standard forwarding headers on private service calls. This
+  // separate header is synthesized here and checked against Django's exact hosts.
+  if (process.env.SIPI_VERCEL_SERVICES?.toLowerCase() === "true")
+    headers.set("x-sipi-public-host", publicUrl.host);
   headers.set("x-forwarded-host", publicUrl.host);
   headers.set("x-forwarded-proto", publicUrl.protocol.slice(0, -1));
   const clientIP = trustedClientIP(request.headers);

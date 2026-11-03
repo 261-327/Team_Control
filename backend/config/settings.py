@@ -49,6 +49,10 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+if SIPI_VERCEL_SERVICES:
+    # Run before Security/Common inspect a host rewritten by the private transport.
+    MIDDLEWARE.insert(0, "config.service_proxy.PrivateServiceHostMiddleware")
+
 ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [
