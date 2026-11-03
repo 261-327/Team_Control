@@ -17,6 +17,16 @@ FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://127.0.0.1:3000").rstrip("/
 CSRF_TRUSTED_ORIGINS = os.environ.get(
     "CSRF_TRUSTED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
 ).split(",")
+# Only the private Next.js binding may supply the canonical public host in this profile.
+USE_X_FORWARDED_HOST = False
+if os.environ.get("SIPI_VERCEL_SERVICES", "false").lower() == "true":
+    from .vercel_hosting import validate_environment
+
+    _vercel_profile = validate_environment(os.environ)
+    ALLOWED_HOSTS = list(_vercel_profile.hosts)
+    CSRF_TRUSTED_ORIGINS = list(_vercel_profile.origins)
+    USE_X_FORWARDED_HOST = True
+
 CSRF_FAILURE_VIEW = "tasks.api.csrf_failure"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"

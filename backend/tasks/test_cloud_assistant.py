@@ -3,6 +3,7 @@
 import base64
 import io
 import json
+import random
 import uuid
 from datetime import timedelta
 from unittest.mock import patch
@@ -14,6 +15,7 @@ from PIL import Image
 
 from .assistant_providers import (
     IMAGE_MODEL,
+    IMAGE_PNG_LIMIT,
     TEXT_MODEL,
     TEXT_RESPONSE_LIMIT,
     NoRedirect,
@@ -184,6 +186,32 @@ class CloudProviderTests(SimpleTestCase):
         request = self.open.call_args.args[0]
         self.assertTrue(request.full_url.endswith(IMAGE_MODEL))
         self.assertEqual(json.loads(request.data), {"prompt": "A logo", "steps": 4})
+
+    def test_large_noisy_image_is_resized_below_host_response_limit(self):
+        # A high-entropy JPEG is small enough upstream, but converting it to a
+        # 2048px lossless PNG would exceed the hosting response limit.
+        source = io.BytesIO()
+        pixels = random.Random(1).randbytes(2048 * 2048 * 3)
+        with Image.frombytes("RGB", (2048, 2048), pixels) as image:
+            image.save(source, format="JPEG", quality=75)
+        self.assertLess(len(source.getvalue()), 5_000_000)
+        self.open.return_value = envelope({"image": base64.b64encode(source.getvalue()).decode()})
+        png = generate_image("A detailed logo concept")
+        self.assertLessEqual(len(png), IMAGE_PNG_LIMIT)
+        with Image.open(io.BytesIO(png)) as image:
+            self.assertEqual(image.size, (1024, 1024))
+            self.assertEqual(image.format, "PNG")
+            self.assertEqual(image.mode, "RGB")
+
+    def test_final_png_budget_is_enforced_after_conversion(self):
+        source = io.BytesIO()
+        Image.new("RGB", (20, 20), "yellow").save(source, format="JPEG")
+        self.open.return_value = envelope({"image": base64.b64encode(source.getvalue()).decode()})
+        # Exercise the final byte gate using a tiny budget rather than allocating
+        # a deliberately oversized binary response in the test process.
+        with patch("tasks.assistant_providers.IMAGE_PNG_LIMIT", 10):
+            with self.assertRaisesRegex(ProviderUnavailable, "некорректное изображение"):
+                generate_image("A logo")
 
     def test_invalid_base64_or_non_image_is_rejected(self):
         for encoded in ("!not-base64!", base64.b64encode(b"<svg>unsafe</svg>").decode(), 123):

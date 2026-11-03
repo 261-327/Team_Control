@@ -22,6 +22,9 @@ TEXT_RESPONSE_LIMIT = 2_000_000
 IMAGE_RESPONSE_LIMIT = 8_000_000
 IMAGE_BYTES_LIMIT = 5_000_000
 IMAGE_PIXELS_LIMIT = 4_194_304
+# Stay below the hosting platform's 4.5 MB response limit, with room for headers.
+IMAGE_PNG_LIMIT = 4_000_000
+IMAGE_OUTPUT_SIZE = (1024, 1024)
 
 
 class ProviderUnavailable(Exception):
@@ -175,9 +178,12 @@ def generate_image(prompt):
                     raise ValueError("oversized image dimensions")
                 source.load()
                 output = io.BytesIO()
-                source.convert("RGB").save(output, format="PNG", optimize=True)
+                with source.convert("RGB") as converted:
+                    converted.thumbnail(IMAGE_OUTPUT_SIZE, Image.Resampling.LANCZOS)
+                    converted.info.clear()
+                    converted.save(output, format="PNG", optimize=True)
         png = output.getvalue()
-        if len(png) > IMAGE_RESPONSE_LIMIT:
+        if len(png) > IMAGE_PNG_LIMIT:
             raise ValueError("oversized PNG")
         return png
     except (
