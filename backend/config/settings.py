@@ -19,10 +19,12 @@ CSRF_TRUSTED_ORIGINS = os.environ.get(
 ).split(",")
 # Only the private Next.js binding may supply the canonical public host in this profile.
 USE_X_FORWARDED_HOST = False
-if os.environ.get("SIPI_VERCEL_SERVICES", "false").lower() == "true":
+SIPI_VERCEL_SERVICES = os.environ.get("SIPI_VERCEL_SERVICES", "false").lower() == "true"
+if SIPI_VERCEL_SERVICES:
     from .vercel_hosting import validate_environment
 
     _vercel_profile = validate_environment(os.environ)
+    FRONTEND_URL = _vercel_profile.primary_origin
     ALLOWED_HOSTS = list(_vercel_profile.hosts)
     CSRF_TRUSTED_ORIGINS = list(_vercel_profile.origins)
     USE_X_FORWARDED_HOST = True
@@ -181,8 +183,10 @@ EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() == "true"
-EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "false").lower() == "true"
+EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "false").strip().lower() == "true"
+EMAIL_USE_TLS = os.environ.get(
+    "EMAIL_USE_TLS", "false" if EMAIL_USE_SSL else "true"
+).strip().lower() == "true"
 EMAIL_TIMEOUT = 15
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL") or EMAIL_HOST_USER or "sipi@localhost"
 

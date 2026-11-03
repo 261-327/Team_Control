@@ -1,3 +1,5 @@
+import { publicProxyURL, trustedClientIP } from "@/services/server-client-ip";
+
 /** Same-origin bridge: session and CSRF cookies remain on the frontend origin. */
 // Cloud inference can outlast the default request timeout; Hobby Fluid allows 300s.
 export const maxDuration = 300;
@@ -5,7 +7,7 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
   const { path } = await context.params;
   if (path.some((part) => !part || part === "." || part === ".." || /[\\/\u0000]/.test(part)))
     return Response.json({ error: { message: "Некорректный адрес запроса." } }, { status: 400 });
-  if (process.env.SIPI_VERCEL_SERVICES === "true" && !process.env.DJANGO_API_URL)
+  if (process.env.SIPI_VERCEL_SERVICES?.toLowerCase() === "true" && !process.env.DJANGO_API_URL)
     return Response.json(
       { error: { message: "Подключение к серверу ещё не настроено." } },
       { status: 503 },
@@ -21,9 +23,16 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
   for (const name of ["cookie", "x-csrftoken", "content-type", "origin", "referer"])
     if (request.headers.has(name)) headers.set(name, request.headers.get(name)!);
   // Replace caller-supplied forwarding headers. Django trusts these only in Services mode.
-  const publicUrl = new URL(process.env.FRONTEND_URL || request.url);
+  const publicUrl = publicProxyURL(request.url);
+  if (!publicUrl)
+    return Response.json(
+      { error: { message: "Публичный адрес сайта ещё не настроен." } },
+      { status: 503 },
+    );
   headers.set("x-forwarded-host", publicUrl.host);
   headers.set("x-forwarded-proto", publicUrl.protocol.slice(0, -1));
+  const clientIP = trustedClientIP(request.headers);
+  if (clientIP) headers.set("x-sipi-client-ip", clientIP);
   const inference = path.length === 1 && path[0] === "assistant" && request.method === "POST";
   try {
     const upstream = await fetch(url, {

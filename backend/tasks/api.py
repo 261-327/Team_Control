@@ -4,7 +4,6 @@ All writes use Django CSRF protection. Project permissions are always checked he
 independently of the controls displayed in the browser.
 """
 
-import hashlib
 import json
 import logging
 from datetime import timedelta
@@ -16,7 +15,6 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sessions.models import Session
-from django.core.cache import cache
 from django.core.paginator import Paginator, EmptyPage
 from django.core.exceptions import ValidationError
 from django.core.mail import get_connection, send_mail
@@ -48,6 +46,7 @@ from .models import (
 from .forms import MembershipRoleForm, WorkspaceUserCreationForm
 from .mail import registration_mail_error
 from .memberships import accessible, remove_project_participant
+from .rate_limits import RateLimitUnavailable, clear as clear_rate, client_identity, consume
 from .serializers import (
     challenge_json,
     invitation_json,
@@ -106,6 +105,8 @@ def endpoint(methods=("GET",), public=False):
                 return result if isinstance(result, HttpResponse) else JsonResponse(result or {})
             except APIError as exc:
                 return error(exc.message, exc.code, exc.status)
+            except RateLimitUnavailable:
+                return error("Сервис входа временно недоступен. Попробуйте позже.", "unavailable", 503)
             except Http404:
                 return error("Объект не найден или недоступен.", "not_found", 404)
             except ValidationError as exc:
@@ -342,20 +343,31 @@ def save_challenge(request, user, mode):
     return challenge_json(request, user, mode)
 
 
+def require_rate(scope, identity, limit, seconds, message):
+    if not consume(scope, identity, limit, seconds):
+        raise APIError(message, "rate_limited", 429)
+
+
+def mail_budget(email, message="Слишком много писем. Попробуйте позже."):
+    # Brevo Free permits 300/day; reserve a lower shared ceiling for the pilot.
+    # Count attempts, including provider failures, and never refund a reservation.
+    require_rate("mail-email", (email.strip().lower(),), 10, 3600, message)
+    require_rate("mail-hour", (), 100, 3600, message)
+    require_rate("mail-day", (), 250, 86400, message)
+
+
 @endpoint(("POST",), public=True)
 def auth_login(request):
     username = text(request.data, "username", 254, True)
     password = request.data.get("password", "")
     if not isinstance(password, str) or len(password) > 4096:
         raise APIError("Неверный логин или пароль.")
-    rate_key = (
-        "sipi-login-"
-        + hashlib.sha256(
-            (request.META.get("REMOTE_ADDR", "") + username.lower()).encode()
-        ).hexdigest()
-    )
-    if cache.get(rate_key, 0) >= 10:
-        raise APIError("Слишком много попыток. Попробуйте через 5 минут.", "rate_limited", 429)
+    identity = (client_identity(request), username.lower())
+    limited = "Слишком много попыток. Попробуйте через 5 минут."
+    # Coarse ceilings also bound the number of per-identifier rows an attacker can create.
+    require_rate("login-ip", (identity[0],), 100, 300, limited)
+    require_rate("login-global", (), 1000, 300, limited)
+    require_rate("login", identity, 10, 300, limited)
     candidate = (
         WorkspaceUser.objects.filter(Q(username=username) | Q(email__iexact=username))
         .order_by("pk")
@@ -374,23 +386,36 @@ def auth_login(request):
     ):
         user = candidate
     if not user:
-        cache.add(rate_key, 0, 300)
-        cache.incr(rate_key)
         raise APIError("Неверный логин или пароль.")
-    cache.delete(rate_key)
-    with transaction.atomic():
-        user = WorkspaceUser.objects.select_for_update().get(pk=user.pk)
-        if not user.email:
-            raise APIError("У аккаунта не указана почта. Обратитесь к администратору.")
-        if not user.otp_expiry or user.otp_expiry <= timezone.now():
-            send_code(user)
-        return save_challenge(request, user, "login" if user.is_active else "register")
+    clear_rate("login", *identity)
+    reserved_email = None
+    for _ in range(3):
+        with transaction.atomic():
+            user = WorkspaceUser.objects.select_for_update().get(pk=user.pk)
+            if not user.email:
+                raise APIError("У аккаунта не указана почта. Обратитесь к администратору.")
+            recipient = user.email.strip().lower()
+            needs_code = not user.otp_expiry or user.otp_expiry <= timezone.now()
+            if not needs_code or reserved_email == recipient:
+                if needs_code:
+                    send_code(user)
+                return save_challenge(request, user, "login" if user.is_active else "register")
+        # Release the user lock before reserving. Recheck under lock afterward: a
+        # parallel verify/resend or account edit must never cause an unbudgeted send.
+        mail_budget(recipient)
+        reserved_email = recipient
+    raise APIError("Данные аккаунта изменились. Повторите вход.", "conflict", 409)
 
 
 @endpoint(("POST",), public=True)
 def auth_register(request):
     data = request.data
     name = text(data, "name", 100, True).split(" ", 1)
+    limited = "Слишком много запросов регистрации. Попробуйте через час."
+    require_rate("register-ip", (client_identity(request),), 20, 3600, limited)
+    require_rate("register-global", (), 100, 3600, limited)
+    email = text(data, "email", 254).lower()
+    require_rate("register-email", (email,), 5, 3600, limited)
     form = WorkspaceUserCreationForm(
         {
             "username": data.get("username", ""),
@@ -403,6 +428,7 @@ def auth_register(request):
     )
     if not form.is_valid():
         raise APIError(" ".join(str(e) for errors in form.errors.values() for e in errors))
+    mail_budget(form.cleaned_data["email"])
     with transaction.atomic():
         user = form.save(commit=False)
         user.is_active = False
@@ -412,12 +438,9 @@ def auth_register(request):
         return save_challenge(request, user, "register")
 
 
-def challenge_user(request):
-    user = (
-        WorkspaceUser.objects.select_for_update()
-        .filter(pk=request.session.get("api_otp_user_id"))
-        .first()
-    )
+def challenge_user(request, lock=True):
+    users = WorkspaceUser.objects.select_for_update() if lock else WorkspaceUser.objects
+    user = users.filter(pk=request.session.get("api_otp_user_id")).first()
     if not user or request.session.get("api_otp_hash") != user.get_session_auth_hash():
         raise APIError(
             "Подтверждение завершилось. Введите логин и пароль заново.", "challenge_expired", 400
@@ -429,6 +452,12 @@ def challenge_user(request):
 
 @endpoint(("POST",), public=True)
 def auth_resend(request):
+    # Reserve the mail budget outside the OTP transaction so a delivery failure
+    # cannot roll back abuse counters and permit an unlimited retry loop.
+    user = challenge_user(request, lock=False)
+    if user.otp_resend_at and user.otp_resend_at > timezone.now():
+        raise APIError("Повторная отправка доступна через 60 секунд после предыдущей.", "rate_limited", 429)
+    mail_budget(user.email)
     with transaction.atomic():
         user = challenge_user(request)
         if user.otp_resend_at and user.otp_resend_at > timezone.now():
@@ -484,25 +513,14 @@ PASSWORD_RESET_RESPONSE = {
 
 
 def password_reset_rate_limited(request, email):
-    ip = request.META.get("REMOTE_ADDR", "")
-    email_digest = hashlib.sha256(email.lower().encode()).hexdigest()
-    ip_digest = hashlib.sha256(ip.encode()).hexdigest()
+    ip = client_identity(request)
+    # Keep the existing email/IP ceilings and public behavior for unknown accounts.
     limits = (
-        ("sipi-password-reset-email-" + email_digest, 3),
-        ("sipi-password-reset-ip-" + ip_digest, 20),
+        ("password-reset-ip", (ip,), 20),
+        ("password-reset-global", (), 1000),
+        ("password-reset-email", (email.lower(),), 3),
     )
-    for key, limit in limits:
-        if cache.get(key, 0) >= limit:
-            return True
-        if not cache.add(key, 1, 900):
-            try:
-                count = cache.incr(key)
-            except ValueError:
-                cache.set(key, 1, 900)
-                count = 1
-            if count > limit:
-                return True
-    return False
+    return any(not consume(scope, identity, limit, 900) for scope, identity, limit in limits)
 
 
 @endpoint(("POST",), public=True)
@@ -515,6 +533,9 @@ def auth_password_reset_request(request):
         return PASSWORD_RESET_RESPONSE
     if password_reset_rate_limited(request, email):
         raise APIError("Слишком много запросов. Попробуйте через 15 минут.", "rate_limited", 429)
+
+    # Unknown and existing addresses reserve the same budget before account lookup.
+    mail_budget(email, "Слишком много запросов. Попробуйте через 15 минут.")
 
     if settings.EMAIL_BACKEND.endswith("smtp.EmailBackend") and not settings.EMAIL_HOST:
         raise APIError("Отправка писем пока не настроена. Попробуйте позже.", "unavailable", 503)
@@ -580,17 +601,12 @@ def auth_password_reset_confirm(request):
     except (ValueError, TypeError, OverflowError, WorkspaceUser.DoesNotExist):
         user = None
 
-    ip = request.META.get("REMOTE_ADDR", "")
-    key_material = f"{uid}|{ip}"
-    attempt_key = "sipi-password-reset-verify-" + hashlib.sha256(key_material.encode()).hexdigest()
-    if cache.get(attempt_key, 0) >= 10:
-        raise APIError("Слишком много попыток. Запросите новую ссылку позже.", "rate_limited", 429)
+    identity = (uid, client_identity(request))
+    limited = "Слишком много попыток. Запросите новую ссылку позже."
+    require_rate("reset-verify-ip", (identity[1],), 100, 900, limited)
+    require_rate("reset-verify-global", (), 1000, 900, limited)
+    require_rate("reset-verify", identity, 10, 900, limited)
     if not user or not user.is_active or user.registration_pending or not default_token_generator.check_token(user, token):
-        cache.add(attempt_key, 0, 900)
-        try:
-            cache.incr(attempt_key)
-        except ValueError:
-            cache.set(attempt_key, 1, 900)
         raise APIError("Ссылка недействительна или срок её действия истёк. Запросите восстановление заново.", "invalid_token", 400)
     if password != password_confirm:
         raise APIError("Пароли не совпадают.")
@@ -605,7 +621,8 @@ def auth_password_reset_confirm(request):
         user.set_password(password)
         user.save(update_fields=["password"])
         revoke_user_sessions(user)
-    cache.delete(attempt_key)
+        # A failed clear rolls the reset back rather than returning 503 after success.
+        clear_rate("reset-verify", *identity)
     return {"message": "Пароль изменён. Войдите с новым паролем и подтвердите вход кодом из письма."}
 
 

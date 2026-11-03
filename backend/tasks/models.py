@@ -395,3 +395,11 @@ class AssistantWorker(models.Model):
     id = models.CharField(primary_key=True, max_length=50)
     kind = models.CharField(max_length=12)
     heartbeat = models.DateTimeField(default=timezone.now)
+
+
+class RateLimitCounter(models.Model):
+    """Shared, expiring abuse counters; the key contains no raw IP or address."""
+
+    key = models.CharField(primary_key=True, max_length=64)
+    count = models.PositiveIntegerField(default=0)
+    expires_at = models.DateTimeField(db_index=True)
