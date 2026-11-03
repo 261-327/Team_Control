@@ -44,7 +44,7 @@ from .models import (
     WorkspaceUser,
 )
 from .forms import MembershipRoleForm, WorkspaceUserCreationForm
-from .mail import registration_mail_error
+from .mail import mail_failure_details, registration_mail_error
 from .memberships import accessible, remove_project_participant
 from .rate_limits import RateLimitUnavailable, clear as clear_rate, client_identity, consume
 from .serializers import (
@@ -569,7 +569,8 @@ def auth_password_reset_request(request):
             raise SMTPException("Not sent")
     except (SMTPException, OSError) as exc:
         # Do not turn recipient-specific delivery errors into an account-existence oracle.
-        logger.warning("Password reset email delivery failed: %s", type(exc).__name__)
+        code, reason = mail_failure_details(exc)
+        logger.warning("Password reset email delivery failed: %s smtp_code=%s reason=%s", type(exc).__name__, code, reason)
     finally:
         if mail_connection:
             mail_connection.close()
