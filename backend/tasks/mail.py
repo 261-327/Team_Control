@@ -2,8 +2,12 @@
 
 from smtplib import SMTPAuthenticationError, SMTPRecipientsRefused, SMTPSenderRefused
 
+from .email_backends import HTTPEmailLimitError
+
 
 def registration_mail_error(exc):
+    if isinstance(exc, HTTPEmailLimitError):
+        return "Достигнут лимит отправки писем. Попробуйте позже."
     if isinstance(exc, SMTPAuthenticationError):
         return "Не удалось отправить письмо: почтовый сервис отклонил авторизацию отправителя. Сообщите администратору сайта."
     if isinstance(exc, SMTPRecipientsRefused):

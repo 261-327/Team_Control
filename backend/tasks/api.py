@@ -306,6 +306,12 @@ def health(request):
     return {"status": "ok"}
 
 
+@endpoint(public=True)
+def livez(request):
+    # Hosting probes must not wake the free PostgreSQL instance.
+    return {"status": "ok"}
+
+
 def send_code(user):
     if settings.EMAIL_BACKEND.endswith("smtp.EmailBackend") and not settings.EMAIL_HOST:
         raise APIError(
@@ -510,15 +516,15 @@ def auth_password_reset_request(request):
     if password_reset_rate_limited(request, email):
         raise APIError("Слишком много запросов. Попробуйте через 15 минут.", "rate_limited", 429)
 
-    mail_connection = None
-    if settings.EMAIL_BACKEND.endswith("smtp.EmailBackend"):
-        if not settings.EMAIL_HOST:
-            raise APIError("Отправка писем пока не настроена. Попробуйте позже.", "unavailable", 503)
-        try:
-            mail_connection = get_connection(fail_silently=False)
-            mail_connection.open()
-        except (SMTPException, OSError) as exc:
-            raise APIError(registration_mail_error(exc), "unavailable", 503)
+    if settings.EMAIL_BACKEND.endswith("smtp.EmailBackend") and not settings.EMAIL_HOST:
+        raise APIError("Отправка писем пока не настроена. Попробуйте позже.", "unavailable", 503)
+    # Check configuration before account lookup for every transport, including HTTPS.
+    # Recipient-specific failures below retain the same public reset response.
+    try:
+        mail_connection = get_connection(fail_silently=False)
+        mail_connection.open()
+    except (SMTPException, OSError) as exc:
+        raise APIError(registration_mail_error(exc), "unavailable", 503)
 
     user = WorkspaceUser.objects.filter(email__iexact=email, is_active=True, registration_pending=False).first()
     if not user:
@@ -616,7 +622,7 @@ def profile(request):
 @endpoint()
 def directory(request):
     query = request.GET.get("q", "").strip()[:255]
-    if not query:
+    if not query or not settings.PROJECT_SELF_JOIN_ENABLED:
         return {"projects": []}
     return {
         "projects": [
@@ -749,6 +755,8 @@ def project_members(request, project_id):
 
 @endpoint(("POST",))
 def join_project(request, project_id):
+    if not settings.PROJECT_SELF_JOIN_ENABLED:
+        raise APIError("Вступление в проект доступно по приглашению руководителя.", "forbidden", 403)
     roles = role_values(request.data.get("role"))
     with transaction.atomic():
         p = get_object_or_404(Project.objects.select_for_update(), pk=project_id)

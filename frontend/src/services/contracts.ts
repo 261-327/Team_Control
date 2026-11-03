@@ -84,6 +84,7 @@ export interface DataClient {
     mode: AssistantMode,
     requestId: string,
     projectId?: string,
+    signal?: AbortSignal,
   ): Promise<AssistantTurn>;
   assistantTurn(id: string): Promise<AssistantTurn>;
   cancelAssistantTurn(id: string): Promise<AssistantTurn>;

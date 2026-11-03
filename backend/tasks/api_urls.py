@@ -8,6 +8,7 @@ urlpatterns = [
     path("colleagues/", colleagues_api.colleagues),
     path("colleagues/<int:connection_id>/respond/", colleagues_api.colleague_response),
     path("health/", api.health),
+    path("livez/", api.livez),
     path("bootstrap/", api.bootstrap),
     path("auth/login/", api.auth_login),
     path("auth/register/", api.auth_register),

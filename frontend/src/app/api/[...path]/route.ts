@@ -1,4 +1,6 @@
 /** Same-origin bridge: session and CSRF cookies remain on the frontend origin. */
+// Cloud inference can outlast the default request timeout; Hobby Fluid allows 300s.
+export const maxDuration = 300;
 async function proxy(request: Request, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
   if (path.some((part) => !part || part === "." || part === ".." || /[\\/\u0000]/.test(part)))
@@ -9,6 +11,7 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
   const headers = new Headers({ Accept: "application/json" });
   for (const name of ["cookie", "x-csrftoken", "content-type", "origin", "referer"])
     if (request.headers.has(name)) headers.set(name, request.headers.get(name)!);
+  const inference = path.length === 1 && path[0] === "assistant" && request.method === "POST";
   try {
     const upstream = await fetch(url, {
       method: request.method,
@@ -16,7 +19,7 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
       body: ["GET", "HEAD"].includes(request.method) ? undefined : await request.text(),
       cache: "no-store",
       redirect: "manual",
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(inference ? 280000 : 90000),
     });
     const responseHeaders = new Headers({
       "Content-Type": upstream.headers.get("content-type") || "application/json",

@@ -10,7 +10,9 @@ test("password reset requires the emailed token and then regular OTP login", asy
   await expect(page).toHaveURL(/forgot-password$/);
   await page.getByLabel("Электронная почта").fill(person.email);
   await page.getByRole("button", { name: "Отправить ссылку" }).click();
-  await expect(page.getByRole("status")).toContainText("Если аккаунт с такой подтверждённой почтой существует");
+  await expect(page.getByRole("status")).toContainText(
+    "Если аккаунт с такой подтверждённой почтой существует",
+  );
   const resetLink = await mailPasswordResetLink(person.email);
   const resetUrl = new URL(resetLink);
   await page.goto(resetUrl.pathname + resetUrl.search);
@@ -28,4 +30,4 @@ test("password reset requires the emailed token and then regular OTP login", asy
   await page.getByLabel("Шестизначный код").fill(await mailCode(person.email));
   await page.getByRole("button", { name: "Подтвердить и войти" }).click();
   await expect(page).toHaveURL(/my-tasks$/);
-}
+});
