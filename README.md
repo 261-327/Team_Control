@@ -65,28 +65,32 @@ DB_ENGINE=sqlite backend/.venv/bin/python backend/manage.py createsuperuser
 
 ## Запуск всей командой через Docker
 
-Перед запуском PostgreSQL создай локальный `infra/.env` по [инструкции по базе данных](infra/README.md). Этот файл содержит локальные параметры и не должен попадать в Git.
+Перед запуском создай локальный `infra/.env` по [инструкции по базе данных](infra/README.md). Он содержит параметры PostgreSQL и не должен попадать в Git. Корневой `.env` — необязательный файл с настройками SMTP; если он есть, Compose нужно передать оба файла явно. При использовании нескольких `--env-file` значения из последнего файла имеют приоритет.
 
-Из корня репозитория:
-
-```sh
-docker compose --env-file infra/.env up --build
-```
-
-Или из каталога `backend`:
+Из корня репозитория проверь конфигурацию и запусти проект:
 
 ```sh
-cd backend
-docker compose --env-file ../infra/.env up --build
+# Только локальные настройки БД; письма будут выводиться в логи Django.
+docker compose --env-file infra/.env config --quiet
+docker compose --env-file infra/.env up -d --build
+
+# Если настроен корневой .env с SMTP, передай оба файла:
+docker compose --env-file .env --env-file infra/.env config --quiet
+docker compose --env-file .env --env-file infra/.env up -d --build
 ```
 
-Для второго варианта нужен Docker Compose 2.20+ с поддержкой `include`.
+В PowerShell команды такие же; перед запуском убедись, что текущая папка — корень репозитория. Для просмотра контейнеров и логов используй те же параметры `--env-file`, с которыми запускала Compose:
+
+```powershell
+docker compose --env-file .env --env-file infra/.env ps
+docker compose --env-file .env --env-file infra/.env logs --tail 100 backend
+```
 
 - **Интерфейс:** http://localhost:8000
 - **Админка Django:** http://localhost:8001/admin/
-- **Письма с кодами:** `docker compose --env-file infra/.env logs -f backend` (из корня репозитория)
+- **Письма с кодами:** в локальном режиме без SMTP выводятся в лог backend.
 
-Compose запускает PostgreSQL, применяет миграции, поднимает Django и собранный Next.js. Браузер обращается к одному адресу; `/api` проксируется в Django вместе с session/CSRF cookies. Данные PostgreSQL остаются в том же томе `backend_postgres_data`, который использовал прежний Compose. Удалять этот том для обновления не нужно.
+Compose запускает PostgreSQL, применяет миграции, поднимает Django и собранный Next.js. Загруженные файлы материалов хранятся отдельно в именованном Docker volume `backend_media_data`; база остаётся в `backend_postgres_data`. Не используй `docker compose down -v` при обычном обновлении: эта команда удаляет тома с данными.
 
 Это конфигурация для локальной разработки команды. Для общего сервера с доменом используй `compose.server.yaml` по [серверной инструкции](deploy/README.md).
 

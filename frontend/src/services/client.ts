@@ -279,6 +279,79 @@ class HttpClient implements DataClient {
   deleteMaterial = async (id: string) => {
     await this.mutate(`materials/${id}`, "DELETE");
   };
+  uploadMaterialFile = (
+    projectId: string,
+    input: { title: string; description: string; file: File },
+    onProgress: (percent: number) => void,
+    signal?: AbortSignal,
+  ) =>
+    new Promise<void>((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(new DOMException("Загрузка отменена.", "AbortError"));
+        return;
+      }
+      const xhr = new XMLHttpRequest();
+      const form = new FormData();
+      form.append("file", input.file);
+      form.append("title", input.title);
+      form.append("description", input.description);
+      xhr.open("POST", `/api/projects/${encodeURIComponent(projectId)}/materials/files/`);
+      xhr.withCredentials = true;
+      xhr.timeout = 90000;
+      xhr.setRequestHeader("Accept", "application/json");
+      const csrf = document.cookie
+        .split("; ")
+        .find((item) => item.startsWith("csrftoken="))
+        ?.split("=")
+        .slice(1)
+        .join("=");
+      if (csrf) xhr.setRequestHeader("X-CSRFToken", decodeURIComponent(csrf));
+      const abort = () => xhr.abort();
+      signal?.addEventListener("abort", abort, { once: true });
+      const cleanup = () => signal?.removeEventListener("abort", abort);
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
+      };
+      xhr.onload = () => {
+        cleanup();
+        let data: { error?: { message?: string }; snapshot?: Database };
+        try {
+          data = JSON.parse(xhr.responseText);
+        } catch {
+          reject(
+            new Error(
+              xhr.status === 413
+                ? "Файл слишком большой. Максимальный размер — 10 МБ."
+                : "Сервер вернул некорректный ответ. Обновите страницу и проверьте список материалов.",
+            ),
+          );
+          return;
+        }
+        if (xhr.status < 200 || xhr.status >= 300) {
+          reject(new Error(data.error?.message || "Не удалось загрузить файл."));
+          return;
+        }
+        if (data.snapshot) {
+          this.revision++;
+          this.publish(data.snapshot);
+        }
+        onProgress(100);
+        resolve();
+      };
+      xhr.onerror = () => {
+        cleanup();
+        reject(new Error("Не удалось связаться с сервером. Проверьте подключение и попробуйте ещё раз."));
+      };
+      xhr.ontimeout = () => {
+        cleanup();
+        reject(new Error("Загрузка заняла слишком много времени. Попробуйте файл ещё раз."));
+      };
+      xhr.onabort = () => {
+        cleanup();
+        reject(new DOMException("Загрузка отменена.", "AbortError"));
+      };
+      xhr.send(form);
+    });
   updateColumn = async (projectId: string, id: Status, name: string, limit: number) => {
     await this.mutate(`projects/${projectId}/columns/${id}`, "PATCH", { name, limit });
   };

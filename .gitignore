@@ -31,3 +31,8 @@ __pycache__/
 backend/.env
 backend/.env.*
 !backend/.env.example
+
+# User-uploaded project files and local backup archives.
+backend/media/
+media/
+media-backups/

@@ -39,6 +39,8 @@ path(
     path("projects/<int:project_id>/members/<int:user_id>/", api.remove_member),
     path("projects/<int:project_id>/columns/<str:status>/", api.update_column),
     path("projects/<int:project_id>/materials/", api.materials),
+    path("projects/<int:project_id>/materials/files/", api.material_file_upload),
+    path("materials/<int:material_id>/download/", api.material_file_download),
     path("projects/<int:project_id>/invitations/", api.invitations),
     path("tasks/", api.tasks),
     path("tasks/<int:task_id>/", api.task_detail),
