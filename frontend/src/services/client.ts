@@ -318,7 +318,13 @@ class HttpClient implements DataClient {
         try {
           data = JSON.parse(xhr.responseText);
         } catch {
-          reject(new Error("Сервер вернул некорректный ответ. Обновите страницу и проверьте список материалов."));
+          reject(
+            new Error(
+              xhr.status === 413
+                ? "Файл слишком большой. Максимальный размер — 10 МБ."
+                : "Сервер вернул некорректный ответ. Обновите страницу и проверьте список материалов.",
+            ),
+          );
           return;
         }
         if (xhr.status < 200 || xhr.status >= 300) {
