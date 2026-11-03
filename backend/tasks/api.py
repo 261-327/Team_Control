@@ -1514,7 +1514,7 @@ def material_file_download(request, material_id):
 
     filename = material.original_filename or "download"
     ascii_name = "".join(
-        char if 32 <= ord(char) < 127 and char not in '"\\' else "_"
+        char if 32 <= ord(char) < 127 and char not in (chr(34), chr(92)) else "_"
         for char in filename
     )
     response = HttpResponse(payload, content_type="application/octet-stream")
