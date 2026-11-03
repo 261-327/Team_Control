@@ -135,7 +135,13 @@ export function ProjectLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const ui = useUi();
   const project = data.projects.find((p) => p.id === projectId);
-  const members = data.memberships.filter((m) => m.projectId === projectId);
+  const members = data.memberships
+    .filter((m) => m.projectId === projectId)
+    .sort((a, b) => {
+      const priority = (role: string) => (role === "leader" ? 0 : role === "teacher" ? 1 : 2);
+
+      return priority(a.role) - priority(b.role);
+    });
   const manage = canManage(data, projectId);
   if (!project)
     return (
@@ -575,7 +581,13 @@ export function MembersView() {
   const ui = useUi();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [remove, setRemove] = useState("");
-  const members = data.memberships.filter((m) => m.projectId === projectId);
+  const members = data.memberships
+    .filter((m) => m.projectId === projectId)
+    .sort((a, b) => {
+      const priority = (role: string) => (role === "leader" ? 0 : role === "teacher" ? 1 : 2);
+
+      return priority(a.role) - priority(b.role);
+    });
   const manage = canManage(data, projectId);
   const invitations = data.invitations.filter(
     (i) => i.projectId === projectId && i.status === "pending",
@@ -784,6 +796,28 @@ export function ProjectSettingsView() {
   const manage = canManage(data, projectId);
   const [column, setColumn] = useState<Status | null>(null);
   const [confirm, setConfirm] = useState("");
+  const [showAssignmentConfirm, setShowAssignmentConfirm] = useState(false);
+  const [confirmCoordinatorDemotion, setConfirmCoordinatorDemotion] = useState(false);
+  const currentLeaderId =
+    data.memberships.find((m) => m.projectId === projectId && m.role === "leader")?.userId ?? "";
+  const currentTeacherId =
+    data.memberships.find((m) => m.projectId === projectId && m.role === "teacher")?.userId ?? "";
+  const [leaderId, setLeaderId] = useState<string | null>(null);
+  const [teacherId, setTeacherId] = useState<string | null>(null);
+  const selectedLeaderId = leaderId ?? currentLeaderId;
+  const selectedTeacherId = teacherId ?? currentTeacherId;
+  const currentLeaderName = data.users.find((u) => u.id === currentLeaderId)?.name ?? "Не выбран";
+  const selectedLeaderName = data.users.find((u) => u.id === selectedLeaderId)?.name ?? "Не выбран";
+  const currentTeacherName =
+    data.users.find((u) => u.id === currentTeacherId)?.name ?? "Не назначен";
+  const selectedTeacherName = selectedTeacherId
+    ? (data.users.find((u) => u.id === selectedTeacherId)?.name ?? "Не выбран")
+    : "Не назначен";
+  const leaderChanged = selectedLeaderId !== currentLeaderId;
+  const teacherChanged = selectedTeacherId !== currentTeacherId;
+  const selectedLeaderIsCoordinator =
+    data.users.find((u) => u.id === selectedLeaderId)?.scopeProjectIds?.includes(projectId) ??
+    false;
   return (
     <div className="settings-page">
       <section className="panel settings-panel">
@@ -809,6 +843,60 @@ export function ProjectSettingsView() {
           </div>
         ))}
       </section>
+      {manage && (
+        <section className="panel settings-panel">
+          <h2>Назначения проекта</h2>
+          <p className="muted" style={{ marginBottom: "6px" }}>
+            Измени руководителя или преподавателя проекта.
+          </p>
+          <Field label="Руководитель" required>
+            <select value={selectedLeaderId} onChange={(e) => setLeaderId(e.target.value)} required>
+              <option value="">Выбери руководителя</option>
+              {data.users
+                .filter((u) => u.kind === "student")
+                .map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+            </select>
+          </Field>
+
+          <Field label="Преподаватель">
+            <select value={selectedTeacherId} onChange={(e) => setTeacherId(e.target.value)}>
+              <option value="">Пока не назначен</option>
+              {data.users
+                .filter((u) => u.kind === "teacher")
+                .map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+            </select>
+          </Field>
+          <Button
+            onClick={() => {
+              if (selectedLeaderId === selectedTeacherId && selectedTeacherId !== "") {
+                ui.notify(
+                  "Один человек не может быть одновременно руководителем и преподавателем.",
+                );
+                return;
+              }
+
+              setConfirmCoordinatorDemotion(
+                selectedLeaderIsCoordinator && selectedLeaderId !== currentLeaderId,
+              );
+              if (!leaderChanged && !teacherChanged) {
+                ui.notify("Изменений нет");
+                return;
+              }
+              setShowAssignmentConfirm(true);
+            }}
+          >
+            Изменить назначения
+          </Button>
+        </section>
+      )}
       <section className="panel settings-panel danger-zone">
         <h2>{manage ? "Удаление проекта" : "Участие в проекте"}</h2>
         <p>
@@ -842,6 +930,75 @@ export function ProjectSettingsView() {
             router.push("/projects");
           }}
         />
+      )}
+      {showAssignmentConfirm && (
+        <ConfirmDialog
+          title="Подтвердить изменения назначений?"
+          hideIcon
+          description="Проверь изменения перед сохранением."
+          confirmLabel="Подтвердить изменения"
+          onClose={() => setShowAssignmentConfirm(false)}
+          onConfirm={async () => {
+            await client.updateProjectAssignments(
+              projectId,
+              selectedLeaderId,
+              selectedTeacherId,
+              confirmCoordinatorDemotion,
+            );
+
+            ui.notify("Назначения проекта обновлены");
+            setShowAssignmentConfirm(false);
+            router.refresh();
+          }}
+        >
+          <div className="assignment-confirm-details">
+            <div className="assignment-confirm-card">
+              <strong>Руководитель проекта</strong>
+              <div className="assignment-confirm-comparison">
+                <div>
+                  <span>Сейчас</span>
+                  <p>{currentLeaderName}</p>
+                </div>
+                <span aria-hidden="true">→</span>
+                <div>
+                  <span>После изменения</span>
+                  <p>{selectedLeaderName}</p>
+                </div>
+              </div>
+              <p className="muted">
+                {leaderChanged ? "Назначение изменится" : "Останется без изменений"}
+              </p>
+            </div>
+
+            <div className="assignment-confirm-card">
+              <strong>Преподаватель</strong>
+              <div className="assignment-confirm-comparison">
+                <div>
+                  <span>Сейчас</span>
+                  <p>{currentTeacherName}</p>
+                </div>
+                <span aria-hidden="true">→</span>
+                <div>
+                  <span>После изменения</span>
+                  <p>{selectedTeacherName}</p>
+                </div>
+              </div>
+              <p className="muted">
+                {teacherChanged ? "Назначение изменится" : "Останется без изменений"}
+              </p>
+            </div>
+
+            <p className="muted">
+              Прежние руководитель и преподаватель останутся участниками проекта.
+            </p>
+
+            {confirmCoordinatorDemotion && (
+              <p>
+                Внимание: роль координатора нового руководителя изменится только в этом проекте.
+              </p>
+            )}
+          </div>
+        </ConfirmDialog>
       )}
     </div>
   );
