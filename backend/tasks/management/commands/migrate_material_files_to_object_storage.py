@@ -61,7 +61,8 @@ class Command(BaseCommand):
                 migrated += 1
                 continue
 
-            if default_storage.exists(name):
+            object_existed = default_storage.exists(name)
+            if object_existed:
                 with default_storage.open(name, "rb") as remote_file:
                     remote_digest = sha256(remote_file.read())
                 if remote_digest == source_digest:
@@ -70,6 +71,7 @@ class Command(BaseCommand):
                     continue
 
             saved_name = default_storage.save(name, ContentFile(content))
+            created_new_object = not object_existed or saved_name != name
             try:
                 with default_storage.open(saved_name, "rb") as remote_file:
                     remote_content = remote_file.read()
@@ -83,7 +85,7 @@ class Command(BaseCommand):
                 material.save(update_fields=["file"])
             except Exception:
                 # Preserve any pre-existing object; remove only the new key created by this run.
-                if saved_name != name or not source.exists(name):
+                if created_new_object:
                     default_storage.delete(saved_name)
                 raise
 
