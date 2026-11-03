@@ -99,6 +99,55 @@
                 android:textColorHint="@color/text_hint"
                 android:textSize="15sp" />
 
+            <!-- Роль (Выпадающий список) - ТЕПЕРЬ ИДЕТ ПЕРВОЙ -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="6dp"
+                android:text="Ваша роль"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <Spinner
+                android:id="@+id/spinnerRole"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_marginBottom="18dp"
+                android:background="@drawable/bg_edittext" />
+
+            <!-- Контейнер для Группы (будет скрываться) -->
+            <LinearLayout
+                android:id="@+id/llGroupContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:text="Номер группы"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <EditText
+                    android:id="@+id/etGroup"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="26dp"
+                    android:background="@drawable/bg_edittext"
+                    android:hint="Например: ПИ-21"
+                    android:inputType="text"
+                    android:maxLines="1"
+                    android:padding="14dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"
+                    android:textSize="15sp" />
+            </LinearLayout>
+
+
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/btnRegister"
                 android:layout_width="match_parent"
