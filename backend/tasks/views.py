@@ -1,6 +1,6 @@
 from .forms import MembershipRoleForm, WorkspaceUserCreationForm
 from .mail import registration_mail_error
-from .memberships import remove_project_participant
+from .memberships import accessible, remove_project_participant
 import secrets
 import time
 from django.utils.crypto import constant_time_compare
@@ -16,7 +16,7 @@ from django.db.models import Q, Prefetch, F
 from django.core.paginator import Paginator
 from django.db.models.functions import Lower, Trim
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.http import require_POST, require_http_methods
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone, translation
@@ -131,6 +131,8 @@ def register_verify_view(request):
 
 
 def accessible_projects(user):
+    if not settings.PROJECT_SELF_JOIN_ENABLED:
+        return accessible(user)
     return Project.objects.filter(Q(owner=user) | Q(members=user)).distinct()
 
 
@@ -310,7 +312,8 @@ def project_create_view(request):
 def project_detail_view(request, project_id):
     project = get_object_or_404(accessible_projects(request.user), pk=project_id)
     Membership.objects.get_or_create(project=project,user_id=project.owner_id, defaults={'role':'other','custom_role':'Владелец проекта','is_confirmed':True})
-    Membership.objects.filter(project=project, user=request.user).update(is_confirmed=True)
+    if settings.PROJECT_SELF_JOIN_ENABLED:
+        Membership.objects.filter(project=project, user=request.user).update(is_confirmed=True)
     boards = project.boards.prefetch_related('columns__tasks__assignees')
     return render(request, 'tasks/project_detail.html', {'project': project, 'boards': boards,
         'participants': project.memberships.filter(is_confirmed=True).select_related('user').order_by('user__username'), 'can_manage_project': project.owner_id == request.user.pk})
@@ -538,7 +541,7 @@ def project_search_view(request):
     query = ''
     if form.is_valid():
         query = form.cleaned_data.get('q', '')
-        if query:
+        if query and settings.PROJECT_SELF_JOIN_ENABLED:
             projects = (Project.objects.filter(name__icontains=query)
                         .exclude(Q(owner=request.user) | Q(members=request.user))
                         .select_related('owner').order_by('name', 'pk'))
@@ -549,6 +552,8 @@ def project_search_view(request):
 @login_required(login_url='login_request')
 @require_http_methods(['GET', 'POST'])
 def project_join_view(request, project_id):
+    if not settings.PROJECT_SELF_JOIN_ENABLED:
+        return HttpResponseForbidden("Вступление в проект доступно по приглашению руководителя.")
     project = get_object_or_404(Project, pk=project_id)
     existing = Membership.objects.filter(project=project, user=request.user).first()
     if existing and existing.is_confirmed:

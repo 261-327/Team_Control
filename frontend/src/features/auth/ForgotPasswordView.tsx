@@ -30,40 +30,59 @@ export function ForgotPasswordView() {
   }
 
   return (
-    <div className="auth-page" style={{ gridTemplateColumns: "minmax(0, 1fr)", minHeight: "100dvh" }}>
-    <main className="auth-main">
-      <div className="auth-mobile-logo"><Link href="/login"><Logo /></Link></div>
-      <section className="auth-form" aria-labelledby="reset-title">
-        <h2 id="reset-title">Восстановление пароля</h2>
-        {sent ? (
-          <>
-            <p role="status">Если аккаунт с такой подтверждённой почтой существует, мы отправили инструкции по восстановлению.</p>
-            <p className="auth-switch"><Link href="/login">Вернуться ко входу</Link></p>
-          </>
-        ) : (
-          <>
-            <p>Укажи почту, привязанную к аккаунту. Если адрес подтверждён, на него придёт ссылка для смены пароля.</p>
-            <form onSubmit={submit}>
-              <Field label="Электронная почта" required>
-                <input
-                  type="email"
-                  name="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  autoComplete="email"
-                  maxLength={254}
-                  autoFocus
-                  required
-                />
-              </Field>
-              <FormError error={error} />
-              <Button className="auth-submit" loading={busy} disabled={busy}>Отправить ссылку</Button>
-            </form>
-            <p className="auth-switch"><Link href="/login">Вернуться ко входу</Link></p>
-          </>
-        )}
-      </section>
-    </main>
+    <div
+      className="auth-page"
+      style={{ gridTemplateColumns: "minmax(0, 1fr)", minHeight: "100dvh" }}
+    >
+      <main className="auth-main">
+        <div className="auth-mobile-logo">
+          <Link href="/login">
+            <Logo />
+          </Link>
+        </div>
+        <section className="auth-form" aria-labelledby="reset-title">
+          <h2 id="reset-title">Восстановление пароля</h2>
+          {sent ? (
+            <>
+              <p role="status">
+                Если аккаунт с такой подтверждённой почтой существует, мы отправили инструкции по
+                восстановлению.
+              </p>
+              <p className="auth-switch">
+                <Link href="/login">Вернуться ко входу</Link>
+              </p>
+            </>
+          ) : (
+            <>
+              <p>
+                Укажи почту, привязанную к аккаунту. Если адрес подтверждён, на него придёт ссылка
+                для смены пароля.
+              </p>
+              <form onSubmit={submit}>
+                <Field label="Электронная почта" required>
+                  <input
+                    type="email"
+                    name="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    autoComplete="email"
+                    maxLength={254}
+                    autoFocus
+                    required
+                  />
+                </Field>
+                <FormError error={error} />
+                <Button className="auth-submit" loading={busy} disabled={busy}>
+                  Отправить ссылку
+                </Button>
+              </form>
+              <p className="auth-switch">
+                <Link href="/login">Вернуться ко входу</Link>
+              </p>
+            </>
+          )}
+        </section>
+      </main>
     </div>
   );
 }

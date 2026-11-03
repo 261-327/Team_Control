@@ -1,9 +1,10 @@
-"""Optional local Diffusers runner. No image service subscriptions or API keys."""
+"""Optional local Diffusers or bounded Cloudflare image generation."""
 
 import io
 
 from django.conf import settings
 
+from .assistant_providers import ProviderUnavailable, provider_name
 from .assistant_service import AssistantUnavailable
 
 _pipeline = None
@@ -15,6 +16,15 @@ def generate_image(prompt):
         raise AssistantUnavailable(
             "Генерация изображений выключена. Запустите ./setup-ai.sh --images."
         )
+    if provider_name() == "cloudflare":
+        from .assistant_providers import generate_image as cloud_generate_image
+
+        try:
+            return cloud_generate_image(prompt)
+        except ProviderUnavailable as exc:
+            raise AssistantUnavailable(str(exc)) from exc
+    if provider_name() != "ollama":
+        raise AssistantUnavailable("Провайдер изображений не настроен на сервере.")
     try:
         import torch
         from diffusers import AutoPipelineForText2Image

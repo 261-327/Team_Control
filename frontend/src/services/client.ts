@@ -51,7 +51,13 @@ class HttpClient implements DataClient {
     this.snapshot = { ...data, connectionError: "" };
     this.listeners.forEach((listener) => listener());
   }
-  private async request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
+  private async request<T>(
+    path: string,
+    method = "GET",
+    body?: unknown,
+    timeoutMs = 95000,
+    signal?: AbortSignal,
+  ): Promise<T> {
     try {
       const csrf = document.cookie
         .split("; ")
@@ -70,7 +76,9 @@ class HttpClient implements DataClient {
           ...(csrf ? { "X-CSRFToken": decodeURIComponent(csrf) } : {}),
         },
         body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(35000),
+        signal: signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
+          : AbortSignal.timeout(timeoutMs),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) {
@@ -141,8 +149,12 @@ class HttpClient implements DataClient {
   resendCode = () => this.request<AuthChallenge>("auth/resend", "POST", {});
   requestPasswordReset = (email: string) =>
     this.request<{ message: string }>("auth/password-reset", "POST", { email });
-  confirmPasswordReset = (input: { uid: string; token: string; password: string; passwordConfirm: string }) =>
-    this.request<{ message: string }>("auth/password-reset/confirm", "POST", input);
+  confirmPasswordReset = (input: {
+    uid: string;
+    token: string;
+    password: string;
+    passwordConfirm: string;
+  }) => this.request<{ message: string }>("auth/password-reset/confirm", "POST", input);
   register = (input: {
     name: string;
     username: string;
@@ -221,18 +233,17 @@ class HttpClient implements DataClient {
     teacherId: string,
     confirmCoordinatorDemotion = false,
   ) =>
-    await this.mutate<{ project: Project; snapshot: Snapshot }>(
-      `projects/${id}`,
-      "PATCH",
-      {
-        leaderId,
-        teacherId,
-        confirmCoordinatorDemotion,
-      },
-    );
+    await this.mutate<{ project: Project; snapshot: Snapshot }>(`projects/${id}`, "PATCH", {
+      leaderId,
+      teacherId,
+      confirmCoordinatorDemotion,
+    });
   directory = async (query: string) =>
     (await this.request<{ projects: Project[] }>(`directory?q=${encodeURIComponent(query)}`))
       .projects;
+  updateMyRole = async (projectId: string, role: RoleInput) => {
+    await this.mutate(`projects/${projectId}/my-role`, "PATCH", role);
+  };
   joinProject = async (id: string, role: RoleInput) => {
     await this.mutate(`projects/${id}/join`, "POST", { role });
   };
@@ -286,15 +297,28 @@ class HttpClient implements DataClient {
     mode: AssistantMode,
     requestId: string,
     projectId?: string,
-  ) =>
-    (
-      await this.request<{ turn: AssistantTurn }>("assistant", "POST", {
-        message,
-        projectId,
-        mode,
-        requestId,
-      })
-    ).turn;
+    signal?: AbortSignal,
+  ) => {
+    const authRevision = this.authRevision;
+    const revision = this.revision;
+    const result = await this.request<{ turn: AssistantTurn; snapshot?: Database }>(
+      "assistant",
+      "POST",
+      { message, projectId, mode, requestId },
+      290000,
+      signal,
+    );
+    if (result.snapshot && authRevision === this.authRevision && revision === this.revision) {
+      this.revision++;
+      this.publish(result.snapshot);
+    } else if (result.snapshot && authRevision === this.authRevision) {
+      // Wait for overlapping edits and older refreshes before reading current data.
+      await this.mutations;
+      if (this.refreshing) await this.refreshing;
+      if (authRevision === this.authRevision) await this.refresh();
+    }
+    return result.turn;
+  };
   assistantTurn = async (id: string) => {
     const authRevision = this.authRevision;
     const revision = this.revision;
@@ -307,8 +331,23 @@ class HttpClient implements DataClient {
     }
     return result.turn;
   };
-  cancelAssistantTurn = async (id: string) =>
-    (await this.request<{ turn: AssistantTurn }>(`assistant/turns/${id}`, "DELETE")).turn;
+  cancelAssistantTurn = async (id: string) => {
+    const authRevision = this.authRevision;
+    const revision = this.revision;
+    const result = await this.request<{ turn: AssistantTurn; snapshot?: Database }>(
+      `assistant/turns/${id}`,
+      "DELETE",
+    );
+    if (result.snapshot && authRevision === this.authRevision && revision === this.revision) {
+      this.revision++;
+      this.publish(result.snapshot);
+    } else if (result.snapshot && authRevision === this.authRevision) {
+      await this.mutations;
+      if (this.refreshing) await this.refreshing;
+      if (authRevision === this.authRevision) await this.refresh();
+    }
+    return result.turn;
+  };
   confirmAssistantTasks = async (id: string, tasks: AssistantDraft[]) =>
     (await this.mutate<{ turn: AssistantTurn }>(`assistant/turns/${id}/confirm`, "POST", { tasks }))
       .turn;

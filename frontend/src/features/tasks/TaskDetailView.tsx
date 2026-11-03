@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useReadyData } from "@/providers/DataProvider";
 import { useUi } from "@/providers/UiContext";
 import { client } from "@/services/client";
@@ -29,6 +30,7 @@ export function TaskDetailView() {
   const router = useRouter();
   const [tab, setTab] = useState("comments");
   const [comment, setComment] = useState("");
+  const [submittedComments, setSubmittedComments] = useState(0);
   const [result, setResult] = useState<string | null>(null);
   const [returnOpen, setReturnOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -225,7 +227,11 @@ export function TaskDetailView() {
             </div>
             {tab === "comments" ? (
               <>
-                <div className="comments-list">
+                <DiscussionList
+                  key={task.id}
+                  lastCommentId={comments.at(-1)?.id}
+                  submittedComments={submittedComments}
+                >
                   {comments.length ? (
                     comments.map((c) => {
                       const user = data.users.find((u) => u.id === c.userId);
@@ -252,7 +258,7 @@ export function TaskDetailView() {
                       </p>
                     </div>
                   )}
-                </div>
+                </DiscussionList>
                 <form
                   className="comment-form"
                   onSubmit={(e) => {
@@ -261,6 +267,7 @@ export function TaskDetailView() {
                       () => client.addComment(task.id, comment),
                       () => {
                         setComment("");
+                        setSubmittedComments((count) => count + 1);
                         ui.notify("Комментарий добавлен");
                       },
                     );
@@ -288,7 +295,7 @@ export function TaskDetailView() {
                 </form>
               </>
             ) : (
-              <div className="history-list">
+              <div className="history-list" role="region" aria-label="История задачи" tabIndex={0}>
                 {history.map((event) => (
                   <div key={event.id}>
                     <span className="history-dot" />
@@ -425,6 +432,45 @@ export function TaskDetailView() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function DiscussionList({
+  children,
+  lastCommentId,
+  submittedComments,
+}: {
+  children: ReactNode;
+  lastCommentId?: string;
+  submittedComments: number;
+}) {
+  const list = useRef<HTMLDivElement>(null);
+  const followLatest = useRef(true);
+  const lastSubmission = useRef(submittedComments);
+  useEffect(() => {
+    const node = list.current;
+    const ownMessage = lastSubmission.current !== submittedComments;
+    lastSubmission.current = submittedComments;
+    // Keep the reader's position when they scroll up through older messages.
+    if (node && (followLatest.current || ownMessage)) {
+      node.scrollTop = node.scrollHeight;
+      followLatest.current = true;
+    }
+  }, [lastCommentId, submittedComments]);
+  return (
+    <div
+      className="comments-list"
+      ref={list}
+      role="region"
+      aria-label="Сообщения задачи"
+      tabIndex={0}
+      onScroll={(event) => {
+        const node = event.currentTarget;
+        followLatest.current = node.scrollHeight - node.scrollTop - node.clientHeight < 48;
+      }}
+    >
+      {children}
     </div>
   );
 }

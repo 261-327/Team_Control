@@ -1,0 +1,50 @@
+# One free web service. The database is provisioned separately on Neon Free.
+# Do not add a Render Free database: it expires after 30 days.
+services:
+  - type: web
+    name: sipi-api
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: bash deploy/free/build.sh
+    startCommand: bash deploy/free/start.sh
+    healthCheckPath: /api/livez/
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_SSLMODE
+        value: require
+      - key: FRONTEND_URL
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: TRUST_PROXY_HEADERS
+        value: "true"
+      - key: EMAIL_BACKEND
+        value: tasks.email_backends.BrevoEmailBackend
+      - key: BREVO_API_KEY
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+      - key: ASSISTANT_PROVIDER
+        value: cloudflare
+      - key: CLOUDFLARE_ACCOUNT_ID
+        sync: false
+      - key: CLOUDFLARE_API_TOKEN
+        sync: false
+      - key: ASSISTANT_CLOUDFLARE_MODEL
+        value: "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+      - key: ASSISTANT_CLOUDFLARE_IMAGE_MODEL
+        value: "@cf/black-forest-labs/flux-1-schnell"
+      - key: ASSISTANT_IMAGES_ENABLED
+        value: "true"
+      - key: ASSISTANT_TIMEOUT
+        value: "60"
+      - key: PYTHONUNBUFFERED
+        value: "1"

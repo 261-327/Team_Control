@@ -19,7 +19,7 @@ import {
   useAction,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
-import { dateLabel, professions, plural, statusIcon } from "@/lib/format";
+import { dateLabel, professions, plural, pluralWord, statusIcon } from "@/lib/format";
 import {
   defaultFilters,
   filterTasks,
@@ -29,7 +29,10 @@ import {
 } from "@/features/tasks/TaskViews";
 import { TaskBoard } from "@/features/tasks/TaskBoard";
 import { useBoardPreference } from "@/lib/use-preference";
-import type { Profession, RoleInput, Status } from "@/types/domain";
+import type { Status } from "@/types/domain";
+
+import { RoleFields, initialRole, RoleEditor } from "./RoleFields";
+export { RoleFields, initialRole } from "./RoleFields";
 
 export function ProjectsView() {
   const data = useReadyData();
@@ -52,8 +55,7 @@ export function ProjectsView() {
         <div>
           <strong>{data.projects.length}</strong>
           <span>
-            {plural(data.projects.length, ["проект", "проекта", "проектов"]).replace(/^\d+\s*/, "")}{" "}
-            в пространстве
+            {pluralWord(data.projects.length, ["проект", "проекта", "проектов"])} в пространстве
           </span>
         </div>
         <p>Команда, задачи и материалы — в каждом проекте.</p>
@@ -136,13 +138,12 @@ export function ProjectLayout({ children }: { children: React.ReactNode }) {
   const ui = useUi();
   const project = data.projects.find((p) => p.id === projectId);
   const members = data.memberships
-  .filter((m) => m.projectId === projectId)
-  .sort((a, b) => {
-    const priority = (role: string) =>
-      role === "leader" ? 0 : role === "teacher" ? 1 : 2;
+    .filter((m) => m.projectId === projectId)
+    .sort((a, b) => {
+      const priority = (role: string) => (role === "leader" ? 0 : role === "teacher" ? 1 : 2);
 
-    return priority(a.role) - priority(b.role);
-  });
+      return priority(a.role) - priority(b.role);
+    });
   const manage = canManage(data, projectId);
   if (!project)
     return (
@@ -390,61 +391,6 @@ export function ColumnEditor({
     </Modal>
   );
 }
-export function RoleFields({
-  value,
-  onChange,
-}: {
-  value: RoleInput;
-  onChange: (value: RoleInput) => void;
-}) {
-  return (
-    <>
-      <Field label="Твоя роль в команде" required>
-        <select
-          value={value.profession}
-          onChange={(e) => onChange({ ...value, profession: e.target.value as Profession })}
-        >
-          {Object.entries(professions).map(([key, label]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </Field>
-      {value.profession === "developer" && (
-        <Field label="Направление разработки" required>
-          <select
-            value={value.specialization}
-            onChange={(e) => onChange({ ...value, specialization: e.target.value })}
-            required
-          >
-            <option value="">Выбери направление</option>
-            <option value="frontend">Фронтенд</option>
-            <option value="backend">Бэкенд</option>
-            <option value="ios">iOS</option>
-            <option value="android">Android</option>
-          </select>
-        </Field>
-      )}
-      {value.profession === "other" && (
-        <Field label="Своя роль" required>
-          <input
-            value={value.customRole}
-            onChange={(e) => onChange({ ...value, customRole: e.target.value })}
-            placeholder="Например, продакт-менеджер"
-            maxLength={100}
-            required
-          />
-        </Field>
-      )}
-    </>
-  );
-}
-export const initialRole: RoleInput = {
-  profession: "developer",
-  specialization: "frontend",
-  customRole: "",
-};
 export function CreateProjectView() {
   const data = useReadyData();
   const router = useRouter();
@@ -581,15 +527,15 @@ export function MembersView() {
   const data = useReadyData();
   const ui = useUi();
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState(false);
   const [remove, setRemove] = useState("");
   const members = data.memberships
-  .filter((m) => m.projectId === projectId)
-  .sort((a, b) => {
-    const priority = (role: string) =>
-      role === "leader" ? 0 : role === "teacher" ? 1 : 2;
+    .filter((m) => m.projectId === projectId)
+    .sort((a, b) => {
+      const priority = (role: string) => (role === "leader" ? 0 : role === "teacher" ? 1 : 2);
 
-    return priority(a.role) - priority(b.role);
-  });
+      return priority(a.role) - priority(b.role);
+    });
   const manage = canManage(data, projectId);
   const invitations = data.invitations.filter(
     (i) => i.projectId === projectId && i.status === "pending",
@@ -645,6 +591,15 @@ export function MembersView() {
                     ? "Преподаватель"
                     : "Участник"}
               </span>
+              {m.userId === data.sessionId && (
+                <Button
+                  className="member-edit-role"
+                  variant="secondary"
+                  onClick={() => setEditingRole(true)}
+                >
+                  Изменить роль
+                </Button>
+              )}
               {manage && m.role !== "leader" && (
                 <IconButton
                   icon="trash"
@@ -697,7 +652,10 @@ export function MembersView() {
           профессия и другие права.
         </p>
       </div>
-      {inviteOpen && <InviteDialog projectId={projectId} onClose={() => setInviteOpen(false)} />}{" "}
+      {editingRole && <RoleEditor projectId={projectId} onClose={() => setEditingRole(false)} />}
+      {inviteOpen && (
+        <InviteDialog projectId={projectId} onClose={() => setInviteOpen(false)} />
+      )}{" "}
       {remove && (
         <ConfirmDialog
           title="Убрать участника из команды?"
@@ -808,19 +766,18 @@ export function ProjectSettingsView() {
   const [teacherId, setTeacherId] = useState<string | null>(null);
   const selectedLeaderId = leaderId ?? currentLeaderId;
   const selectedTeacherId = teacherId ?? currentTeacherId;
-  const currentLeaderName =
-    data.users.find((u) => u.id === currentLeaderId)?.name ?? "Не выбран";
-  const selectedLeaderName =
-    data.users.find((u) => u.id === selectedLeaderId)?.name ?? "Не выбран";
+  const currentLeaderName = data.users.find((u) => u.id === currentLeaderId)?.name ?? "Не выбран";
+  const selectedLeaderName = data.users.find((u) => u.id === selectedLeaderId)?.name ?? "Не выбран";
   const currentTeacherName =
     data.users.find((u) => u.id === currentTeacherId)?.name ?? "Не назначен";
   const selectedTeacherName = selectedTeacherId
-    ? data.users.find((u) => u.id === selectedTeacherId)?.name ?? "Не выбран"
+    ? (data.users.find((u) => u.id === selectedTeacherId)?.name ?? "Не выбран")
     : "Не назначен";
   const leaderChanged = selectedLeaderId !== currentLeaderId;
   const teacherChanged = selectedTeacherId !== currentTeacherId;
   const selectedLeaderIsCoordinator =
-    data.users.find((u) => u.id === selectedLeaderId)?.scopeProjectIds?.includes(projectId) ?? false;
+    data.users.find((u) => u.id === selectedLeaderId)?.scopeProjectIds?.includes(projectId) ??
+    false;
   return (
     <div className="settings-page">
       <section className="panel settings-panel">
@@ -834,7 +791,7 @@ export function ProjectSettingsView() {
             <strong>{c.name}</strong>
             <span>
               {data.tasks.filter((t) => t.projectId === projectId && t.status === c.id).length} /{" "}
-              {c.limit} задач
+              {plural(c.limit)}
             </span>
             {manage && (
               <IconButton
@@ -853,11 +810,7 @@ export function ProjectSettingsView() {
             Измени руководителя или преподавателя проекта.
           </p>
           <Field label="Руководитель" required>
-            <select
-              value={selectedLeaderId}
-              onChange={(e) => setLeaderId(e.target.value)}
-              required
-            >
+            <select value={selectedLeaderId} onChange={(e) => setLeaderId(e.target.value)} required>
               <option value="">Выбери руководителя</option>
               {data.users
                 .filter((u) => u.kind === "student")
@@ -870,10 +823,7 @@ export function ProjectSettingsView() {
           </Field>
 
           <Field label="Преподаватель">
-            <select
-              value={selectedTeacherId}
-              onChange={(e) => setTeacherId(e.target.value)}
-            >
+            <select value={selectedTeacherId} onChange={(e) => setTeacherId(e.target.value)}>
               <option value="">Пока не назначен</option>
               {data.users
                 .filter((u) => u.kind === "teacher")
@@ -887,7 +837,9 @@ export function ProjectSettingsView() {
           <Button
             onClick={() => {
               if (selectedLeaderId === selectedTeacherId && selectedTeacherId !== "") {
-                ui.notify("Один человек не может быть одновременно руководителем и преподавателем.");
+                ui.notify(
+                  "Один человек не может быть одновременно руководителем и преподавателем.",
+                );
                 return;
               }
 

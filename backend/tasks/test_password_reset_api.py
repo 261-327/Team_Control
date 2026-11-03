@@ -149,3 +149,26 @@ class PasswordResetAPITests(TestCase):
         response = self.confirm(uid, token, password="123")
         self.assertEqual(response.status_code, 400)
         self.assertTrue(self.user.__class__.objects.get(pk=self.user.pk).check_password("Original-Strong-123!"))
+
+
+class MailDiagnosticsTests(TestCase):
+    def test_provider_diagnostics_exclude_private_response_content(self):
+        from smtplib import SMTPDataError
+        from .mail import mail_failure_details
+        secret = "private@example.com https://example.com/reset?token=private"
+        error = SMTPDataError(554, ("Message rejected under suspicion of SPAM " + secret).encode())
+        self.assertEqual(mail_failure_details(error), (554, "spam_policy"))
+        self.assertEqual(mail_failure_details(SMTPDataError(451, b"Temporary failure")), (451, "provider_rejection"))
+
+    def test_reset_warning_never_logs_provider_response(self):
+        from smtplib import SMTPDataError
+        from django.test import override_settings
+        WorkspaceUser.objects.create_user(username="diagnostic", email="diagnostic@example.com", password="unused")
+        with override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", ROOT_URLCONF="config.urls"):
+            with patch("tasks.api.send_mail", side_effect=SMTPDataError(554, b"SPAM secret@example.com token=hidden")):
+                with self.assertLogs("tasks.api", level="WARNING") as logs:
+                    result = self.client.post("/api/auth/password-reset/", {"email": "diagnostic@example.com"}, content_type="application/json")
+        self.assertEqual(result.status_code, 200)
+        self.assertIn("smtp_code=554 reason=spam_policy", str(logs.output))
+        self.assertNotIn("secret@example.com", str(logs.output))
+        self.assertNotIn("hidden", str(logs.output))

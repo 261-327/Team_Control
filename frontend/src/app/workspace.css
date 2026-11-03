@@ -1075,6 +1075,7 @@ select:focus {
   color: #665318;
 }
 .assistant-composer textarea {
+  color: var(--text);
   font-size: 15px;
   min-height: 92px;
   padding: 13px 55px 13px 14px;
@@ -1708,5 +1709,155 @@ select:focus {
   }
   .assistant-orb {
     display: none;
+  }
+}
+
+/* Role controls stay visible and wrap on narrow screens. */
+.profile-username {
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+.profile-role-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.profile-role-row > a {
+  display: grid;
+  gap: 4px;
+  flex: 1 1 190px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.profile-role-row > a > span {
+  color: var(--muted);
+  font-size: 14px;
+}
+.profile-role-row > .btn,
+.member-edit-role {
+  min-height: 44px;
+  flex-shrink: 0;
+}
+@media (max-width: 600px) {
+  .member-edit-role {
+    margin-left: 46px;
+  }
+}
+
+.assistant-composer textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+/* Long task conversations scroll inside the panel; the composer stays outside. */
+.discussion-panel .comments-list,
+.discussion-panel .history-list {
+  max-height: 440px;
+  max-height: min(440px, 50dvh);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  overflow-wrap: anywhere;
+}
+.discussion-panel .comments-list:focus-visible,
+.discussion-panel .history-list:focus-visible {
+  outline: 2px solid var(--brand-yellow, #ffb600);
+  outline-offset: -3px;
+}
+.discussion-panel .comment-form {
+  border-top: 1px solid var(--line);
+}
+.discussion-panel .comment-form textarea {
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+/* Calendar gestures are scoped to dates; vertical scrolling and zoom stay native. */
+.calendar-swipe {
+  touch-action: pan-y pinch-zoom;
+}
+.calendar-panel .calendar-toolbar {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.calendar-panel .calendar-toolbar > div:first-child {
+  flex: 1 1 240px;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.calendar-panel .calendar-toolbar h2 {
+  font-size: 18px;
+  text-transform: none;
+}
+.calendar-panel .calendar-toolbar > div > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.calendar-mode {
+  display: flex;
+  padding: 3px;
+  gap: 4px;
+  background: var(--surface, #f4f4f4);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.calendar-mode button {
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+.calendar-mode button[aria-pressed="true"] {
+  background: var(--brand-yellow, #f5cf4b);
+  color: #302a18;
+}
+.calendar-panel .calendar-toolbar .btn,
+.calendar-panel .calendar-toolbar .icon-button,
+.calendar-panel .calendar-toolbar > select {
+  min-height: 44px;
+  font-size: 14px;
+}
+.calendar-swipe-hint {
+  display: none;
+}
+@media (max-width: 600px) {
+  .calendar-panel .calendar-toolbar > div:first-child {
+    flex-basis: 100%;
+  }
+  .calendar-panel .calendar-toolbar > select {
+    flex: 1 1 140px;
+    min-width: 0;
+    width: 140px;
+  }
+  .calendar-panel .calendar-toolbar .button-wrap {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .calendar-swipe .calendar-cell {
+    padding: 3px 0;
+  }
+  .calendar-swipe .calendar-day-button {
+    width: 100%;
+    min-height: 48px;
+    border-radius: 8px;
+    font-size: 15px;
+  }
+  .calendar-week .calendar-cell {
+    min-height: 76px;
+  }
+  .calendar-swipe-hint {
+    display: block;
+    margin: 0;
+    padding: 12px 14px;
+    font-size: 12px;
+    color: var(--muted);
   }
 }

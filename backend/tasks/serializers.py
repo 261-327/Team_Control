@@ -207,6 +207,7 @@ def snapshot(request):
             {
                 "id": str(person.pk),
                 "name": person.get_full_name().strip() or person.username,
+                "username": person.username if person.pk in visible_users else "",
                 "email": person.email
                 if person.pk in visible_users or user.account_type == "staff"
                 else "",
