@@ -181,8 +181,15 @@ if PROJECT_MEDIA_STORAGE == "s3":
         raise RuntimeError(
             "Object storage is enabled but its endpoint, bucket or credentials are missing"
         )
-    if not _object_storage_endpoint.startswith("https://"):
-        raise RuntimeError("OBJECT_STORAGE_ENDPOINT_URL must use HTTPS")
+    _parsed_storage_endpoint = urlsplit(_object_storage_endpoint)
+    if (
+        _parsed_storage_endpoint.scheme != "https"
+        or not _parsed_storage_endpoint.hostname
+        or _parsed_storage_endpoint.path not in ("", "/")
+        or _parsed_storage_endpoint.query
+        or _parsed_storage_endpoint.fragment
+    ):
+        raise RuntimeError("OBJECT_STORAGE_ENDPOINT_URL must be a valid HTTPS endpoint without a path")
 
     _default_file_storage = {
         "BACKEND": "storages.backends.s3.S3Storage",
