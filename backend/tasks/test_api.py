@@ -785,6 +785,34 @@ class OTPResendCooldownTests(TestCase):
         self.assertFalse(WorkspaceUser.objects.get(pk=user.pk).is_active)
 
 
+
+
+@override_settings(ROOT_URLCONF="config.urls")
+class ProjectFileMaterialTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = WorkspaceUser.objects.create_user(
+            "file-owner", "file-owner@example.com", "Strong-pass-57!"
+        )
+        cls.member = WorkspaceUser.objects.create_user(
+            "file-member", "file-member@example.com", "Strong-pass-57!"
+        )
+        cls.stranger = WorkspaceUser.objects.create_user(
+            "file-stranger", "file-stranger@example.com", "Strong-pass-57!"
+        )
+        cls.project = Project.objects.create(name="Проект с файлами", owner=cls.owner)
+        Membership.objects.create(
+            project=cls.project,
+            user=cls.member,
+            role="developer",
+            developer_specialization="backend",
+            is_confirmed=True,
+            access_role="member",
+        )
+
+    def setUp(self):
+        self.client.force_login(self.owner)
+
     def test_project_file_upload_download_is_private_and_membership_scoped(self):
         content = b"%PDF-1.7\nteam-control-test"
         upload = SimpleUploadedFile("brief.pdf", content, content_type="application/pdf")
@@ -813,7 +841,9 @@ class OTPResendCooldownTests(TestCase):
         self.assertEqual(self.client.get(f"/api/materials/{material.pk}/download/").status_code, 404)
 
     def test_project_file_upload_rejects_wrong_signature_type_and_size(self):
-        invalid = SimpleUploadedFile("fake.pdf", b"<html>not a pdf</html>", content_type="application/pdf")
+        invalid = SimpleUploadedFile(
+            "fake.pdf", b"<html>not a pdf</html>", content_type="application/pdf"
+        )
         response = self.client.post(
             f"/api/projects/{self.project.pk}/materials/files/",
             {"file": invalid, "title": "Подмена"},
@@ -821,24 +851,38 @@ class OTPResendCooldownTests(TestCase):
         self.assertEqual(response.status_code, 415)
         self.assertFalse(Material.objects.filter(kind="file").exists())
 
-        svg = SimpleUploadedFile("active.svg", b"<svg xmlns='http://www.w3.org/2000/svg'/>", content_type="image/svg+xml")
+        svg = SimpleUploadedFile(
+            "active.svg",
+            b"<svg xmlns='http://www.w3.org/2000/svg'/>",
+            content_type="image/svg+xml",
+        )
         self.assertEqual(
-            self.client.post(f"/api/projects/{self.project.pk}/materials/files/", {"file": svg}).status_code,
+            self.client.post(
+                f"/api/projects/{self.project.pk}/materials/files/", {"file": svg}
+            ).status_code,
             415,
         )
         too_large = SimpleUploadedFile(
-            "large.pdf", b"%PDF-" + b"x" * (10 * 1024 * 1024), content_type="application/pdf"
+            "large.pdf",
+            b"%PDF-" + b"x" * (10 * 1024 * 1024),
+            content_type="application/pdf",
         )
         self.assertEqual(
-            self.client.post(f"/api/projects/{self.project.pk}/materials/files/", {"file": too_large}).status_code,
+            self.client.post(
+                f"/api/projects/{self.project.pk}/materials/files/", {"file": too_large}
+            ).status_code,
             413,
         )
         self.assertFalse(Material.objects.filter(kind="file").exists())
 
     def test_only_project_manager_can_upload_file_material(self):
         self.client.force_login(self.member)
-        upload = SimpleUploadedFile("brief.pdf", b"%PDF-1.7\ntest", content_type="application/pdf")
+        upload = SimpleUploadedFile(
+            "brief.pdf", b"%PDF-1.7\ntest", content_type="application/pdf"
+        )
         self.assertEqual(
-            self.client.post(f"/api/projects/{self.project.pk}/materials/files/", {"file": upload}).status_code,
+            self.client.post(
+                f"/api/projects/{self.project.pk}/materials/files/", {"file": upload}
+            ).status_code,
             403,
         )
