@@ -32,3 +32,14 @@ fun daysUntil(deadlineMillis: Long, nowMillis: Long = System.currentTimeMillis()
 
 fun formatDeadline(millis: Long): String =
     SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(millis))
+
+val RU_LOCALE: Locale = Locale.forLanguageTag("ru")
+
+fun formatShortDate(millis: Long): String =
+    SimpleDateFormat("d MMM", RU_LOCALE).format(Date(millis))
+
+fun formatLongDate(millis: Long): String =
+    SimpleDateFormat("d MMMM yyyy", RU_LOCALE).format(Date(millis))
+
+fun formatDateTimeShort(millis: Long): String =
+    SimpleDateFormat("d MMM, HH:mm", RU_LOCALE).format(Date(millis))

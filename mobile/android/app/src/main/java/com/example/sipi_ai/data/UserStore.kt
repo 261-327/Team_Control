@@ -13,6 +13,9 @@ class UserStore(context: Context) {
     val email: String?
         get() = prefs.getString(KEY_EMAIL, null)
 
+    val about: String
+        get() = prefs.getString(KEY_ABOUT, null).orEmpty()
+
     fun save(fullName: String, email: String) {
         prefs.edit {
             putString(KEY_FULL_NAME, fullName)
@@ -20,9 +23,21 @@ class UserStore(context: Context) {
         }
     }
 
+    fun saveProfile(fullName: String, about: String) {
+        prefs.edit {
+            putString(KEY_FULL_NAME, fullName)
+            putString(KEY_ABOUT, about)
+        }
+    }
+
+    fun clear() {
+        prefs.edit { clear() }
+    }
+
     private companion object {
         const val PREFS_NAME = "UserPrefs"
         const val KEY_FULL_NAME = "USER_NAME"
         const val KEY_EMAIL = "USER_EMAIL"
+        const val KEY_ABOUT = "USER_ABOUT"
     }
 }

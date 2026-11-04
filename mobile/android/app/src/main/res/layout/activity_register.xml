@@ -99,12 +99,12 @@
                 android:textColorHint="@color/text_hint"
                 android:textSize="15sp" />
 
-            <!-- Роль (Выпадающий список) - ТЕПЕРЬ ИДЕТ ПЕРВОЙ -->
+            <!-- Роль (выпадающий список) -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="6dp"
-                android:text="Ваша роль"
+                android:text="@string/register_role_label"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp"
                 android:textStyle="bold" />
@@ -127,7 +127,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="6dp"
-                    android:text="Номер группы"
+                    android:text="@string/register_group_label"
                     android:textColor="@color/text_primary"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -138,7 +138,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="26dp"
                     android:background="@drawable/bg_edittext"
-                    android:hint="Например: ПИ-21"
+                    android:hint="@string/register_group_hint"
                     android:inputType="text"
                     android:maxLines="1"
                     android:padding="14dp"

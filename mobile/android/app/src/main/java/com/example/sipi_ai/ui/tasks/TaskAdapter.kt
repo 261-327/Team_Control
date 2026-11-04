@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.sipi_ai.R
+import com.example.sipi_ai.data.ProjectRepository
 import com.example.sipi_ai.data.Task
 import com.example.sipi_ai.data.TaskRepository
 import com.example.sipi_ai.data.TaskStatus
@@ -22,6 +23,7 @@ private const val COLLAPSED_DESCRIPTION_LINES = 3
 
 class TaskAdapter(
     private val onSubmitForReview: ((Task) -> Unit)? = null,
+    private val onClick: ((Task) -> Unit)? = null,
 ) : ListAdapter<Task, TaskAdapter.TaskViewHolder>(TaskDiff) {
 
     private val expandedTaskIds = mutableSetOf<Long>()
@@ -43,22 +45,32 @@ class TaskAdapter(
             boundTaskId = task.id
             val context = binding.root.context
 
-            binding.tvStatus.setText(task.status.labelRes)
-            binding.tvStatus.setTextColor(context.getColor(task.status.colorRes))
-            binding.tvStatus.backgroundTintList =
-                ColorStateList.valueOf(context.getColor(task.status.backgroundColorRes))
+            val style = task.displayStyle
+            binding.tvStatus.setText(style.label)
+            binding.tvStatus.setTextColor(context.getColor(style.color))
+            binding.tvStatus.backgroundTintList = ColorStateList.valueOf(context.getColor(style.background))
+
+            val project = ProjectRepository.get(task.projectId)
+            val code = if (project != null) "${project.key}-${task.number}" else "#${task.number}"
+            binding.tvTaskMeta.text = listOfNotNull(code, project?.name, task.direction).joinToString(" · ")
 
             binding.tvTaskTitle.text = task.title
             binding.tvTaskDescription.text = task.description
+            binding.tvTaskDescription.isVisible = task.description.isNotEmpty()
             bindDeadline(task, context)
 
             val attachment = task.attachmentName.orEmpty()
             binding.tvFilesInfo.isVisible = attachment.isNotEmpty()
             binding.tvFilesInfo.text = attachment
 
-            binding.btnSubmitReview.isVisible = onSubmitForReview != null && task.status != TaskStatus.REVIEW
+            val canSubmit = onSubmitForReview != null &&
+                task.status != TaskStatus.REVIEW && task.status != TaskStatus.DONE
+            binding.btnSubmitReview.isVisible = canSubmit
             binding.btnSubmitReview.setOnClickListener { onSubmitForReview?.invoke(task) }
             binding.rowActions.isVisible = binding.tvFilesInfo.isVisible || binding.btnSubmitReview.isVisible
+
+            binding.root.setOnClickListener { onClick?.invoke(task) }
+            binding.root.isClickable = onClick != null
 
             binding.tvShowMore.setOnClickListener {
                 if (task.id in expandedTaskIds) expandedTaskIds.remove(task.id) else expandedTaskIds.add(task.id)
@@ -68,12 +80,14 @@ class TaskAdapter(
         }
 
         private fun bindDeadline(task: Task, context: Context) {
-            if (task.status == TaskStatus.REVIEW) {
-                val reviewColor = context.getColor(R.color.status_review)
+            if (task.status == TaskStatus.REVIEW || task.status == TaskStatus.DONE) {
+                val color = context.getColor(if (task.status == TaskStatus.DONE) R.color.status_done else R.color.status_review)
                 binding.ivDeadlineIcon.setImageResource(R.drawable.ic_check_circle)
-                ImageViewCompat.setImageTintList(binding.ivDeadlineIcon, ColorStateList.valueOf(reviewColor))
-                binding.tvDeadlineDate.setText(R.string.task_sent_for_review)
-                binding.tvDeadlineDate.setTextColor(reviewColor)
+                ImageViewCompat.setImageTintList(binding.ivDeadlineIcon, ColorStateList.valueOf(color))
+                binding.tvDeadlineDate.setText(
+                    if (task.status == TaskStatus.DONE) R.string.task_done_label else R.string.task_sent_for_review,
+                )
+                binding.tvDeadlineDate.setTextColor(color)
                 binding.tvTimeRemaining.isVisible = false
                 return
             }
@@ -81,13 +95,19 @@ class TaskAdapter(
             val secondaryColor = context.getColor(R.color.text_secondary)
             binding.ivDeadlineIcon.setImageResource(R.drawable.ic_schedule)
             ImageViewCompat.setImageTintList(binding.ivDeadlineIcon, ColorStateList.valueOf(secondaryColor))
-            binding.tvDeadlineDate.text =
-                context.getString(R.string.task_deadline, formatDeadline(task.deadlineMillis))
             binding.tvDeadlineDate.setTextColor(secondaryColor)
 
+            val deadline = task.deadlineMillis
+            if (deadline == null) {
+                binding.tvDeadlineDate.setText(R.string.task_no_deadline)
+                binding.tvTimeRemaining.isVisible = false
+                return
+            }
+
+            binding.tvDeadlineDate.text = context.getString(R.string.task_deadline, formatDeadline(deadline))
             val now = System.currentTimeMillis()
-            binding.tvTimeRemaining.text = context.remainingTimeText(task.deadlineMillis, now)
-            binding.tvTimeRemaining.setTextColor(context.getColor(remainingTimeColorRes(task.deadlineMillis, now)))
+            binding.tvTimeRemaining.text = context.remainingTimeText(deadline, now)
+            binding.tvTimeRemaining.setTextColor(context.getColor(remainingTimeColorRes(deadline, now)))
             binding.tvTimeRemaining.isVisible = true
         }
 
@@ -110,7 +130,6 @@ class TaskAdapter(
     }
 }
 
-//Ты что реально читаешь PR? У тебя ребятки слабенькие(
 private object TaskDiff : DiffUtil.ItemCallback<Task>() {
     override fun areItemsTheSame(oldItem: Task, newItem: Task): Boolean = oldItem.id == newItem.id
 
