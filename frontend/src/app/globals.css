@@ -2978,6 +2978,76 @@ button.stat-card:hover {
   color: #cfab8c;
   margin-bottom: 22px;
 }
+
+.assignment-confirm-details {
+  display: grid;
+  gap: 14px;
+}
+
+.assignment-confirm-card {
+  padding: 16px;
+  border: 1px solid #e0e9d7;
+  border-radius: 14px;
+  background: #fbfcf8;
+}
+
+.assignment-confirm-card > strong {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.assignment-confirm-comparison {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.assignment-confirm-comparison > div {
+  min-width: 0;
+}
+
+.assignment-confirm-comparison > div > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.assignment-confirm-comparison p {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+
+.assignment-confirm-card > .muted {
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+
+.assignment-confirm-details > .muted {
+  margin: 0;
+  line-height: 1.6;
+}
+
+@media (max-width: 480px) {
+  .assignment-confirm-card {
+    padding: 13px;
+  }
+
+  .assignment-confirm-comparison {
+    gap: 8px;
+  }
+
+  .assignment-confirm-comparison p {
+    font-size: 13px;
+  }
+}
+
 .sheet {
   margin: 0 0 0 auto;
   height: 100dvh;

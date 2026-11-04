@@ -71,16 +71,31 @@ function AssistantChat({
   const [loadError, setLoadError] = useState("");
   const [pollError, setPollError] = useState("");
   const [mode, setMode] = useState<AssistantMode>("chat");
-  const [message, setMessage] = useState(initialMessage || "");
+  const [message, setMessage] = useState("");
+  const [promptHint, setPromptHint] = useState(initialMessage || "");
   const [clearOpen, setClearOpen] = useState(false);
   const [reload, setReload] = useState(0);
   const action = useAction();
+  const cancellation = useAction();
+  const [sending, setSending] = useState<{
+    id: string;
+    message: string;
+    mode: AssistantMode;
+    status: "running";
+  } | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
-  const request = useRef<{ id: string; text: string; mode: AssistantMode } | null>(null);
+  const request = useRef<{
+    id: string;
+    text: string;
+    mode: AssistantMode;
+    controller: AbortController;
+    cancelled: AssistantTurn | null;
+  } | null>(null);
   const pending = turns.find(inFlight);
   const pendingId = pending?.id;
-  const busy = action.busy || !!pending;
+  const processing = pending || sending;
+  const busy = action.busy || cancellation.busy || !!pending;
   const ready = mode === "logo" ? capabilities?.imagesReady : capabilities?.chatReady;
   const updateTurn = useCallback((turn: AssistantTurn) => {
     setTurns((old) =>
@@ -141,19 +156,41 @@ function AssistantChat({
   }, [loading]);
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "instant", block: "end" });
-  }, [turns.length, last?.status]);
+  }, [turns.length, last?.status, sending?.id]);
 
   const send = (text: string, chosenMode = mode) => {
     if (!text.trim() || busy || loading) return;
-    if (
-      !request.current ||
-      request.current.text !== text.trim() ||
-      request.current.mode !== chosenMode
-    )
-      request.current = { id: crypto.randomUUID(), text: text.trim(), mode: chosenMode };
-    const current = request.current;
+    const previous = request.current;
+    const current = {
+      id:
+        previous?.text === text.trim() && previous.mode === chosenMode
+          ? previous.id
+          : crypto.randomUUID(),
+      text: text.trim(),
+      mode: chosenMode,
+      controller: new AbortController(),
+      cancelled: null as AssistantTurn | null,
+    };
+    request.current = current;
+    setSending({ id: current.id, message: current.text, mode: chosenMode, status: "running" });
+    cancellation.setError("");
     void action.run(
-      () => client.askAssistant(current.text, chosenMode, current.id, projectId || undefined),
+      async () => {
+        try {
+          return await client.askAssistant(
+            current.text,
+            chosenMode,
+            current.id,
+            projectId || undefined,
+            current.controller.signal,
+          );
+        } catch (error) {
+          if (current.cancelled) return current.cancelled;
+          throw error;
+        } finally {
+          setSending(null);
+        }
+      },
       (turn) => {
         updateTurn(turn);
         request.current = null;
@@ -199,7 +236,9 @@ function AssistantChat({
               ? "Помощник готов"
               : "Помощник недоступен"}
         </strong>
-        <span>Данные проекта</span>
+        <span>
+          {capabilities ? (capabilities.local ? "Локальная модель" : "Облачная модель") : ""}
+        </span>
       </div>
       <div className="assistant-messages" aria-busy={loading}>
         <FormError error={loadError} />
@@ -209,7 +248,7 @@ function AssistantChat({
           </Button>
         )}
         {loading && <p role="status">Загружаем переписку…</p>}
-        {!loading && !loadError && !turns.length && (
+        {!loading && !loadError && !turns.length && !sending && (
           <div className="assistant-welcome">
             <span className="assistant-orb">
               <Icon name="sparkles" size={28} />
@@ -247,7 +286,7 @@ function AssistantChat({
                   disabled={busy}
                   onClick={() => {
                     setMode(p.mode);
-                    setMessage(p.text);
+                    setPromptHint(p.text);
                     textarea.current?.focus();
                   }}
                 >
@@ -344,7 +383,7 @@ function AssistantChat({
                       height={512}
                       unoptimized
                     />
-                    <figcaption>Концепт логотипа · 512 × 512</figcaption>
+                    <figcaption>Концепт логотипа</figcaption>
                     <a
                       className="button button-secondary"
                       href={turn.reply.imageUrl}
@@ -377,7 +416,12 @@ function AssistantChat({
             )}
           </div>
         ))}
-        {pending && (
+        {sending && !turns.some((turn) => turn.id === sending.id) && (
+          <article className="chat-message chat-user">
+            <p className="pre-wrap">{sending.message}</p>
+          </article>
+        )}
+        {processing && (
           <div className="assistant-pending" role="status">
             <div className="assistant-thinking">
               <span>
@@ -387,30 +431,44 @@ function AssistantChat({
               <i />
               <i />
               <span>
-                {pending.status === "queued"
-                  ? "Запрос в очереди…"
-                  : pending.mode === "logo"
-                    ? "Рисуем концепт…"
-                    : "Готовим ответ…"}
+                {cancellation.busy
+                  ? "Отменяем запрос…"
+                  : processing.status === "queued"
+                    ? "Запрос в очереди…"
+                    : processing.mode === "logo"
+                      ? "Рисуем концепт…"
+                      : "Готовим ответ…"}
               </span>
             </div>
             <p>
-              {pending.mode === "logo"
-                ? "Генерация картинки может занять несколько минут."
-                : "Первый ответ может занять больше времени: модель загружается в память."}{" "}
+              {capabilities?.local
+                ? processing.mode === "logo"
+                  ? "Генерация картинки может занять несколько минут."
+                  : "Первый ответ может занять больше времени: модель загружается в память."
+                : "Обрабатываем запрос в облаке."}{" "}
               Чат можно закрыть — ответ сохранится.
             </p>
             <button
               type="button"
-              disabled={action.busy}
+              disabled={cancellation.busy}
               onClick={() =>
-                void action.run(() => client.cancelAssistantTurn(pending.id), updateTurn)
+                void cancellation.run(async () => {
+                  const turn = await client.cancelAssistantTurn(processing.id);
+                  const current = request.current;
+                  if (current?.id === turn.id && !inFlight(turn)) {
+                    // Only stop waiting after the server confirms the final state.
+                    current.cancelled = turn;
+                    current.controller.abort();
+                  }
+                  return turn;
+                }, updateTurn)
               }
             >
-              Отменить запрос
+              {cancellation.busy ? "Отменяем…" : "Отменить запрос"}
             </button>
           </div>
         )}
+        <FormError error={cancellation.error} />
         <FormError error={pollError} />
         <div ref={bottom} />
       </div>
@@ -422,7 +480,10 @@ function AssistantChat({
               type="button"
               aria-pressed={mode === m.id}
               disabled={busy}
-              onClick={() => setMode(m.id)}
+              onClick={() => {
+                setMode(m.id);
+                setPromptHint("");
+              }}
             >
               <Icon name={m.icon} size={15} />
               {m.label}
@@ -432,8 +493,8 @@ function AssistantChat({
         {!loading && !ready && !loadError && (
           <div className="assistant-setup-note" role="status">
             {mode === "logo"
-              ? "Генератор изображений сейчас недоступен. Его нужно запустить на сервере Сипи."
-              : "Не удалось подключиться к помощнику. Проверь запуск сервера и попробуй ещё раз."}
+              ? "Генератор логотипов сейчас недоступен. Попробуй подключиться позже."
+              : "Помощник сейчас недоступен. Попробуй подключиться ещё раз."}
             <button type="button" disabled={busy} onClick={() => setReload((n) => n + 1)}>
               Проверить подключение
             </button>
@@ -466,11 +527,12 @@ function AssistantChat({
               }
             }}
             placeholder={
-              mode === "tasks"
+              promptHint ||
+              (mode === "tasks"
                 ? "Опиши проект и что нужно подготовить…"
                 : mode === "logo"
                   ? "Какой логотип ты представляешь?"
-                  : "Создай проект, добавь задачи или задай вопрос…"
+                  : "Создай проект, добавь задачи или задай вопрос…")
             }
             rows={2}
             maxLength={4000}
@@ -491,9 +553,15 @@ function AssistantChat({
           <span>{message.length}/4000</span>
         </div>
         <p className="assistant-disclaimer">
-          <Icon name="lock" size={11} />
+          <Icon name="sparkles" size={11} />
           По просьбе «создай» помощник сразу добавит проект или задачи.
         </p>
+        {capabilities && !capabilities.local && (
+          <p className="assistant-disclaimer">
+            <Icon name="lock" size={11} />
+            Для ответа Cloudflare получает сообщение и часть данных доступных тебе проектов.
+          </p>
+        )}
       </div>
       {clearOpen && (
         <ConfirmDialog

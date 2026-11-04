@@ -1,0 +1,40 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "fluid": true,
+  "regions": ["fra1"],
+  "services": {
+    "backend": {
+      "root": "backend",
+      "framework": "django",
+      "entrypoint": "config.wsgi:application",
+      "buildCommand": "python vercel_build.py",
+      "functions": {
+        "config/wsgi.py": {
+          "maxDuration": 300
+        }
+      }
+    },
+    "frontend": {
+      "root": "frontend",
+      "framework": "nextjs",
+      "installCommand": "npm ci",
+      "buildCommand": "npm run build",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "backend",
+          "format": "url",
+          "env": "DJANGO_API_URL"
+        }
+      ]
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "frontend"
+      }
+    }
+  ]
+}

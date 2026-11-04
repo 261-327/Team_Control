@@ -1,36 +1,38 @@
 package com.example.sipi_ai.ui.tasks
 
+import androidx.annotation.ColorRes
+import androidx.annotation.StringRes
 import com.example.sipi_ai.R
+import com.example.sipi_ai.data.Task
+import com.example.sipi_ai.data.TaskRepository
 import com.example.sipi_ai.data.TaskStatus
+import com.example.sipi_ai.data.TaskTab
 
-val TaskStatus.tabTitleRes: Int
+data class StatusStyle(
+    @StringRes val label: Int,
+    @ColorRes val color: Int,
+    @ColorRes val background: Int,
+)
+
+private val URGENT_STYLE = StatusStyle(R.string.status_urgent, R.color.status_urgent, R.color.status_urgent_bg)
+
+val TaskStatus.style: StatusStyle
     get() = when (this) {
-        TaskStatus.URGENT -> R.string.tab_urgent
-        TaskStatus.IN_PROGRESS -> R.string.tab_in_progress
-        TaskStatus.REVIEW -> R.string.tab_review
-        TaskStatus.BACKLOG -> R.string.tab_backlog
+        TaskStatus.TODO -> StatusStyle(R.string.status_todo, R.color.status_backlog, R.color.status_backlog_bg)
+        TaskStatus.IN_PROGRESS -> StatusStyle(R.string.status_in_progress, R.color.status_in_progress, R.color.status_in_progress_bg)
+        TaskStatus.REVIEW -> StatusStyle(R.string.status_review, R.color.status_review, R.color.status_review_bg)
+        TaskStatus.DONE -> StatusStyle(R.string.status_done, R.color.status_done, R.color.status_done_bg)
     }
 
-val TaskStatus.labelRes: Int
-    get() = when (this) {
-        TaskStatus.URGENT -> R.string.status_urgent
-        TaskStatus.IN_PROGRESS -> R.string.status_in_progress
-        TaskStatus.REVIEW -> R.string.status_review
-        TaskStatus.BACKLOG -> R.string.status_backlog
-    }
+/** Срочные задачи подсвечиваются как «Срочно», остальные — своим статусом. */
+val Task.displayStyle: StatusStyle
+    get() = if (TaskRepository.isUrgent(this)) URGENT_STYLE else status.style
 
-val TaskStatus.colorRes: Int
+val TaskTab.tabTitleRes: Int
     get() = when (this) {
-        TaskStatus.URGENT -> R.color.status_urgent
-        TaskStatus.IN_PROGRESS -> R.color.status_in_progress
-        TaskStatus.REVIEW -> R.color.status_review
-        TaskStatus.BACKLOG -> R.color.status_backlog
-    }
-
-val TaskStatus.backgroundColorRes: Int
-    get() = when (this) {
-        TaskStatus.URGENT -> R.color.status_urgent_bg
-        TaskStatus.IN_PROGRESS -> R.color.status_in_progress_bg
-        TaskStatus.REVIEW -> R.color.status_review_bg
-        TaskStatus.BACKLOG -> R.color.status_backlog_bg
+        TaskTab.URGENT -> R.string.tab_urgent
+        TaskTab.TODO -> R.string.tab_todo
+        TaskTab.IN_PROGRESS -> R.string.tab_in_progress
+        TaskTab.REVIEW -> R.string.tab_review
+        TaskTab.DONE -> R.string.tab_done
     }

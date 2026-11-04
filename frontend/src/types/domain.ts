@@ -4,6 +4,7 @@ export type User = {
   id: string;
   name: string;
   email: string;
+  username: string;
   bio: string;
   color: string;
   kind: "student" | "teacher" | "staff";

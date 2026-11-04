@@ -23,6 +23,13 @@ export interface DataClient {
   refresh(): Promise<void>;
   requestCode(username: string, password: string): Promise<AuthChallenge>;
   resendCode(): Promise<AuthChallenge>;
+  requestPasswordReset(email: string): Promise<{ message: string }>;
+  confirmPasswordReset(input: {
+    uid: string;
+    token: string;
+    password: string;
+    passwordConfirm: string;
+  }): Promise<{ message: string }>;
   verifyCode(code: string): Promise<void>;
   register(input: {
     name: string;
@@ -40,6 +47,7 @@ export interface DataClient {
     role?: RoleInput,
   ): Promise<{ notifications: NotificationItem[] }>;
   updateProfile(name: string, bio: string): Promise<void>;
+  updateMyRole(projectId: string, role: RoleInput): Promise<void>;
   createTask(input: TaskInput): Promise<Task>;
   updateTask(id: string, input: TaskInput): Promise<void>;
   transitionTask(id: string, status: Status, resultUrl?: string, reason?: string): Promise<void>;
@@ -54,6 +62,12 @@ export interface DataClient {
     teacherId?: string,
   ): Promise<Project>;
   deleteProject(id: string): Promise<void>;
+  updateProjectAssignments(
+    id: string,
+    leaderId: string,
+    teacherId: string,
+    confirmCoordinatorDemotion?: boolean,
+  ): Promise<{ project: Project; snapshot: Snapshot }>;
   directory(
     query: string,
   ): Promise<Pick<Project, "id" | "name" | "description" | "color" | "symbol">[]>;
@@ -77,6 +91,7 @@ export interface DataClient {
     mode: AssistantMode,
     requestId: string,
     projectId?: string,
+    signal?: AbortSignal,
   ): Promise<AssistantTurn>;
   assistantTurn(id: string): Promise<AssistantTurn>;
   cancelAssistantTurn(id: string): Promise<AssistantTurn>;

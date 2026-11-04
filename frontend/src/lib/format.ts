@@ -81,7 +81,10 @@ export function isWebUrl(value: string) {
     return false;
   }
 }
-export function plural(count: number, words = ["задача", "задачи", "задач"]) {
+export function pluralWord(count: number, words = ["задача", "задачи", "задач"]) {
   const n = Math.abs(count) % 100;
-  return `${count} ${words[n > 10 && n < 20 ? 2 : n % 10 === 1 ? 0 : n % 10 >= 2 && n % 10 <= 4 ? 1 : 2]}`;
+  return words[n > 10 && n < 20 ? 2 : n % 10 === 1 ? 0 : n % 10 >= 2 && n % 10 <= 4 ? 1 : 2];
+}
+export function plural(count: number, words = ["задача", "задачи", "задач"]) {
+  return `${count} ${pluralWord(count, words)}`;
 }

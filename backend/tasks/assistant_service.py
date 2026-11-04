@@ -1,4 +1,4 @@
-"""Local inference with bounded, permission-checked creation tools."""
+"""Configured inference with bounded, permission-checked creation tools."""
 
 import json
 import logging
@@ -13,6 +13,13 @@ from django.http import Http404
 from django.utils import timezone
 
 from .api import APIError
+from .assistant_providers import (
+    ProviderUnavailable,
+    chat as cloud_chat,
+    configured as cloud_configured,
+    provider_name,
+    text_model as cloud_text_model,
+)
 from .assistant_actions import creation_intent, execute_creation
 from .memberships import accessible
 from .models import AssistantTurn, Comment, Material, Membership, Task, TaskEvent, WorkspaceUser
@@ -26,7 +33,16 @@ class AssistantUnavailable(Exception):
 
 
 def local_request(path, payload=None, timeout=None):
-    """The URL is administrator configuration, never model output or user input."""
+    """Keep the internal contract shared by local and optional cloud inference."""
+    if provider_name() == "cloudflare":
+        if path != "/api/chat":
+            raise AssistantUnavailable("Облачный ИИ не поддерживает этот запрос.")
+        try:
+            return cloud_chat(payload)
+        except ProviderUnavailable as exc:
+            raise AssistantUnavailable(str(exc)) from exc
+    if provider_name() != "ollama":
+        raise AssistantUnavailable("Провайдер ИИ не настроен на сервере.")
     body = json.dumps(payload).encode() if payload is not None else None
     request = Request(
         settings.ASSISTANT_OLLAMA_URL.rstrip("/") + path,
@@ -53,7 +69,16 @@ def local_request(path, payload=None, timeout=None):
         raise AssistantUnavailable("Модель вернула неполный ответ. Попробуйте ещё раз.") from exc
 
 
+def model_name():
+    return cloud_text_model() if provider_name() == "cloudflare" else settings.ASSISTANT_MODEL
+
+
 def model_ready():
+    # No extra paid/quotad inference call for every status request.
+    if provider_name() == "cloudflare":
+        return cloud_configured()
+    if provider_name() != "ollama":
+        return False
     try:
         models = local_request("/api/tags", timeout=2).get("models", [])
         return any(m.get("name") == settings.ASSISTANT_MODEL for m in models)
@@ -604,7 +629,7 @@ def parse_reply(turn, context, response):
             result["imagePrompt"] = prompt[:2000]
         return result
     except (ValueError, KeyError, TypeError, AttributeError) as exc:
-        logger.warning("Invalid local model reply for turn %s", turn.pk)
+        logger.warning("Invalid model reply for turn %s", turn.pk)
         raise AssistantUnavailable(
             "Не удалось разобрать ответ модели. Попробуйте уточнить запрос."
         ) from exc

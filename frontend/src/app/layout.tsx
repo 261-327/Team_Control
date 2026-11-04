@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { DataProvider } from "@/providers/DataProvider";
 import "./globals.css";
@@ -14,7 +14,12 @@ const workspaceFont = localFont({
 export const metadata: Metadata = {
   title: { default: "Сипи — проекты и задачи", template: "%s · Сипи" },
   description: "Задачи, участники и материалы учебных проектов.",
+  applicationName: "Сипи",
+  appleWebApp: { capable: true, title: "Сипи", statusBarStyle: "default" },
+  formatDetection: { telephone: false },
 };
+
+export const viewport: Viewport = { themeColor: "#f8f8f8" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

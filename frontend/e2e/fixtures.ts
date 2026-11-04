@@ -37,6 +37,7 @@ export function createDatabase(): Database {
     users: [
       {
         id: "alex",
+        username: "alex",
         name: "Александр Соколов",
         email: "alex@example.com",
         bio: "Делаю сложное понятным. Разрабатываю Сипи вместе с командой.",
@@ -45,6 +46,7 @@ export function createDatabase(): Database {
       },
       {
         id: "maria",
+        username: "maria",
         name: "Мария Волкова",
         email: "maria@example.com",
         bio: "Фронтенд и немного магии.",
@@ -53,6 +55,7 @@ export function createDatabase(): Database {
       },
       {
         id: "danil",
+        username: "danil",
         name: "Даниил Ким",
         email: "danil@example.com",
         bio: "Проектирую удобные интерфейсы.",
@@ -61,6 +64,7 @@ export function createDatabase(): Database {
       },
       {
         id: "elena",
+        username: "elena",
         name: "Елена Миронова",
         email: "teacher@example.com",
         bio: "Куратор проектной деятельности.",
@@ -69,6 +73,7 @@ export function createDatabase(): Database {
       },
       {
         id: "staff",
+        username: "staff",
         name: "Андрей Петров",
         email: "staff@example.com",
         bio: "Координатор учебных проектов.",
@@ -78,6 +83,7 @@ export function createDatabase(): Database {
       },
       {
         id: "new",
+        username: "new",
         name: "Новый участник",
         email: "student@example.com",
         bio: "",

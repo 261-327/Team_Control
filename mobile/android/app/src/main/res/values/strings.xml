@@ -12,14 +12,17 @@
     <string name="title_calendar">Календарь</string>
 
     <string name="tab_urgent">Срочно</string>
-    <string name="tab_in_progress">В процессе</string>
+    <string name="tab_in_progress">В работе</string>
     <string name="tab_review">На проверке</string>
-    <string name="tab_backlog">Сделанные</string>
+    <string name="tab_todo">К выполнению</string>
+    <string name="tab_done">Готово</string>
+    <string name="nav_todo">К работе</string>
 
     <string name="status_urgent">Срочно</string>
-    <string name="status_in_progress">В процессе</string>
+    <string name="status_in_progress">В работе</string>
     <string name="status_review">На проверке</string>
-    <string name="status_backlog">Сделано</string>
+    <string name="status_todo">К выполнению</string>
+    <string name="status_done">Готово</string>
 
     <string name="register_logo_description">Логотип SIPI AI</string>
     <string name="register_title">Регистрация</string>
@@ -29,8 +32,8 @@
     <string name="register_email_label">Почта</string>
     <string name="register_email_hint">example@mail.ru</string>
     <string name="register_submit">Зарегистрироваться</string>
-    <string name="register_error_empty_fields">Заполните все поля</string>
-    <string name="register_success">Регистрация: %1$s / %2$s</string>
+    <string name="register_error_empty_fields">Заполните все обязательные поля</string>
+    <string name="register_success">Регистрация успешна!</string>
 
     <string name="tasks_empty">Задач нет</string>
     <string name="tasks_empty_hint">Здесь появятся задачи с этим статусом</string>
@@ -67,4 +70,251 @@
     <string name="profile_avatar_description">Аватар профиля</string>
     <string name="profile_name_missing">Имя не указано</string>
     <string name="profile_email_missing">Email не указан</string>
+
+    <!-- Навигация и общие -->
+    <string name="nav_tasks">Мои задачи</string>
+    <string name="nav_projects">Мои проекты</string>
+    <string name="nav_team_overview">Обзор команд</string>
+    <string name="nav_assistant">Сипи AI</string>
+    <string name="nav_projects_group">Проекты</string>
+    <string name="nav_help">Помощь и о проекте</string>
+    <string name="org_name">Московский Политех</string>
+    <string name="org_subtitle">Проектная деятельность</string>
+    <string name="action_add_task">Новая задача</string>
+    <string name="action_edit">Редактировать</string>
+    <string name="action_delete">Удалить</string>
+    <string name="action_export">Экспорт на 7 дней</string>
+    <string name="action_clear_chat">Очистить чат</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_save">Сохранить</string>
+    <string name="action_create">Создать</string>
+    <string name="action_add">Добавить</string>
+    <string name="action_close">Закрыть</string>
+    <string name="assistant_fab">Сипи AI</string>
+    <string name="help_title">Сипи — проекты и задачи</string>
+    <string name="help_message">Трекер проектной деятельности Московского Политеха.\n\nЗадачи проходят путь: К выполнению → В работе → На проверке → Готово. Задачи со сроком в ближайшие 2 дня и просроченные попадают на вкладку «Срочно».\n\nСипи AI подскажет, что осталось до сдачи, и поможет создать проект или черновик задач.</string>
+
+    <!-- Мои задачи: статистика -->
+    <string name="stat_open">Открыто</string>
+    <string name="stat_today">На сегодня</string>
+    <string name="stat_overdue">Просрочено</string>
+    <string name="stat_done">Завершено</string>
+    <string name="stat_in_progress_and_plans">В работе и в планах</string>
+    <string name="stat_review">На проверке</string>
+    <string name="stat_done_total">Выполнено</string>
+
+    <!-- Задача -->
+    <string name="task_unassigned">Нужно назначить</string>
+    <string name="task_no_deadline">Без срока</string>
+    <string name="task_done_label">Задача выполнена</string>
+    <string name="task_screen_title">Задача</string>
+    <string name="task_about">О задаче</string>
+    <string name="task_details">Детали задачи</string>
+    <string name="task_assignee">Исполнитель</string>
+    <string name="task_due">Срок выполнения</string>
+    <string name="task_project">Проект</string>
+    <string name="task_author">Автор</string>
+    <string name="task_direction">Направление</string>
+    <string name="task_created">Создана %1$s</string>
+    <string name="task_no_description">Описание не добавлено</string>
+    <string name="task_discussion">Обсуждение</string>
+    <string name="task_history">История</string>
+    <string name="task_no_comments">Комментариев пока нет.\nНапиши вопрос или расскажи о ходе работы.</string>
+    <string name="task_comment_hint">Обсудить задачу с командой…</string>
+    <string name="task_comment_counter">%1$d/2000</string>
+    <string name="task_comment_send">Отправить</string>
+    <string name="task_change_status">Сменить статус</string>
+    <string name="task_delete_title">Удалить задачу?</string>
+    <string name="task_delete_message">Задача «%1$s» будет удалена без возможности восстановления.</string>
+    <string name="task_deleted">Задача удалена</string>
+    <string name="task_moved">Статус изменён: %1$s</string>
+    <string name="task_not_found">Задача не найдена</string>
+
+    <!-- Создание / редактирование задачи -->
+    <string name="task_form_new">Новая задача</string>
+    <string name="task_form_edit">Редактирование задачи</string>
+    <string name="task_form_subtitle">Укажи, что нужно сделать, кто отвечает и когда срок.</string>
+    <string name="task_form_title_label">Название задачи *</string>
+    <string name="task_form_title_hint">Что нужно сделать?</string>
+    <string name="task_form_description_label">Описание</string>
+    <string name="task_form_description_hint">Расскажи, какой результат ожидается…</string>
+    <string name="task_form_description_help">Контекст, ожидаемый результат и критерии готовности</string>
+    <string name="task_form_project_label">Проект *</string>
+    <string name="task_form_assignee_label">Исполнитель</string>
+    <string name="task_form_deadline_label">Срок выполнения</string>
+    <string name="task_form_deadline_help">Московское время (UTC+3)</string>
+    <string name="task_form_direction_label">Направление</string>
+    <string name="task_form_clear_deadline">Без срока</string>
+    <string name="task_form_error_title">Введите название задачи</string>
+    <string name="task_form_error_no_project">Сначала создайте проект</string>
+    <string name="task_form_saved">Задача сохранена</string>
+
+    <!-- Проекты -->
+    <string name="projects_subtitle">Проекты, в которых ты участвуешь.</string>
+    <string name="projects_count_one">%1$d проект в пространстве</string>
+    <string name="projects_count_few">%1$d проекта в пространстве</string>
+    <string name="projects_count_many">%1$d проектов в пространстве</string>
+    <string name="projects_create_with_assistant">Создать с помощником</string>
+    <string name="projects_search_hint">Найти свой проект…</string>
+    <string name="projects_new_title">Новый проект</string>
+    <string name="projects_new_hint">Создай проект и пригласи участников команды</string>
+    <string name="projects_new_action">Создать проект</string>
+    <string name="projects_empty">Проектов не найдено</string>
+    <string name="project_tasks_count_one">%1$d задача</string>
+    <string name="project_tasks_count_few">%1$d задачи</string>
+    <string name="project_tasks_count_many">%1$d задач</string>
+    <string name="project_members_count_one">%1$d участник</string>
+    <string name="project_members_count_few">%1$d участника</string>
+    <string name="project_members_count_many">%1$d участников</string>
+    <string name="project_progress">Прогресс проекта</string>
+    <string name="project_done_of">%1$d из %2$d готово</string>
+    <string name="project_role_owner">Руководитель проекта</string>
+    <string name="project_role_member">Участник проекта</string>
+    <string name="project_you_lead">Ты руководишь этим проектом</string>
+    <string name="project_team_count">%1$d в команде</string>
+    <string name="project_tab_tasks">Задачи</string>
+    <string name="project_tab_team">Команда</string>
+    <string name="project_tab_materials">Материалы</string>
+    <string name="project_tab_settings">Настройки</string>
+    <string name="project_dialog_title">Новый проект</string>
+    <string name="project_name_hint">Название проекта</string>
+    <string name="project_description_hint">Краткое описание</string>
+    <string name="project_error_name">Введите название проекта</string>
+    <string name="project_created">Проект создан</string>
+    <string name="project_not_found">Проект не найден</string>
+
+    <!-- Доска -->
+    <string name="board_search_hint">Найти задачу…</string>
+    <string name="board_filters">Фильтры</string>
+    <string name="board_filters_active">Фильтры (1)</string>
+    <string name="board_mode_board">Доска</string>
+    <string name="board_mode_list">Список</string>
+    <string name="board_column_empty">Нет задач</string>
+    <string name="board_filter_title">Направление</string>
+    <string name="board_filter_all">Все направления</string>
+    <string name="board_move_to">Переместить: %1$s</string>
+    <string name="board_open">Открыть</string>
+
+    <!-- Команда / материалы / настройки -->
+    <string name="team_invite">Пригласить участника</string>
+    <string name="team_invite_hint">Имя и фамилия участника</string>
+    <string name="team_invite_error">Введите имя участника</string>
+    <string name="team_remove_title">Убрать из проекта?</string>
+    <string name="team_remove_message">%1$s больше не будет участником проекта.</string>
+    <string name="team_remove">Убрать</string>
+    <string name="team_leader">Руководитель</string>
+    <string name="team_member">Участник</string>
+    <string name="materials_empty">Материалов пока нет</string>
+    <string name="materials_empty_hint">Добавь файлы, которые пригодятся команде</string>
+    <string name="materials_add">Добавить материал</string>
+    <string name="materials_from_task">Из задачи %1$s</string>
+    <string name="materials_added">Добавлено вручную</string>
+    <string name="settings_name_label">Название проекта</string>
+    <string name="settings_description_label">Описание</string>
+    <string name="settings_season_label">Период</string>
+    <string name="settings_saved">Настройки сохранены</string>
+    <string name="settings_delete_project">Удалить проект</string>
+    <string name="settings_delete_title">Удалить проект?</string>
+    <string name="settings_delete_message">Проект «%1$s» и все его задачи будут удалены.</string>
+
+    <!-- Обзор команд -->
+    <string name="overview_title">Обзор команд</string>
+    <string name="overview_subtitle">Проекты, которые ты ведёшь или курируешь.</string>
+    <string name="overview_projects_state">Состояние проектов</string>
+    <string name="overview_members_tasks">Задачи участников</string>
+    <string name="overview_members_hint">Незавершённые задачи по участникам</string>
+    <string name="overview_no_assignments">Пока нет активных назначений.</string>
+    <string name="overview_members_note">Количество задач не измеряет сложность работы или личный вклад человека.</string>
+    <string name="overview_deadlines">Ближайшие дедлайны</string>
+    <string name="overview_no_deadlines">Ближайших дедлайнов нет</string>
+    <string name="overview_project_line">%1$d в работе · %2$d готово</string>
+    <string name="overview_next_deadline">Ближайший срок: %1$s</string>
+    <string name="overview_no_open_tasks">Нет открытых задач</string>
+    <string name="overview_open_tasks_count">%1$d откр.</string>
+
+    <!-- Календарь -->
+    <string name="calendar_subtitle">Твои личные дедлайны из всех проектов.</string>
+    <string name="calendar_today">Сегодня</string>
+    <string name="calendar_all_projects">Все мои проекты</string>
+    <string name="calendar_export_empty">На ближайшие 7 дней дедлайнов нет</string>
+    <string name="calendar_export_share">Экспорт дедлайнов</string>
+    <string name="calendar_export_error">Не удалось создать файл</string>
+
+    <!-- Профиль -->
+    <string name="profile_subtitle">Имя, почта и роли в проектах.</string>
+    <string name="profile_role_student">Студент</string>
+    <string name="profile_stat_projects">проекты</string>
+    <string name="profile_stat_tasks">задачи</string>
+    <string name="profile_personal_info">Личная информация</string>
+    <string name="profile_personal_hint">Так тебя видят участники твоих проектов.</string>
+    <string name="profile_name_label">Имя и фамилия *</string>
+    <string name="profile_email_label">Электронная почта</string>
+    <string name="profile_email_hint">Чтобы изменить почту, обратись к администратору</string>
+    <string name="profile_about_label">О себе</string>
+    <string name="profile_about_hint">Чем увлекаешься? Что любишь делать в команде?</string>
+    <string name="profile_about_counter">%1$d/500 символов</string>
+    <string name="profile_save">Сохранить изменения</string>
+    <string name="profile_saved">Профиль сохранён</string>
+    <string name="profile_name_error">Введите имя и фамилию</string>
+    <string name="profile_colleagues">Коллеги</string>
+    <string name="profile_no_colleagues">Пока никого — пригласи участников в проект</string>
+    <string name="profile_logout">Выйти из аккаунта</string>
+    <string name="profile_logout_title">Выйти из аккаунта?</string>
+    <string name="profile_logout_message">Данные профиля на этом устройстве будут удалены.</string>
+
+    <!-- Поиск и уведомления -->
+    <string name="search_title">Поиск по пространству</string>
+    <string name="search_hint">Задачи и проекты</string>
+    <string name="search_empty">Ничего не найдено</string>
+    <string name="search_prompt">Начни вводить название задачи или проекта</string>
+    <string name="search_section_projects">Проект</string>
+    <string name="notifications_title">Уведомления</string>
+    <string name="notifications_empty">Уведомлений нет</string>
+    <string name="notification_overdue">Просрочена: %1$s</string>
+    <string name="notification_today">Срок сегодня: %1$s</string>
+    <string name="notification_tomorrow">Срок завтра: %1$s</string>
+    <string name="notification_review">Ожидает проверки: %1$s</string>
+
+    <!-- Сипи AI -->
+    <string name="assistant_title">Сипи AI</string>
+    <string name="assistant_subtitle">Помощник по твоим проектам</string>
+    <string name="assistant_context_label">Контекст</string>
+    <string name="assistant_ready">Помощник готов</string>
+    <string name="assistant_project_data">Данные проекта</string>
+    <string name="assistant_welcome_title">С чего начнём?</string>
+    <string name="assistant_welcome_text">Могу создать проект, добавить задачи на доску или разобраться в том, что уже есть.</string>
+    <string name="assistant_suggest_deadlines">Что осталось до сдачи?</string>
+    <string name="assistant_suggest_create">Создай проект «Название» — здесь опиши идею. Добавь 5 задач для начала работы.</string>
+    <string name="assistant_mode_assistant">Помощник</string>
+    <string name="assistant_mode_drafts">Черновик задач</string>
+    <string name="assistant_input_hint_assistant">Создай проект «Название» — здесь опиши идею.\nДобавь 5 задач для начала работы.</string>
+    <string name="assistant_input_hint_drafts">Опиши работу — каждая строка станет задачей</string>
+    <string name="assistant_counter">%1$d/4000</string>
+    <string name="assistant_footer">По просьбе «создай» помощник сразу добавит проект или задачи.</string>
+    <string name="assistant_add_drafts">Добавить %1$d на доску</string>
+    <string name="assistant_drafts_added">Задачи добавлены на доску</string>
+    <string name="assistant_clear_title">Очистить чат?</string>
+
+    <string name="register_role_label">Ваша роль</string>
+    <string name="register_group_label">Номер группы</string>
+    <string name="register_group_hint">Например: ПИ-21</string>
+    <string-array name="register_roles">
+        <item>Студент</item>
+        <item>Преподаватель</item>
+    </string-array>
+
+    <string name="verify_title">Подтверждение</string>
+    <string name="verify_email_subtitle">Код отправлен на %1$s</string>
+    <string name="verify_email_fallback">вашу почту</string>
+    <string name="verify_code_hint">Введите код</string>
+    <string name="verify_submit">Подтвердить</string>
+    <string name="verify_error_code">Неверный код (введите 1234)</string>
+
+    <string name="login_title">Вход</string>
+    <string name="login_subtitle">Рады видеть вас снова</string>
+    <string name="login_email_label">Почта</string>
+    <string name="login_email_hint">example@mail.ru</string>
+    <string name="login_submit">Войти</string>
+    <string name="login_go_to_register">Нет аккаунта? Зарегистрироваться</string>
+    <string name="login_error_empty_email">Введите почту</string>
 </resources>

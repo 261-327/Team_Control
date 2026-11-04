@@ -1,0 +1,40 @@
+package com.example.sipi_ai.ui.register
+
+import android.content.Intent
+import android.os.Bundle
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import com.example.sipi_ai.R
+import com.example.sipi_ai.databinding.ActivityVerifyCodeBinding
+import com.example.sipi_ai.ui.main.MainActivity
+
+class VerifyCodeActivity : AppCompatActivity() {
+
+    private lateinit var binding: ActivityVerifyCodeBinding
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityVerifyCodeBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        val userEmail = intent.getStringExtra(EXTRA_EMAIL) ?: getString(R.string.verify_email_fallback)
+        binding.tvEmailSubtitle.text = getString(R.string.verify_email_subtitle, userEmail)
+
+        binding.btnVerify.setOnClickListener {
+            // Заглушка: правильный код — 1234
+            if (binding.etCode.text.toString().trim() == STUB_CODE) {
+                // Очищаем стек, чтобы нельзя было вернуться назад к регистрации
+                val intent = Intent(this, MainActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                startActivity(intent)
+            } else {
+                Toast.makeText(this, R.string.verify_error_code, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    companion object {
+        const val EXTRA_EMAIL = "USER_EMAIL"
+        private const val STUB_CODE = "1234"
+    }
+}
