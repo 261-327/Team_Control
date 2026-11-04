@@ -1277,6 +1277,8 @@ def move_task(request, task_id):
             t.accepted_at = timezone.now() if status == "done" else None
             if "resultUrl" in request.data:
                 t.result_url = web_url(request.data, "resultUrl")
+            if status == "todo":
+                t.result_url = None
         t.save()
         for position, item in enumerate(ordered):
             item.position = position
