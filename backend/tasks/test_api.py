@@ -72,8 +72,13 @@ class APITests(TestCase):
         self.assertTrue(task['resultUrl'].startswith('https://github.com'))
         self.assertEqual(Comment.objects.count(), 1)
         self.assertEqual(TaskEvent.objects.filter(task_id=tid).count(), 6)
-        self.call(f'tasks/{tid}/move', {'status': 'todo'})
+        from tasks.models import Column
+        Column.objects.filter(board=self.board, workflow_status='todo').update(max_tasks=15)
+        resp = self.call(f'tasks/{tid}/move', {'status': 'todo', 'reason': 'возврат'})
+        self.assertEqual(resp.status_code, 200, resp.content)
         self.assertIsNone(Task.objects.get(pk=tid).accepted_at)
+        self.assertIsNone(Task.objects.get(pk=tid).result_url)
+        self.assertFalse(Task.objects.get(pk=tid).submitted_at)
 
     def test_reorder_capacity_and_failed_move_are_atomic(self):
         first, second = self.create_task(), self.create_task(title='Вторая')
