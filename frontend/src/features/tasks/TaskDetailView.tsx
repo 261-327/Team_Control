@@ -104,7 +104,22 @@ export function TaskDetailView() {
                 </h2>
                 <Icon name={task.status === "done" ? "checkCircle" : "flag"} size={20} />
               </div>
-              {task.resultUrl && (
+              {/* resultUrl показываем только для in_review и done — для todo/in_progress он уже очищен */}
+              {task.resultUrl && task.status === "in_review" && (
+                <a
+                  className="result-link"
+                  href={task.resultUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span>
+                    <Icon name="link" size={18} />
+                    {task.resultUrl}
+                  </span>
+                  <Icon name="upRight" size={17} />
+                </a>
+              )}
+              {task.resultUrl && task.status === "done" && (
                 <a
                   className="result-link"
                   href={task.resultUrl}
