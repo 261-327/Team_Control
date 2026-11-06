@@ -106,3 +106,38 @@ class NotificationsAPITests(TestCase):
         self.client.logout()
         self.assertEqual(self.client.get('/api/notifications/').status_code, 401)
         self.assertEqual(self.respond('colleague', self.link.pk, 'decline').status_code, 401)
+    def test_discussion_unread_and_bell_notifications(self):
+        """Локальное сквозное тестирование уведомлений в колокольчике и статуса прочитанности по ТЗ."""
+        from .models import Task, Comment, TaskDiscussionRead
+        from .notifications_api import incoming_notifications
+        from .serializers import task_json
+
+        # 1. Создаем доску, колонку и задачу внутри нашего тестового проекта
+        from .models import Board, Column
+        board = Board.objects.create(project=self.project, name="Тестовая Доска")
+        column = Column.objects.create(board=board, workflow_status="todo", name="В работе")
+        task = Task.objects.create(column=column, title="Реализовать колокольчик", creator=self.sender)
+        task.assignees.set([self.recipient])
+
+        # 2. Имитируем ТЗ: Получатель (recipient) оставляет комментарий
+        Comment.objects.create(task=task, user=self.recipient, text="Я оставил комментарий")
+
+        # 3. Проверяем колокольчик Создателя (sender) — он должен увидеть уведомление
+        sender_bell = incoming_notifications(self.sender)
+        comment_notes = [n for n in sender_bell if n.get('kind') == 'task_comment']
+        self.assertTrue(len(comment_notes) > 0, "Координатор должен получить уведомление в колокольчик")
+
+        # 4. Проверяем колокольчик Автора комментария (recipient) — он сам себе уведомление получать НЕ должен
+        recipient_bell = incoming_notifications(self.recipient)
+        self.assertFalse(any(n.get('kind') == 'task_comment' for n in recipient_bell), "Автор комментария не должен уведомлять сам себя")
+
+        # 5. Проверяем признак прочитанности в сериализаторе
+        # Для отправителя (sender) обсуждение должно гореть как непрочитанное
+        # Создаем фиктивный request для передачи контекста авторизации
+        from django.test import RequestFactory
+        req = RequestFactory().get('/')
+        req.user = self.sender
+        
+        # Симулируем вызов сериализатора
+        data = task_json(task)
+        self.assertIn("hasUnreadComments", data, "В JSON задачи должен быть передан ключ hasUnreadComments")

@@ -395,3 +395,10 @@ class AssistantWorker(models.Model):
     id = models.CharField(primary_key=True, max_length=50)
     kind = models.CharField(max_length=12)
     heartbeat = models.DateTimeField(default=timezone.now)
+class TaskDiscussionRead(models.Model):
+    task = models.ForeignKey('Task', on_delete=models.CASCADE, related_name='discussion_reads')
+    user = models.ForeignKey('WorkspaceUser', on_delete=models.CASCADE)
+    last_read_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        unique_together = ('task', 'user')

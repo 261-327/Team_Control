@@ -970,6 +970,14 @@ def comments(request, task_id):
             .order_by("created_at", "pk")
         )
 
+        from .models import TaskDiscussionRead
+        from django.utils import timezone
+        TaskDiscussionRead.objects.update_or_create(
+            task=task,
+            user=request.user,
+            defaults={"last_read_at": timezone.now()}
+        )
+
         return {
             "comments": [
                 {
