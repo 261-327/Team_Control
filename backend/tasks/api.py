@@ -1268,6 +1268,10 @@ def move_task(request, task_id):
                 raise APIError("Порядок задач изменился. Обновите доску.", "conflict", 409)
         ordered.insert(index, t)
         t.column = col
+        # Запоминаем старые значения до изменения — нужны для истории
+        old_result_url = t.result_url if status != old else None
+        old_submitted_at = t.submitted_at if status != old else None
+        
         if status != old:
             t.submitted_at = (
                 timezone.now()
@@ -1275,18 +1279,27 @@ def move_task(request, task_id):
                 else (None if status in ("todo", "in_progress") else t.submitted_at)
             )
             t.accepted_at = timezone.now() if status == "done" else None
+            
+            # Очищаем result_url при возврате на доработку или сбросе в todo
+            # из статусов, где результат мог быть сдан (in_review, done)
+            if old_result_url and status in ("todo", "in_progress") and old in ("in_review", "done"):
+                t.result_url = ""
+            
+            # Обновляем result_url только если явно передан в запросе
             if "resultUrl" in request.data:
                 t.result_url = web_url(request.data, "resultUrl")
-            if status == "todo":
-                t.result_url = None
         t.save()
         for position, item in enumerate(ordered):
             item.position = position
         Task.objects.bulk_update(ordered, ["position"])
         if old != status:
-            log_event(
-                t, request.user, f"{old_label} → {col.name}" + (f". {reason}" if reason else "")
-            )
+            event_text = f"{old_label} → {col.name}"
+            if reason:
+                event_text += f". {reason}"
+            # Записываем старый результат в историю, если он был очищен
+            if old_result_url and status in ("todo", "in_progress") and old in ("in_review", "done"):
+                event_text += f" [предыдущий результат: {old_result_url}]"
+            log_event(t, request.user, event_text)
     return {"snapshot": snapshot(request)}
 
 
