@@ -1427,7 +1427,3 @@ class NotificationMenuTests(TestCase):
         self.client.force_login(sender)
         self.assertContains(self.client.get('/projects/'),'aria-label="Уведомления: 0"')
 
-
-class CiFailureSmokeTest(TestCase):
-    def test_ci_detects_failure(self):
-        self.assertEqual(1, 2)
