@@ -1145,8 +1145,15 @@ button.stat-card:hover {
   padding: 0 11px;
   min-width: 0;
 }
+
+.search-field:focus-within {
+  border-color: #9ab89a;
+  box-shadow: 0 0 0 3px rgba(122, 175, 145, 0.12);
+}
+
 .search-field > input:not([type="checkbox"]) {
-  border: none;
+  border: none !important;
+  outline: none !important;
   box-shadow: none !important;
   background: transparent;
   padding: 10px 0;
@@ -9046,4 +9053,12 @@ button.stat-card:hover {
   .notification-request-actions {
     margin-left: 0;
   }
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #9ab89a;
+  box-shadow: 0 0 0 3px rgba(122, 175, 145, 0.12);
 }
