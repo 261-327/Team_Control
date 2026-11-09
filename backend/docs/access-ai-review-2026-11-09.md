@@ -11,6 +11,7 @@
 - Автоматические проверки используют `config.test_settings`, `DEBUG=False`, настоящую защиту CSRF и отдельную тестовую БД. В новом классе намеренно выставлено старое `PROJECT_SELF_JOIN_ENABLED=True`, чтобы обнаружить возможный обход закрытого вступления.
 - В браузере использовались отдельная SQLite-база, Django на порту 8005 и production-сборка Next.js на 3005. Локальный `DEBUG=True`, письма тестовых аккаунтов сохранялись в отдельную временную папку.
 - Next.js production build, TypeScript, ESLint, Prettier изменённых файлов, Django check и проверка отсутствия новых миграций прошли. PostgreSQL-тесты автоматически подхватывает существующий `backend-membership.yml`.
+- [GitHub Actions на head 93bc684](https://github.com/261-327/Team_Control/actions/runs/42631991362/job/129210348999) прошёл с PostgreSQL 15 и Python 3.11. Выполнено 348 тестов за 40,955 с. Последующие правки этого отчёта добавляют результаты приёмки, коммит проверенного кода указан выше.
 
 ## Обезличенные ответы
 
@@ -102,6 +103,8 @@ Legacy-вступление, просроченные/чужие/отменён�
 | Автоматический HTTP-клиент к пилоту | Заблокирован Cloudflare 1010 до Django. Эти ответы исключены из матрицы API |
 | Настройки фактического production и роли на опубликованной версии | Требуется отдельная приёмка после публикации этого коммита |
 | Защита Vercel Production-профиля | Проверена кодом и тестами конфигурации. Требует DEBUG=False, secure cookies, Cloudflare и PostgreSQL |
+| Последний production общего main | Vercel success для 3374831, health через браузер отвечает ok |
+| Preview PR #84 | В журнале HhuAdVS8Z подтверждён отказ Production-only перед миграциями. Фронтенд собрался, для Preview требуется отдельная БД |
 | Живой Cloudflare, текст и изображения | Ожидает входа пользователя. В браузере открыта форма входа |
 | Живой Ollama | Локальная модель и runtime для этого прогона отсутствуют |
 | Совместимость адаптеров Cloudflare/Ollama с HTTP-протоколом | Проверена тестами с подменой сетевых ответов |
@@ -130,7 +133,10 @@ Legacy-вступление, просроченные/чужие/отменён�
 Команды запускаются из корня репозитория на отдельной тестовой PostgreSQL. Обычные DB_* переменные указывают только на тестовый сервер. Приложение ответов лучше сохранять во временный файл и сравнивать ожидаемые/фактические поля, поскольку идентификаторы, UUID и время меняются.
 
 ```sh
-TEST_POSTGRES=1 SIPI_AUDIT_EVIDENCE=/tmp/sipi-access-ai-review.jsonl backend/.venv/bin/python backend/manage.py test tasks   --settings=config.test_settings --noinput
+TEST_POSTGRES=1 \
+SIPI_AUDIT_EVIDENCE=/tmp/sipi-access-ai-review.jsonl \
+backend/.venv/bin/python backend/manage.py test tasks \
+  --settings=config.test_settings --noinput
 ```
 
 На Windows используется `backend\.venv\Scripts\python.exe`, переменные задаются через `$env:` в PowerShell. Пароли приложения, настоящие cookie и ключи провайдера для этих тестов не нужны.
