@@ -6,18 +6,26 @@ from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
-from .api import APIError, endpoint, identifier, text
-from .models import ColleagueConnection, Invitation, Membership, Project, WorkspaceUser
+from .api import APIError, accessible, endpoint, identifier, project_for, text
+from .models import ColleagueConnection, Invitation, Membership, WorkspaceUser
 
 
 def colleague_list(user):
     links = ColleagueConnection.objects.filter(
         Q(user_low=user) | Q(user_high=user)
     ).select_related('user_low', 'user_high').order_by('-updated_at', '-pk')
-    projects = list(Project.objects.filter(owner=user).order_by('name', 'pk'))
+    projects = list(accessible(user).filter(
+        Q(owner=user) | Q(memberships__user=user, memberships__is_confirmed=True,
+            memberships__access_role='coordinator')
+    ).distinct().order_by('name', 'pk'))
     member_projects = {}
-    for user_id, project_id in Membership.objects.filter(project__owner=user, is_confirmed=True).values_list('user_id', 'project_id'):
+    for user_id, project_id in Membership.objects.filter(project__in=projects, is_confirmed=True).values_list('user_id', 'project_id'):
         member_projects.setdefault(user_id, []).append(project_id)
+    pending_projects = {}
+    for email, project_id in Invitation.objects.filter(
+        project__in=projects, status='pending', expires_at__gt=timezone.now()
+    ).values_list('email', 'project_id'):
+        pending_projects.setdefault(email.lower(), []).append(project_id)
     result = []
     for link in links:
         person = link.user_high if link.user_low_id == user.pk else link.user_low
@@ -28,6 +36,7 @@ def colleague_list(user):
             'name': person.get_full_name() or person.username,
             'bio': person.bio if state == 'accepted' else '', 'state': state,
             'projectIds': member_projects.get(person.pk, []),
+            'pendingProjectIds': pending_projects.get(person.email.lower(), []) if state == 'accepted' else [],
         })
     return {'colleagues': result, 'projects': [{'id': project.pk, 'name': project.name} for project in projects]}
 
@@ -88,12 +97,12 @@ def colleague_response(request, connection_id):
 @endpoint(('POST',))
 def invite_colleague(request, connection_id):
     with transaction.atomic():
+        project = project_for(request.user, identifier(request.data.get('projectId')),
+            manage=True, lock=True)
         link = get_object_or_404(ColleagueConnection.objects.select_for_update().filter(
             Q(user_low=request.user) | Q(user_high=request.user)), pk=connection_id, status='accepted')
         recipient_id = link.user_high_id if link.user_low_id == request.user.pk else link.user_low_id
         recipient = get_object_or_404(WorkspaceUser, pk=recipient_id, is_active=True)
-        project = get_object_or_404(Project.objects.select_for_update(),
-            pk=identifier(request.data.get('projectId')), owner=request.user)
         if Membership.objects.filter(project=project, user=recipient, is_confirmed=True).exists():
             raise APIError('Коллега уже участвует в этом проекте.')
         if Invitation.objects.filter(project=project, email__iexact=recipient.email,

@@ -202,9 +202,10 @@ def can_manage(user, project):
 def project_for(user, project_id, manage=False, lock=False):
     # Lock the parent row before reading capacity/positions to serialize API writes on PostgreSQL.
     qs = Project.objects.select_for_update() if lock else Project.objects.all()
-    project = get_object_or_404(
-        qs.filter(pk__in=accessible(user).values("pk")), pk=identifier(project_id)
-    )
+    project = get_object_or_404(qs, pk=identifier(project_id))
+    # Read membership after acquiring the parent lock. A waiter must see revocation.
+    if not accessible(user).filter(pk=project.pk).exists():
+        raise Http404
     if manage and not can_manage(user, project):
         raise APIError("Это действие доступно руководителю проекта.", "forbidden", 403)
     return project
@@ -468,13 +469,26 @@ def auth_resend(request):
 
 @endpoint(("POST",), public=True)
 def auth_verify(request):
+    # Malformed input still consumes a shared transport budget, not an OTP guess.
+    require_rate(
+        "verify-ip", (client_identity(request),), 100, 300,
+        "Слишком много запросов. Попробуйте позже.",
+    )
+    code = request.data.get("code")
+    if (
+        not isinstance(code, str)
+        or len(code) != 6
+        or not code.isascii()
+        or not code.isdigit()
+    ):
+        raise APIError("Введите шестизначный код.", "invalid_code_format")
     with transaction.atomic():
         user = challenge_user(request)
         if not user.otp_expiry or user.otp_expiry <= timezone.now():
             raise APIError("Срок кода истёк. Запросите новый код.")
         if user.otp_attempts >= 5:
             raise APIError("Попытки исчерпаны. Запросите новый код, когда станет доступна повторная отправка.")
-        if not user.is_otp_valid(text(request.data, "code", 6)):
+        if not user.is_otp_valid(code):
             user.otp_attempts += 1
             user.save(update_fields=["otp_attempts"])
             # Return inside atomic so failed attempts are committed, not rolled back.
@@ -640,16 +654,8 @@ def profile(request):
 @endpoint()
 def directory(request):
     query = request.GET.get("q", "").strip()[:255]
-    if not query or not settings.PROJECT_SELF_JOIN_ENABLED:
-        return {"projects": []}
-    return {
-        "projects": [
-            public_project(p)
-            for p in Project.objects.filter(name__icontains=query)
-            .exclude(pk__in=accessible(request.user).values("pk"))
-            .order_by("name")[:50]
-        ]
-    }
+    projects = accessible(request.user).filter(name__icontains=query).order_by("name")[:50]
+    return {"projects": [public_project(project) for project in projects] if query else []}
 
 
 @endpoint(("GET", "POST"))
@@ -930,24 +936,9 @@ def project_members(request, project_id):
 
 @endpoint(("POST",))
 def join_project(request, project_id):
-    if not settings.PROJECT_SELF_JOIN_ENABLED:
-        raise APIError("Вступление в проект доступно по приглашению руководителя.", "forbidden", 403)
-    roles = role_values(request.data.get("role"))
-    with transaction.atomic():
-        p = get_object_or_404(Project.objects.select_for_update(), pk=project_id)
-        if not p.memberships.filter(user=request.user, is_confirmed=True).exists():
-            Membership.objects.update_or_create(
-                project=p,
-                user=request.user,
-                defaults={
-                    **roles,
-                    "is_confirmed": True,
-                    "access_role": "teacher"
-                    if request.user.account_type == "teacher"
-                    else "member",
-                },
-            )
-    return {"snapshot": snapshot(request)}
+    raise APIError(
+        "Вступление в проект доступно по приглашению руководителя.", "forbidden", 403
+    )
 
 
 @endpoint(("POST",))
@@ -981,6 +972,29 @@ def update_my_role(request, project_id):
             setattr(membership, field, value)
         membership.full_clean()
         membership.save(update_fields=list(roles))
+    return {"snapshot": snapshot(request)}
+
+
+@endpoint(("PATCH",))
+def update_member_role(request, project_id, user_id):
+    from .models import ProjectEvent
+
+    roles = role_values(request.data)
+    with transaction.atomic():
+        project = project_for(request.user, project_id, manage=True, lock=True)
+        membership = get_object_or_404(
+            Membership.objects.select_for_update(),
+            project=project, user_id=user_id, is_confirmed=True,
+        )
+        previous = membership.role_description
+        for field, value in roles.items():
+            setattr(membership, field, value)
+        membership.full_clean()
+        membership.save(update_fields=list(roles))
+        ProjectEvent.objects.create(
+            project=project, user=request.user,
+            text=f"Изменена профессия участника {user_id}: {previous} → {membership.role_description}",
+        )
     return {"snapshot": snapshot(request)}
 
 
@@ -1275,7 +1289,12 @@ def move_task(request, task_id):
                 else (None if status in ("todo", "in_progress") else t.submitted_at)
             )
             t.accepted_at = timezone.now() if status == "done" else None
-            if "resultUrl" in request.data:
+            if status == "todo":
+                previous_result = t.result_url
+                t.result_url = ""
+                if previous_result:
+                    log_event(t, request.user, f"Предыдущий результат: {previous_result}")
+            elif "resultUrl" in request.data:
                 t.result_url = web_url(request.data, "resultUrl")
         t.save()
         for position, item in enumerate(ordered):
@@ -1331,9 +1350,11 @@ def comments(request, task_id):
             ]
         }
 
-    # POST — прежнее создание комментария.
+    from .models import CommentNotification
+
     with transaction.atomic():
-        Comment.objects.create(
+        project = project_for(request.user, task.column.board.project_id, lock=True)
+        comment = Comment.objects.create(
             task=task,
             user=request.user,
             text=text(
@@ -1344,6 +1365,33 @@ def comments(request, task_id):
             ),
         )
 
+        participants = set(
+            project.memberships.filter(is_confirmed=True, user__is_active=True)
+            .values_list("user_id", flat=True)
+        )
+        participants.add(project.owner_id)
+        recipients = {project.owner_id, task.creator_id}
+        recipients.update(task.assignees.values_list("pk", flat=True))
+        recipients.update(task.comments.values_list("user_id", flat=True))
+        recipients = (recipients & participants) - {request.user.pk, None}
+        CommentNotification.objects.bulk_create(
+            [CommentNotification(comment=comment, user_id=user_id) for user_id in recipients]
+        )
+
+    return {"snapshot": snapshot(request)}
+
+
+@endpoint(("POST",))
+def read_comments(request, task_id):
+    from .models import CommentNotification
+
+    with transaction.atomic():
+        task = get_object_or_404(Task.objects.select_related("column__board"), pk=task_id)
+        project_for(request.user, task.column.board.project_id, lock=True)
+        seen = get_object_or_404(Comment, pk=identifier(request.data.get("lastCommentId")), task=task)
+        CommentNotification.objects.filter(
+            user=request.user, comment__task=task, comment_id__lte=seen.pk, read_at=None,
+        ).update(read_at=timezone.now())
     return {"snapshot": snapshot(request)}
 
 
@@ -1424,9 +1472,9 @@ def invitations(request, project_id):
 @endpoint(("DELETE", "POST"))
 def invitation_detail(request, invitation_id):
     with transaction.atomic():
-        invitation = get_object_or_404(
-            Invitation.objects.select_for_update().select_related("project"), pk=invitation_id
-        )
+        project_id = get_object_or_404(Invitation, pk=invitation_id).project_id
+        p = get_object_or_404(Project.objects.select_for_update(), pk=project_id)
+        invitation = get_object_or_404(Invitation.objects.select_for_update(), pk=invitation_id, project=p)
         if request.method == "DELETE":
             project_for(request.user, invitation.project_id, manage=True)
             if invitation.status != "pending":

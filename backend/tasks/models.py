@@ -383,6 +383,7 @@ class AssistantTurn(models.Model):
     error = models.CharField(max_length=500, blank=True)
     image = models.BinaryField(null=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    worker = models.ForeignKey("AssistantWorker", null=True, blank=True, on_delete=models.SET_NULL, related_name="turns")
     started_at = models.DateTimeField(null=True)
     finished_at = models.DateTimeField(null=True)
     confirmed_at = models.DateTimeField(null=True)
@@ -403,3 +404,19 @@ class RateLimitCounter(models.Model):
     key = models.CharField(primary_key=True, max_length=64)
     count = models.PositiveIntegerField(default=0)
     expires_at = models.DateTimeField(db_index=True)
+
+
+class ProjectEvent(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="events")
+    user = models.ForeignKey(WorkspaceUser, on_delete=models.SET_NULL, null=True)
+    text = models.CharField(max_length=1000)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class CommentNotification(models.Model):
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name="notifications")
+    user = models.ForeignKey(WorkspaceUser, on_delete=models.CASCADE, related_name="comment_notifications")
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["comment", "user"], name="unique_comment_notification")]

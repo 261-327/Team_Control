@@ -216,7 +216,7 @@ ASSISTANT_TIMEOUT = int(os.environ.get("ASSISTANT_TIMEOUT", "240"))
 ASSISTANT_IMAGES_ENABLED = os.environ.get("ASSISTANT_IMAGES_ENABLED", "false").lower() == "true"
 ASSISTANT_IMAGE_MODEL = os.environ.get("ASSISTANT_IMAGE_MODEL", "stabilityai/sdxl-turbo")
 
-# A hosted pilot requires invitations; local development keeps the previous opt-in flow.
+# Compatibility setting for older deployments. Joining now always requires an invitation.
 PROJECT_SELF_JOIN_ENABLED = os.environ.get(
     "PROJECT_SELF_JOIN_ENABLED", "true" if DEBUG else "false"
 ).lower() == "true"

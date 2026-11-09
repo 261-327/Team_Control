@@ -639,19 +639,16 @@ class ProjectMembershipTests(TestCase):
         self.join_url = f'/projects/{self.project.pk}/join/'
 
     def test_search_join_and_participant_list(self):
-        self.assertContains(self.client.get('/projects/'), 'Вступить в проект')
-        self.assertNotContains(self.client.get('/projects/search/'), 'Find This Project')
-        self.assertContains(self.client.get('/projects/search/', {'q': 'find this'}), 'Find This Project')
+        self.assertNotContains(self.client.get('/projects/search/', {'q': 'find this'}), 'Find This Project')
         self.assertEqual(self.client.get(f'/projects/{self.project.pk}/').status_code, 404)
-        self.assertRedirects(self.client.post(self.join_url,{'role':'designer'}), f'/projects/{self.project.pk}/')
-        self.assertContains(self.client.get('/'), 'Find This Project')
+        self.assertEqual(self.client.post(self.join_url, {'role': 'designer'}).status_code, 403)
+        self.assertFalse(Membership.objects.filter(project=self.project, user=self.member).exists())
+        Membership.objects.create(project=self.project, user=self.member, role='designer', is_confirmed=True)
+        self.assertContains(self.client.get('/projects/search/', {'q': 'find this'}), 'Find This Project')
         page = self.client.get(f'/projects/{self.project.pk}/')
         self.assertContains(page, 'newmember')
         self.assertContains(page, 'membershipowner')
         self.assertNotContains(page, 'Изменить лимит')
-        self.assertNotContains(self.client.get('/projects/search/', {'q': 'find'}), 'Find This Project')
-        self.client.post(self.join_url,{'role':'designer'})
-        self.assertEqual(self.project.members.filter(pk=self.member.pk).count(), 1)
 
     def test_only_project_participants_can_be_assignees(self):
         from .views import TaskCreationForm
@@ -683,7 +680,7 @@ class ProjectMembershipTests(TestCase):
         self.assertEqual(self.client.post(f'/projects/{self.project.pk}/columns/{target.pk}/limit/', {'max_tasks': 3}).status_code, 404)
 
     def test_guest_join_and_get_requests_are_blocked(self):
-        self.assertEqual(self.client.get(self.join_url).status_code, 200)
+        self.assertEqual(self.client.get(self.join_url).status_code, 403)
         self.client.logout()
         self.assertEqual(self.client.post(self.join_url,{'role':'designer'}).status_code, 302)
         self.assertEqual(self.client.get('/projects/search/').status_code, 302)
@@ -719,18 +716,18 @@ class ConfirmedProjectParticipantsTests(TestCase):
         data={'title':'Cannot assign yet','assignee':self.member.pk,'column':self.column.pk}
         self.assertContains(self.client.post(f'/projects/{self.project.pk}/tasks/new/',data),'Выберите активного участника этого проекта.')
         self.client.force_login(self.member)
-        self.client.get(f'/projects/{self.project.pk}/')
-        self.assertIn(self.member.pk, TaskCreationForm(project=self.project).fields['assignee'].queryset.values_list('pk',flat=True))
+        self.assertEqual(self.client.get(f'/projects/{self.project.pk}/').status_code, 404)
+        self.assertNotIn(self.member.pk, TaskCreationForm(project=self.project).fields['assignee'].queryset.values_list('pk',flat=True))
 
-    def test_join_confirms_and_list_is_visible_without_expansion(self):
+    def test_join_is_denied_and_confirmed_participants_remain_visible(self):
         from .views import TaskCreationForm
         self.client.force_login(self.stranger)
-        self.client.post(f'/projects/{self.project.pk}/join/',{'role':'designer'})
-        self.assertIn(self.stranger.pk, TaskCreationForm(project=self.project).fields['assignee'].queryset.values_list('pk',flat=True))
-        page=self.client.get(f'/projects/{self.project.pk}/')
-        self.assertContains(page,'class="member-list"')
-        self.assertContains(page,'<strong>stranger</strong>')
-        self.assertContains(page,'<strong>confirmedowner</strong>')
+        self.assertEqual(self.client.post(f'/projects/{self.project.pk}/join/', {'role': 'designer'}).status_code, 403)
+        self.assertNotIn(self.stranger.pk, TaskCreationForm(project=self.project).fields['assignee'].queryset.values_list('pk', flat=True))
+        Membership.objects.create(project=self.project, user=self.stranger, role='designer', is_confirmed=True)
+        page = self.client.get(f'/projects/{self.project.pk}/')
+        self.assertContains(page, '<strong>stranger</strong>')
+        self.assertContains(page, '<strong>confirmedowner</strong>')
 
     def test_outsider_cannot_confirm_by_opening_private_project(self):
         self.client.force_login(self.stranger)
@@ -1022,20 +1019,17 @@ class MembershipModelAndAdminTests(TestCase):
         self.assertContains(response,'Backend Team'); self.assertContains(response,'Design Team')
         self.assertEqual(self.client.get(f'/admin/tasks/workspaceuser/{self.user.pk}/change/').status_code,200)
 
-    def test_join_collects_role_without_changing_other_team(self):
-        Membership.objects.create(user=self.user,project=self.first,role='designer',is_confirmed=True)
+    def test_invitation_collects_role_without_changing_other_team(self):
+        from .models import ProjectInvitation
+        Membership.objects.create(user=self.user, project=self.first, role='designer', is_confirmed=True)
         self.client.force_login(self.user)
-        url=f'/projects/{self.second.pk}/join/'
-        self.assertContains(self.client.get(url),'Ваша роль в проекте')
-        response=self.client.post(url,{'role':'developer'})
-        self.assertEqual(response.status_code,200)
-        self.assertFalse(Membership.objects.filter(project=self.second,user=self.user).exists())
-        response=self.client.post(url,{'role':'developer','developer_specialization':'ios'})
-        self.assertRedirects(response,f'/projects/{self.second.pk}/')
-        self.assertEqual(Membership.objects.get(project=self.first,user=self.user).role,'designer')
-        self.assertEqual(Membership.objects.get(project=self.second,user=self.user).developer_specialization,'ios')
-        self.client.post(url,{'role':'tester'})
-        self.assertEqual(Membership.objects.filter(project=self.second,user=self.user).count(),1)
+        self.assertEqual(self.client.post(f'/projects/{self.second.pk}/join/', {'role': 'developer', 'developer_specialization': 'ios'}).status_code, 403)
+        self.assertFalse(Membership.objects.filter(project=self.second, user=self.user).exists())
+        invitation = ProjectInvitation.objects.create(project=self.second, sender=self.second.owner, recipient=self.user)
+        response = self.client.post(f'/profile/invitations/{invitation.pk}/', {'role': 'developer', 'developer_specialization': 'ios'})
+        self.assertRedirects(response, f'/projects/{self.second.pk}/')
+        self.assertEqual(Membership.objects.get(project=self.first, user=self.user).role, 'designer')
+        self.assertEqual(Membership.objects.get(project=self.second, user=self.user).developer_specialization, 'ios')
 
 
 from django.test import TransactionTestCase

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useReadyData } from "@/providers/DataProvider";
 import { useUi } from "@/providers/UiContext";
@@ -87,7 +87,10 @@ export function TaskDetailView() {
         <div>
           <section className="panel detail-description">
             <h2>О задаче</h2>
-            <p className="pre-wrap">{task.description || "Описание пока не добавлено."}</p>
+            <TaskDescription
+              key={task.id}
+              text={task.description || "Описание пока не добавлено."}
+            />
           </section>
           {(transitions.length > 0 ||
             task.resultUrl ||
@@ -229,6 +232,7 @@ export function TaskDetailView() {
               <>
                 <DiscussionList
                   key={task.id}
+                  taskId={task.id}
                   lastCommentId={comments.at(-1)?.id}
                   submittedComments={submittedComments}
                 >
@@ -438,16 +442,42 @@ export function TaskDetailView() {
 
 function DiscussionList({
   children,
+  taskId,
   lastCommentId,
   submittedComments,
 }: {
   children: ReactNode;
+  taskId: string;
   lastCommentId?: string;
   submittedComments: number;
 }) {
   const list = useRef<HTMLDivElement>(null);
+  const readMarker = useRef<HTMLDivElement>(null);
   const followLatest = useRef(true);
   const lastSubmission = useRef(submittedComments);
+  const lastRead = useRef("");
+  const markRead = useCallback(() => {
+    if (
+      !lastCommentId ||
+      lastRead.current === lastCommentId ||
+      document.visibilityState !== "visible" ||
+      !followLatest.current
+    )
+      return;
+    const marker = readMarker.current?.getBoundingClientRect();
+    const region = list.current?.getBoundingClientRect();
+    if (
+      !marker ||
+      !region ||
+      marker.top < Math.max(0, region.top) ||
+      marker.bottom > Math.min(window.innerHeight, region.bottom)
+    )
+      return;
+    lastRead.current = lastCommentId;
+    void client.readComments(taskId, lastCommentId).catch(() => {
+      lastRead.current = "";
+    });
+  }, [lastCommentId, taskId]);
   useEffect(() => {
     const node = list.current;
     const ownMessage = lastSubmission.current !== submittedComments;
@@ -458,6 +488,16 @@ function DiscussionList({
       followLatest.current = true;
     }
   }, [lastCommentId, submittedComments]);
+  useEffect(() => {
+    const observer = new IntersectionObserver(markRead, { threshold: 1 });
+    if (readMarker.current) observer.observe(readMarker.current);
+    markRead();
+    document.addEventListener("visibilitychange", markRead);
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", markRead);
+    };
+  }, [markRead]);
   return (
     <div
       className="comments-list"
@@ -468,9 +508,49 @@ function DiscussionList({
       onScroll={(event) => {
         const node = event.currentTarget;
         followLatest.current = node.scrollHeight - node.scrollTop - node.clientHeight < 48;
+        markRead();
       }}
     >
       {children}
+      <div ref={readMarker} className="comments-read-marker" aria-hidden="true" />
+    </div>
+  );
+}
+
+function TaskDescription({ text }: { text: string }) {
+  const descriptionId = useId();
+  const paragraph = useRef<HTMLParagraphElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  useEffect(() => {
+    const node = paragraph.current;
+    if (!node) return;
+    const measure = () => setOverflows(node.scrollHeight > 192);
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    measure();
+    return () => observer.disconnect();
+  }, [text]);
+  return (
+    <div className="task-description-content">
+      <p
+        id={descriptionId}
+        ref={paragraph}
+        className={`pre-wrap task-description-text ${expanded ? "expanded" : "collapsed"}`}
+      >
+        {text}
+      </p>
+      {overflows && (
+        <Button
+          type="button"
+          variant="ghost"
+          aria-expanded={expanded}
+          aria-controls={descriptionId}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? "Свернуть" : "Показать полностью"}
+        </Button>
+      )}
     </div>
   );
 }

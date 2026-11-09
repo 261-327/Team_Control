@@ -52,6 +52,7 @@ export function NotificationsBell({ attention }: { attention: Task[] }) {
     const timer = window.setInterval(refresh, 15000);
     window.addEventListener("focus", refresh);
     window.addEventListener("colleagues-changed", refresh);
+    window.addEventListener("comments-changed", refresh);
     document.addEventListener("visibilitychange", refresh);
     return () => {
       mounted.current = false;
@@ -60,6 +61,7 @@ export function NotificationsBell({ attention }: { attention: Task[] }) {
       window.clearInterval(timer);
       window.removeEventListener("focus", refresh);
       window.removeEventListener("colleagues-changed", refresh);
+      window.removeEventListener("comments-changed", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [load, invalidateRequests]);
@@ -136,6 +138,7 @@ export function NotificationsBell({ attention }: { attention: Task[] }) {
           )}
           {selected ? (
             <form
+              className="notification-invitation-form"
               onSubmit={(event) => {
                 event.preventDefault();
                 void respond(selected, "accept");
@@ -158,42 +161,63 @@ export function NotificationsBell({ attention }: { attention: Task[] }) {
           ) : (
             <>
               {loading && <p className="muted">Загрузка уведомлений…</p>}
-              {items.map((item) => (
-                <article className="notification-request" key={`${item.kind}:${item.id}`}>
-                  <div className="notification-request-heading">
-                    <span className="notification-icon lilac">
-                      <Icon name={item.kind === "colleague" ? "users" : "projects"} size={18} />
+              {items
+                .filter((item) => item.kind !== "comment")
+                .map((item) => (
+                  <article className="notification-request" key={`${item.kind}:${item.id}`}>
+                    <div className="notification-request-heading">
+                      <span className="notification-icon lilac">
+                        <Icon name={item.kind === "colleague" ? "users" : "projects"} size={18} />
+                      </span>
+                      <div>
+                        <strong>{item.title}</strong>
+                        <p>{item.description}</p>
+                      </div>
+                    </div>
+                    <div className="notification-request-actions">
+                      <Button
+                        disabled={busy}
+                        onClick={() => {
+                          if (item.kind === "colleague") void respond(item, "accept");
+                          else {
+                            setSelected(item);
+                            setRole({ ...initialRole });
+                            setError("");
+                            setNotice("");
+                          }
+                        }}
+                      >
+                        Принять
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        disabled={busy}
+                        onClick={() => void respond(item, "decline")}
+                      >
+                        Отклонить
+                      </Button>
+                    </div>
+                  </article>
+                ))}
+              {items
+                .filter((item) => item.kind === "comment")
+                .map((item) => (
+                  <Link
+                    className="notification-item"
+                    key={`comment-${item.id}`}
+                    href={`/projects/${item.projectId}/tasks/${item.taskId}`}
+                    onClick={() => setOpen(false)}
+                  >
+                    <span className="notification-icon">
+                      <Icon name="message" />
                     </span>
                     <div>
                       <strong>{item.title}</strong>
                       <p>{item.description}</p>
                     </div>
-                  </div>
-                  <div className="notification-request-actions">
-                    <Button
-                      disabled={busy}
-                      onClick={() => {
-                        if (item.kind === "colleague") void respond(item, "accept");
-                        else {
-                          setSelected(item);
-                          setRole({ ...initialRole });
-                          setError("");
-                          setNotice("");
-                        }
-                      }}
-                    >
-                      Принять
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      disabled={busy}
-                      onClick={() => void respond(item, "decline")}
-                    >
-                      Отклонить
-                    </Button>
-                  </div>
-                </article>
-              ))}
+                    <Icon name="chevron" size={17} />
+                  </Link>
+                ))}
               {attention.map((task) => (
                 <Link
                   className="notification-item"

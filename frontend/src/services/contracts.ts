@@ -48,6 +48,9 @@ export interface DataClient {
   ): Promise<{ notifications: NotificationItem[] }>;
   updateProfile(name: string, bio: string): Promise<void>;
   updateMyRole(projectId: string, role: RoleInput): Promise<void>;
+  updateMemberRole(projectId: string, userId: string, role: RoleInput): Promise<void>;
+  inviteColleague(projectId: string, connectionId: string): Promise<void>;
+  readComments(taskId: string, lastCommentId: string): Promise<void>;
   createTask(input: TaskInput): Promise<Task>;
   updateTask(id: string, input: TaskInput): Promise<void>;
   transitionTask(id: string, status: Status, resultUrl?: string, reason?: string): Promise<void>;

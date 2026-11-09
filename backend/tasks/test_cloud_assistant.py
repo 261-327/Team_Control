@@ -626,7 +626,7 @@ class CloudApiTests(TestCase):
         self.assertTrue(self.client.get("/api/assistant/").json()["capabilities"]["chatReady"])
         self.assertEqual(self.ask().json()["turn"]["status"], "succeeded")
 
-    def test_local_queued_request_is_not_expired_by_cloud_housekeeping(self):
+    def test_abandoned_local_request_expires_without_cloud_network(self):
         from .models import AssistantThread, AssistantTurn
 
         thread = AssistantThread.objects.create(user=self.owner)
@@ -634,7 +634,7 @@ class CloudApiTests(TestCase):
         AssistantTurn.objects.filter(pk=old.pk).update(created_at=timezone.now() - timedelta(days=1))
         with override_settings(ASSISTANT_PROVIDER="ollama"):
             response = self.client.get(f"/api/assistant/turns/{old.pk}/")
-        self.assertEqual(response.json()["turn"]["status"], "queued")
+        self.assertEqual(response.json()["turn"]["status"], "failed")
         self.open.assert_not_called()
 
 

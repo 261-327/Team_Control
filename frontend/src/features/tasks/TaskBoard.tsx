@@ -11,7 +11,7 @@ import { Avatar, Button, Field, FormError, IconButton, Modal, useAction } from "
 import { Icon } from "@/components/ui/Icon";
 import { statusLabels, statusIcon } from "@/lib/format";
 import type { Status, Task } from "@/types/domain";
-import { Deadline } from "./TaskViews";
+import { Deadline, UnreadComments } from "./TaskViews";
 
 type Move = { taskId: string; status: Status; beforeTaskId?: string };
 export function TaskBoard({
@@ -331,6 +331,7 @@ function BoardCard({
         draggable={false}
       >
         <h3>{task.title}</h3>
+        <UnreadComments task={task} />
         <p>{task.description.split("\n")[0]}</p>
       </Link>
       <div className="task-card-id">
