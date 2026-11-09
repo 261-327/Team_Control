@@ -1289,10 +1289,10 @@ def move_task(request, task_id):
             t.submitted_at = (
                 timezone.now()
                 if status == "in_review"
-                else (None if status in ("todo", "in_progress") else t.submitted_at)
+                else (None if status != "done" else t.submitted_at)
             )
             t.accepted_at = timezone.now() if status == "done" else None
-            if status in ("todo", "in_progress"):
+            if status not in ("in_review", "done"):
                 t.result_url = ""
             elif "resultUrl" in request.data:
                 t.result_url = web_url(request.data, "resultUrl")
@@ -1305,7 +1305,7 @@ def move_task(request, task_id):
             if reason:
                 event_text += f". {reason}"
             # Записываем старый результат в историю, если он был очищен
-            if old_result_url and status in ("todo", "in_progress"):
+            if old_result_url and status not in ("in_review", "done"):
                 event_text += f" [предыдущий результат: {old_result_url}]"
             log_event(t, request.user, event_text)
     return {"snapshot": snapshot(request)}
@@ -1399,19 +1399,47 @@ def read_comments(request, task_id):
     return {"snapshot": snapshot(request)}
 
 
+@endpoint(("POST",))
+def create_column(request, project_id):
+    with transaction.atomic():
+        p = project_for(request.user, project_id, manage=True, lock=True)
+        name, limit = column_values(request.data)
+        names = list(STATUSES.values()) + list(
+            Column.objects.filter(board__project=p).values_list("name", flat=True)
+        )
+        if any(name.casefold() == existing.casefold() for existing in names):
+            raise APIError("Этап с таким названием уже есть.", "conflict", 409)
+        board = p.boards.order_by("pk").first() or Board.objects.create(
+            project=p, name="Основная доска"
+        )
+        last = board.columns.order_by("-position", "-pk").first()
+        Column.objects.create(
+            board=board,
+            name=name,
+            max_tasks=limit,
+            position=max(last.position + 1 if last else 0, len(STATUSES)),
+        )
+    return {"snapshot": snapshot(request)}
+
+
+def column_values(data):
+    limit = data.get("limit")
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 15:
+        raise APIError("Лимит должен быть от 1 до 15.")
+    return text(data, "name", 100, True), limit
+
+
 @endpoint(("PATCH",))
 def update_column(request, project_id, status):
     with transaction.atomic():
         p = project_for(request.user, project_id, manage=True, lock=True)
         col = column_for(p, status)
-        limit = request.data.get("limit")
-        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 15:
-            raise APIError("Лимит должен быть от 1 до 15.")
+        name, limit = column_values(request.data)
         if status_tasks(p, status).count() > limit:
             raise APIError(
                 "В колонке уже больше задач. Сначала переместите часть из них.", "capacity", 409
             )
-        col.name, col.max_tasks = text(request.data, "name", 100, True), limit
+        col.name, col.max_tasks = name, limit
         col.save(update_fields=["name", "max_tasks"])
     return {"snapshot": snapshot(request)}
 
@@ -1419,7 +1447,7 @@ def update_column(request, project_id, status):
 @endpoint(("POST",))
 def materials(request, project_id):
     with transaction.atomic():
-        p = project_for(request.user, project_id, manage=True)
+        p = project_for(request.user, project_id, manage=True, lock=True)
         Material.objects.create(
             project=p,
             created_by=request.user,
@@ -1434,7 +1462,8 @@ def materials(request, project_id):
 def material_detail(request, material_id):
     with transaction.atomic():
         m = get_object_or_404(Material, pk=material_id)
-        project_for(request.user, m.project_id, manage=True)
+        project_for(request.user, m.project_id, manage=True, lock=True)
+        m = get_object_or_404(Material, pk=material_id)
         if request.method == "DELETE":
             m.delete()
         else:

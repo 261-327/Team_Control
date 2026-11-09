@@ -86,6 +86,7 @@ export interface DataClient {
     id?: string,
   ): Promise<void>;
   deleteMaterial(id: string): Promise<void>;
+  createColumn(projectId: string, name: string, limit: number): Promise<void>;
   updateColumn(projectId: string, id: Status, name: string, limit: number): Promise<void>;
   assistantHistory(projectId?: string): Promise<AssistantHistory>;
   clearAssistantHistory(projectId?: string): Promise<void>;

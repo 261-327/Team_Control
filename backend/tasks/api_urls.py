@@ -39,6 +39,7 @@ path(
     path("projects/<int:project_id>/members/<int:user_id>/role/", api.update_member_role),
     path("tasks/<int:task_id>/comments/read/", api.read_comments),
     path("projects/<int:project_id>/members/<int:user_id>/", api.remove_member),
+    path("projects/<int:project_id>/columns/", api.create_column),
     path("projects/<int:project_id>/columns/<str:status>/", api.update_column),
     path("projects/<int:project_id>/materials/", api.materials),
     path("projects/<int:project_id>/invitations/", api.invitations),

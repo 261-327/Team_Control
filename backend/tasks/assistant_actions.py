@@ -5,7 +5,16 @@ import re
 from django.db import transaction
 from django.utils import timezone
 
-from .api import APIError, column_for, log_event, project_for, status_tasks, task_input, text
+from .api import (
+    APIError,
+    column_for,
+    identifier,
+    log_event,
+    project_for,
+    status_tasks,
+    task_input,
+    text,
+)
 from .memberships import accessible
 from .models import AssistantTurn, Board, Column, Membership, Project, Task
 from .workflow import STATUSES
@@ -40,6 +49,23 @@ def creation_intent(message):
     return ""
 
 
+def check_context_access(user, scope, extra_projects=()):
+    """Called inside an atomic block, before locking a turn or writing its output.
+
+    Lock every source project, including personal-chat context, in a stable order.
+    Revocation uses the same parent lock, so it cannot slip between this check and commit.
+    """
+    list(
+        Project.objects.select_for_update()
+        .filter(pk__in=set(scope) | set(extra_projects))
+        .order_by("pk")
+    )
+    if not user.__class__.objects.filter(pk=user.pk, is_active=True).exists():
+        raise APIError("Аккаунт недоступен.")
+    if not set(scope).issubset(set(accessible(user).values_list("pk", flat=True))):
+        raise APIError("Доступ к проектам изменился. Повторите запрос.")
+
+
 def execute_creation(turn, result, scope):
     """Commit creation and its receipt together; retries/cancellation cannot duplicate writes."""
     intent = creation_intent(turn.message) if turn.mode == "chat" else ""
@@ -48,23 +74,18 @@ def execute_creation(turn, result, scope):
         return False
     user = turn.thread.user
     with transaction.atomic():
-        # Same parent-before-child lock order as the normal task API and deletion.
-        scoped = None
-        if turn.thread.project_id:
-            scoped = project_for(user, turn.thread.project_id, lock=True)
+        target_id = identifier(plan.get("projectId")) if intent == "create_tasks" else None
+        extra = [pk for pk in (turn.thread.project_id, target_id) if pk is not None]
+        check_context_access(user, scope, extra)
+        scoped = project_for(user, turn.thread.project_id) if turn.thread.project_id else None
         project = None
         if intent == "create_tasks":
-            target_id = str(plan.get("projectId", ""))
-            if scoped and target_id != str(scoped.pk):
+            if scoped and target_id != scoped.pk:
                 raise APIError("Для другого проекта сначала переключите контекст помощника.")
-            project = project_for(user, target_id, manage=True, lock=True)
+            project = project_for(user, target_id, manage=True)
         current = AssistantTurn.objects.select_for_update().filter(pk=turn.pk).first()
         if current is None or current.status != "running" or current.worker_id != turn.worker_id:
             return True
-        if not user.__class__.objects.filter(pk=user.pk, is_active=True).exists():
-            raise APIError("Аккаунт недоступен.")
-        if not set(scope).issubset(set(accessible(user).values_list("pk", flat=True))):
-            raise APIError("Доступ к проектам изменился. Повторите запрос.")
         if intent == "create_project":
             name = text(plan, "projectName", 255, True)
             description = text(plan, "description", 10000)

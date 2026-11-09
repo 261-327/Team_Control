@@ -34,6 +34,11 @@ export function AssistantPanel({
 }) {
   const data = useReadyData();
   const [selectedId, setSelectedId] = useState(projectId || "");
+  const accessKey = data.projects
+    .map((project) => project.id)
+    .sort()
+    .join(",");
+  const unavailable = !!selectedId && !data.projects.some((project) => project.id === selectedId);
   return (
     <Modal
       title="Сипи AI"
@@ -42,13 +47,22 @@ export function AssistantPanel({
       sheet
       focusSelector="#assistant-message"
     >
-      <AssistantChat
-        key={`${data.sessionId}:${selectedId}`}
-        projectId={selectedId}
-        initialMessage={initialMessage}
-        onProjectChange={setSelectedId}
-        onClose={onClose}
-      />
+      {unavailable ? (
+        <div role="status">
+          <p>Доступ к проекту изменился. Выбери другой контекст помощника.</p>
+          <Button variant="secondary" onClick={() => setSelectedId("")}>
+            Мои проекты
+          </Button>
+        </div>
+      ) : (
+        <AssistantChat
+          key={`${data.sessionId}:${selectedId}:${accessKey}`}
+          projectId={selectedId}
+          initialMessage={initialMessage}
+          onProjectChange={setSelectedId}
+          onClose={onClose}
+        />
+      )}
     </Modal>
   );
 }

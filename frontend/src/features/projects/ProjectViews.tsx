@@ -238,7 +238,7 @@ export function ProjectTasksView() {
   const ui = useUi();
   const [filters, setFilters] = useState(defaultFilters);
   const [view, setView] = useBoardPreference();
-  const [column, setColumn] = useState<Status | null>(null);
+  const [column, setColumn] = useState<Status | "new" | null>(null);
   const allTasks = data.tasks.filter((t) => t.projectId === projectId);
   const tasks = filterTasks(allTasks, filters, data);
   const manage = canManage(data, projectId);
@@ -265,6 +265,14 @@ export function ProjectTasksView() {
           </button>
         </div>
       </div>
+      {manage && (
+        <div className="board-stage-actions">
+          <Button variant="secondary" onClick={() => setColumn("new")}>
+            <Icon name="plus" size={16} />
+            Добавить этап
+          </Button>
+        </div>
+      )}
       {view === "board" ? (
         <TaskBoard
           projectId={projectId}
@@ -312,7 +320,11 @@ export function ProjectTasksView() {
         </span>
       </div>
       {column && (
-        <ColumnEditor projectId={projectId} columnId={column} onClose={() => setColumn(null)} />
+        <ColumnEditor
+          projectId={projectId}
+          columnId={column === "new" ? undefined : column}
+          onClose={() => setColumn(null)}
+        />
       )}
     </>
   );
@@ -323,22 +335,22 @@ export function ColumnEditor({
   onClose,
 }: {
   projectId: string;
-  columnId: Status;
+  columnId?: Status;
   onClose: () => void;
 }) {
   const data = useReadyData();
   const ui = useUi();
   const column = data.projects
     .find((p) => p.id === projectId)!
-    .columns.find((c) => c.id === columnId)!;
-  const [name, setName] = useState(column.name);
-  const [limit, setLimit] = useState(column.limit);
+    .columns.find((c) => c.id === columnId);
+  const [name, setName] = useState(column?.name || "");
+  const [limit, setLimit] = useState(column?.limit ?? 15);
   const action = useAction();
   const count = data.tasks.filter((t) => t.projectId === projectId && t.status === columnId).length;
   return (
     <Modal
-      title="Настройки колонки"
-      description="Понятное название и разумный объём работы"
+      title={columnId ? "Настройки этапа" : "Новый этап"}
+      description="Название и лимит задач на доске"
       onClose={onClose}
       busy={action.busy}
     >
@@ -346,9 +358,12 @@ export function ColumnEditor({
         onSubmit={(e) => {
           e.preventDefault();
           void action.run(
-            () => client.updateColumn(projectId, columnId, name, limit),
+            () =>
+              columnId
+                ? client.updateColumn(projectId, columnId, name, limit)
+                : client.createColumn(projectId, name, limit),
             () => {
-              ui.notify("Настройки колонки сохранены");
+              ui.notify(columnId ? "Настройки этапа сохранены" : "Этап добавлен");
               onClose();
             },
           );
@@ -378,14 +393,15 @@ export function ColumnEditor({
           />
         </Field>
         <p className="form-note">
-          Четыре этапа сохраняют полный цикл: постановка → работа → проверка → приёмка.
+          Дополнительные этапы помогают разделить работу. Задачу принимает руководитель в этапе
+          «Готово».
         </p>
         <FormError error={action.error} />
         <div className="form-actions">
           <Button type="button" variant="secondary" onClick={onClose} disabled={action.busy}>
             Отмена
           </Button>
-          <Button loading={action.busy}>Сохранить</Button>
+          <Button loading={action.busy}>{columnId ? "Сохранить" : "Добавить этап"}</Button>
         </div>
       </form>
     </Modal>
@@ -760,7 +776,7 @@ export function ProjectSettingsView() {
   const router = useRouter();
   const project = data.projects.find((p) => p.id === projectId)!;
   const manage = canManage(data, projectId);
-  const [column, setColumn] = useState<Status | null>(null);
+  const [column, setColumn] = useState<Status | "new" | null>(null);
   const [confirm, setConfirm] = useState("");
   const [showAssignmentConfirm, setShowAssignmentConfirm] = useState(false);
   const [confirmCoordinatorDemotion, setConfirmCoordinatorDemotion] = useState(false);
@@ -796,6 +812,12 @@ export function ProjectSettingsView() {
       <section className="panel settings-panel">
         <h2>Этапы работы</h2>
         <p className="muted">Настрой названия этапов и допустимое количество задач в колонках.</p>
+        {manage && (
+          <Button variant="secondary" onClick={() => setColumn("new")}>
+            <Icon name="plus" size={16} />
+            Добавить этап
+          </Button>
+        )}
         {project.columns.map((c) => (
           <div className="column-settings-row" key={c.id}>
             <span className={`column-marker status-${c.id}`}>
@@ -883,7 +905,11 @@ export function ProjectSettingsView() {
         </Button>
       </section>
       {column && (
-        <ColumnEditor projectId={projectId} columnId={column} onClose={() => setColumn(null)} />
+        <ColumnEditor
+          projectId={projectId}
+          columnId={column === "new" ? undefined : column}
+          onClose={() => setColumn(null)}
+        />
       )}{" "}
       {confirm && (
         <ConfirmDialog

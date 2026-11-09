@@ -8,6 +8,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Count, F, Q
 from django.http import Http404
 from django.utils import timezone
@@ -20,7 +21,7 @@ from .assistant_providers import (
     provider_name,
     text_model as cloud_text_model,
 )
-from .assistant_actions import creation_intent, execute_creation
+from .assistant_actions import check_context_access, creation_intent, execute_creation
 from .memberships import accessible
 from .models import AssistantTurn, Comment, Material, Membership, Task, TaskEvent, WorkspaceUser
 from .serializers import status_key
@@ -649,12 +650,18 @@ def process_turn(turn):
 
             image = generate_image(result.pop("imagePrompt"))
             result["imageUrl"] = f"/api/assistant/turns/{turn.pk}/image"
-        # Recheck access after inference; membership could change during a long job.
-        if not set(scope).issubset(set(accessible(turn.thread.user).values_list("pk", flat=True))):
-            raise AssistantUnavailable("Доступ к проектам изменился. Повторите запрос.")
-        AssistantTurn.objects.filter(pk=turn.pk, status="running", worker_id=turn.worker_id).update(
-            status="succeeded", result=result, scope=scope, image=image, finished_at=timezone.now()
-        )
+        # Publish under the same parent locks used to revoke project membership.
+        with transaction.atomic():
+            check_context_access(turn.thread.user, scope)
+            AssistantTurn.objects.filter(
+                pk=turn.pk, status="running", worker_id=turn.worker_id
+            ).update(
+                status="succeeded",
+                result=result,
+                scope=scope,
+                image=image,
+                finished_at=timezone.now(),
+            )
     except (AssistantUnavailable, APIError, Http404) as exc:
         AssistantTurn.objects.filter(pk=turn.pk, status="running", worker_id=turn.worker_id).update(
             status="failed",

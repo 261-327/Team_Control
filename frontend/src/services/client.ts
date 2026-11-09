@@ -290,6 +290,9 @@ class HttpClient implements DataClient {
   deleteMaterial = async (id: string) => {
     await this.mutate(`materials/${id}`, "DELETE");
   };
+  createColumn = async (projectId: string, name: string, limit: number) => {
+    await this.mutate(`projects/${projectId}/columns`, "POST", { name, limit });
+  };
   updateColumn = async (projectId: string, id: Status, name: string, limit: number) => {
     await this.mutate(`projects/${projectId}/columns/${id}`, "PATCH", { name, limit });
   };

@@ -1976,3 +1976,9 @@ select:focus {
     display: none;
   }
 }
+
+.board-stage-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
