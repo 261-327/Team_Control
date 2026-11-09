@@ -356,6 +356,17 @@ class ReportRegressionTests(TestCase):
             HTTP_X_CSRFTOKEN=csrf,
         )
         self.assertEqual(response.status_code, 200)
+        another_task = Task.objects.create(column=self.columns["todo"], title="Other discussion")
+        foreign_cursor = Comment.objects.create(
+            task=another_task, user=self.member, text="Other comment"
+        )
+        response = client.post(
+            f"/api/tasks/{self.task.pk}/comments/read/",
+            json.dumps({"lastCommentId": str(foreign_cursor.pk)}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf,
+        )
+        self.assertEqual(response.status_code, 404)
         client.force_login(self.stranger)
         client.get("/api/bootstrap/")
         response = client.post(

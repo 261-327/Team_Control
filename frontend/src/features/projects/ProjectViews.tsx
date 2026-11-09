@@ -1023,7 +1023,10 @@ function InviteColleague({ projectId }: { projectId: string }) {
       <Field label="Поиск коллеги">
         <input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setSelected("");
+          }}
           placeholder="Имя или никнейм"
         />
       </Field>
