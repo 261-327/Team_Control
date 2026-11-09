@@ -5,9 +5,12 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from .models import AssistantTurn
+from .assistant_providers import provider_name
 
 
 def recover_local_turns(thread=None):
+    if provider_name() != "ollama":
+        return
     now = timezone.now()
     cutoff = now - timedelta(seconds=45)
     turns = AssistantTurn.objects.all()

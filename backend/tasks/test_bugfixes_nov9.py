@@ -387,6 +387,10 @@ class AssistantOwnershipRegressionTests(TestCase):
         live = AssistantTurn.objects.create(
             thread=self.thread, status="running", started_at=old, worker=self.worker
         )
+        with override_settings(ASSISTANT_PROVIDER="cloudflare"):
+            recover_local_turns(self.thread)
+            abandoned.refresh_from_db()
+            self.assertEqual(abandoned.status, "running")
         recover_local_turns(self.thread)
         abandoned.refresh_from_db()
         live.refresh_from_db()

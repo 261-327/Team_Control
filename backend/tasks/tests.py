@@ -1175,7 +1175,7 @@ class ActiveTaskDashboardTests(TestCase):
         self.assertNotContains(page,'My second project task')
         self.assertEqual(self.client.get('/',{'project':'bad'}).context['task_count'],0)
         self.assertContains(self.client.get('/projects/'),'Создать проект')
-        self.assertContains(self.client.get('/projects/'),'Вступить в проект')
+        self.assertContains(self.client.get('/projects/'),'Поиск проектов')
 
     def test_custom_completion_flag_and_change_of_status(self):
         self.client.force_login(self.user)
