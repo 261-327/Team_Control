@@ -1282,6 +1282,9 @@ def move_task(request, task_id):
                 raise APIError("Порядок задач изменился. Обновите доску.", "conflict", 409)
         ordered.insert(index, t)
         t.column = col
+        # Запоминаем старые значения до изменения — нужны для истории
+        old_result_url = t.result_url if status != old else None
+
         if status != old:
             t.submitted_at = (
                 timezone.now()
@@ -1289,11 +1292,8 @@ def move_task(request, task_id):
                 else (None if status in ("todo", "in_progress") else t.submitted_at)
             )
             t.accepted_at = timezone.now() if status == "done" else None
-            if status == "todo":
-                previous_result = t.result_url
+            if status in ("todo", "in_progress"):
                 t.result_url = ""
-                if previous_result:
-                    log_event(t, request.user, f"Предыдущий результат: {previous_result}")
             elif "resultUrl" in request.data:
                 t.result_url = web_url(request.data, "resultUrl")
         t.save()
@@ -1301,9 +1301,13 @@ def move_task(request, task_id):
             item.position = position
         Task.objects.bulk_update(ordered, ["position"])
         if old != status:
-            log_event(
-                t, request.user, f"{old_label} → {col.name}" + (f". {reason}" if reason else "")
-            )
+            event_text = f"{old_label} → {col.name}"
+            if reason:
+                event_text += f". {reason}"
+            # Записываем старый результат в историю, если он был очищен
+            if old_result_url and status in ("todo", "in_progress"):
+                event_text += f" [предыдущий результат: {old_result_url}]"
+            log_event(t, request.user, event_text)
     return {"snapshot": snapshot(request)}
 
 

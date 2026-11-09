@@ -60,8 +60,11 @@ class APITests(TestCase):
         self.assertEqual(self.call(f'tasks/{tid}/comments', {'text': 'Можно проверять'}).status_code, 200)
         self.client.force_login(self.owner)
         self.assertEqual(self.call(f'tasks/{tid}/move', {'status': 'in_progress'}).status_code, 400)
+        # in_review → in_progress очищает result_url (новое поведение)
         self.assertEqual(self.call(f'tasks/{tid}/move', {'status': 'in_progress', 'reason': 'Добавить проверку'}).status_code, 200)
+        self.assertEqual(Task.objects.get(pk=tid).result_url, "")  # result_url очищен при возврате
         self.client.force_login(self.member)
+        # Повторная сдача БЕЗ resultUrl
         self.call(f'tasks/{tid}/move', {'status': 'in_review'})
         self.client.force_login(self.owner)
         self.call(f'tasks/{tid}/move', {'status': 'done'})
@@ -69,11 +72,112 @@ class APITests(TestCase):
         self.assertEqual(task['status'], 'done')
         self.assertTrue(task['acceptedAt'])
         self.assertTrue(task['submittedAt'])
-        self.assertTrue(task['resultUrl'].startswith('https://github.com'))
+        # resultUrl пустой — повторная сдача без URL
+        self.assertEqual(task['resultUrl'], "")
         self.assertEqual(Comment.objects.count(), 1)
         self.assertEqual(TaskEvent.objects.filter(task_id=tid).count(), 6)
         self.call(f'tasks/{tid}/move', {'status': 'todo'})
-        self.assertIsNone(Task.objects.get(pk=tid).accepted_at)
+        task_after_reset = Task.objects.get(pk=tid)
+        self.assertIsNone(task_after_reset.accepted_at)
+        self.assertIsNone(task_after_reset.submitted_at)
+        self.assertEqual(task_after_reset.result_url, "")  # result_url остаётся пустым
+
+    def test_result_url_cleared_on_return_to_todo(self):
+        """done → todo: result_url, submitted_at, accepted_at очищаются, история сохраняется"""
+        tid = self.create_task()
+        self.client.force_login(self.member)
+        self.call(f'tasks/{tid}/move', {'status': 'in_progress'})
+        self.call(f'tasks/{tid}/move', {'status': 'in_review', 'resultUrl': 'https://github.com/test1'})
+        self.client.force_login(self.owner)
+        self.call(f'tasks/{tid}/move', {'status': 'done'})
+        task = Task.objects.get(pk=tid)
+        self.assertEqual(task.result_url, 'https://github.com/test1')
+        self.assertIsNotNone(task.submitted_at)
+        self.assertIsNotNone(task.accepted_at)
+        # Сброс в todo
+        self.call(f'tasks/{tid}/move', {'status': 'todo'})
+        task = Task.objects.get(pk=tid)
+        self.assertEqual(task.result_url, "")
+        self.assertIsNone(task.submitted_at)
+        self.assertIsNone(task.accepted_at)
+        # Проверка истории
+        self.assertTrue(
+            TaskEvent.objects.filter(
+                task_id=tid,
+                text__contains="[предыдущий результат: https://github.com/test1]",
+            ).exists()
+        )
+
+    def test_result_url_cleared_on_return_to_in_progress(self):
+        """in_review → in_progress: result_url и submitted_at очищаются"""
+        tid = self.create_task()
+        self.client.force_login(self.member)
+        self.call(f'tasks/{tid}/move', {'status': 'in_progress'})
+        self.call(f'tasks/{tid}/move', {'status': 'in_review', 'resultUrl': 'https://github.com/test2'})
+        self.client.force_login(self.owner)
+        self.call(f'tasks/{tid}/move', {'status': 'in_progress', 'reason': 'Нужно доработать'})
+        task = Task.objects.get(pk=tid)
+        self.assertEqual(task.result_url, "")
+        self.assertIsNone(task.submitted_at)
+        self.assertIsNone(task.accepted_at)
+        # Проверка истории
+        self.assertTrue(
+            TaskEvent.objects.filter(
+                task_id=tid,
+                text__contains="[предыдущий результат: https://github.com/test2]",
+            ).exists()
+        )
+
+    def test_result_url_cleared_on_in_review_to_todo(self):
+        """in_review → todo (руководитель сбрасывает): result_url очищается"""
+        tid = self.create_task()
+        self.client.force_login(self.member)
+        self.call(f'tasks/{tid}/move', {'status': 'in_progress'})
+        self.call(f'tasks/{tid}/move', {'status': 'in_review', 'resultUrl': 'https://github.com/test3'})
+        self.client.force_login(self.owner)
+        self.call(f'tasks/{tid}/move', {'status': 'todo'})
+        task = Task.objects.get(pk=tid)
+        self.assertEqual(task.result_url, "")
+        self.assertIsNone(task.submitted_at)
+        self.assertIsNone(task.accepted_at)
+
+    def test_result_url_preserved_on_forward_transitions(self):
+        """Обычные переходы вперёд сохраняют result_url"""
+        tid = self.create_task()
+        self.client.force_login(self.member)
+        self.call(f'tasks/{tid}/move', {'status': 'in_progress'})
+        self.call(f'tasks/{tid}/move', {'status': 'in_review', 'resultUrl': 'https://github.com/preserved'})
+        task = Task.objects.get(pk=tid)
+        self.assertEqual(task.result_url, 'https://github.com/preserved')
+        # in_review → done сохраняет URL
+        self.client.force_login(self.owner)
+        self.call(f'tasks/{tid}/move', {'status': 'done'})
+        task = Task.objects.get(pk=tid)
+        self.assertEqual(task.result_url, 'https://github.com/preserved')
+
+    def test_resubmission_with_new_url(self):
+        """Повторная сдача с новой ссылкой заменяет старую"""
+        tid = self.create_task()
+        self.client.force_login(self.member)
+        # Первый цикл
+        self.call(f'tasks/{tid}/move', {'status': 'in_progress'})
+        self.call(f'tasks/{tid}/move', {'status': 'in_review', 'resultUrl': 'https://github.com/url-a'})
+        self.client.force_login(self.owner)
+        self.call(f'tasks/{tid}/move', {'status': 'in_progress', 'reason': 'Первый раз'})
+        # Второй цикл
+        self.client.force_login(self.member)
+        self.call(f'tasks/{tid}/move', {'status': 'in_review', 'resultUrl': 'https://github.com/url-b'})
+        self.client.force_login(self.owner)
+        self.call(f'tasks/{tid}/move', {'status': 'done'})
+        task = Task.objects.get(pk=tid)
+        self.assertEqual(task.result_url, 'https://github.com/url-b')
+        # В истории должны быть оба URL
+        self.assertTrue(
+            TaskEvent.objects.filter(
+                task_id=tid,
+                text__contains="https://github.com/url-a",
+            ).exists()
+        )
 
     def test_reorder_capacity_and_failed_move_are_atomic(self):
         first, second = self.create_task(), self.create_task(title='Вторая')

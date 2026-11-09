@@ -131,7 +131,12 @@ class ReportRegressionTests(TestCase):
         self.assertEqual(self.task.result_url, "https://example.test/new")
         self.call(f"tasks/{self.task.pk}/move", {"status": "in_progress", "reason": "Needs work"})
         self.task.refresh_from_db()
-        self.assertEqual(self.task.result_url, "https://example.test/new")
+        self.assertEqual(self.task.result_url, "")
+        self.assertTrue(
+            TaskEvent.objects.filter(
+                task=self.task, text__contains="https://example.test/new"
+            ).exists()
+        )
 
     def test_manager_updates_profession_without_changing_access(self):
         response = self.call(
