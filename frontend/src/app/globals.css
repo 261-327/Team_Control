@@ -1145,8 +1145,10 @@ button.stat-card:hover {
   padding: 0 11px;
   min-width: 0;
 }
+
 .search-field > input:not([type="checkbox"]) {
-  border: none;
+  border: none !important;
+  outline: none !important;
   box-shadow: none !important;
   background: transparent;
   padding: 10px 0;
@@ -6541,8 +6543,10 @@ button.stat-card:hover {
   border-color: #e5e5ec;
 }
 .search-field:focus-within {
-  border-color: #ddbe73;
-  box-shadow: 0 0 0 2px #ffd47518;
+  border-color: #a77400;
+  outline: 2px solid #a77400;
+  outline-offset: 0;
+  box-shadow: none;
 }
 .search-field.small input {
   font-size: 12px;

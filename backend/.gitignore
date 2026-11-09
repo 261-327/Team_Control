@@ -8,3 +8,4 @@ __pycache__/
 staticfiles/
 
 .ruff_cache/
+media/

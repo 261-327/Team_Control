@@ -107,7 +107,7 @@ export function TaskDetailView() {
                 </h2>
                 <Icon name={task.status === "done" ? "checkCircle" : "flag"} size={20} />
               </div>
-              {task.resultUrl && (
+              {task.resultUrl && ["in_review", "done"].includes(task.status) && (
                 <a
                   className="result-link"
                   href={task.resultUrl}
@@ -137,7 +137,10 @@ export function TaskDetailView() {
                     e.preventDefault();
                     void action.run(
                       () => client.transitionTask(task.id, "in_review", result ?? task.resultUrl),
-                      () => ui.notify("Результат отправлен на проверку"),
+                      () => {
+                        setResult(null);
+                        ui.notify("Результат отправлен на проверку");
+                      },
                     );
                   }}
                 >
