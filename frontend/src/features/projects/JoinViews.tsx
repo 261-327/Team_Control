@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useReadyData } from "@/providers/DataProvider";
 import { useUi } from "@/providers/UiContext";
 import { client } from "@/services/client";
-import { Button, EmptyState, FormError, Modal, useAction } from "@/components/ui";
+import { Button, EmptyState, FormError, useAction } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { initialRole, RoleFields } from "./ProjectViews";
 import type { Project } from "@/types/domain";
@@ -18,12 +18,7 @@ export function ProjectSearchView() {
   const [results, setResults] = useState<
     Pick<Project, "id" | "name" | "description" | "color" | "symbol">[]
   >([]);
-  const [selected, setSelected] = useState("");
-  const [role, setRole] = useState(initialRole);
   const action = useAction();
-  const joinAction = useAction();
-  const ui = useUi();
-  const router = useRouter();
   return (
     <>
       <Link className="back-link" href="/projects">
@@ -32,20 +27,21 @@ export function ProjectSearchView() {
       </Link>
       <div className="page-heading">
         <div>
-          <h1>
-            Поиск проектов<span className="heading-dot">.</span>
-          </h1>
-          <p>Найди проект по названию и выбери свою роль в нём.</p>
+          <h1>Поиск проектов</h1>
+          <p>
+            Найди проект среди своих команд. Для вступления в новую команду нужно приглашение
+            руководителя.
+          </p>
         </div>
       </div>
       <form
         className="directory-search panel"
-        onSubmit={(e) => {
-          e.preventDefault();
+        onSubmit={(event) => {
+          event.preventDefault();
           void action.run(
             () => client.directory(query),
-            (result) => {
-              setResults(result);
+            (rows) => {
+              setResults(rows);
               setSearched(true);
             },
           );
@@ -54,11 +50,10 @@ export function ProjectSearchView() {
         <div className="search-field">
           <Icon name="search" />
           <input
-            autoFocus
             aria-label="Название проекта"
             placeholder="Например, робототехника…"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(event) => setQuery(event.target.value)}
             maxLength={255}
           />
         </div>
@@ -69,76 +64,32 @@ export function ProjectSearchView() {
       </form>
       <FormError error={action.error} />
       <div className="directory-results">
-        {results.map((p) => (
-          <article className="panel directory-card" key={p.id}>
-            <span className={`project-icon large ${p.color}`}>
-              <Icon name={p.symbol} size={28} />
+        {results.map((project) => (
+          <article className="panel directory-card" key={project.id}>
+            <span className={`project-icon large ${project.color}`}>
+              <Icon name={project.symbol} size={28} />
             </span>
             <div>
-              <h2>{p.name}</h2>
-              <p>{p.description}</p>
+              <h2>{project.name}</h2>
+              <p>{project.description}</p>
             </div>
-            <Button variant="secondary" onClick={() => setSelected(p.id)}>
-              Присоединиться
-              <Icon name="arrow" size={15} />
-            </Button>
+            <Link className="btn btn-secondary" href={`/projects/${project.id}`}>
+              Открыть проект
+            </Link>
           </article>
         ))}
       </div>
-      {searched && !results.length ? (
+      {!results.length && (
         <EmptyState
           icon="search"
-          title="Пока нет совпадений"
-          description="Попробуй другое название. Проекты, в которых ты уже участвуешь, находятся в «Моих проектах»."
+          title={searched ? "Пока нет совпадений" : "Поиск в своих проектах"}
+          description="Приглашения в новые проекты находятся в уведомлениях. Можно также открыть ссылку от руководителя."
         />
-      ) : (
-        !searched && (
-          <EmptyState
-            icon="compass"
-            title="Найди проект по названию"
-            description="Введи название проекта, к которому хочешь присоединиться."
-          />
-        )
-      )}
-      {selected && (
-        <Modal
-          title="Присоединиться к проекту"
-          description={results.find((p) => p.id === selected)?.name}
-          onClose={() => setSelected("")}
-          busy={joinAction.busy}
-        >
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void joinAction.run(
-                () => client.joinProject(selected, role),
-                () => {
-                  ui.notify("Ты присоединился к проекту");
-                  router.push(`/projects/${selected}`);
-                },
-              );
-            }}
-          >
-            <RoleFields value={role} onChange={setRole} />
-            <p className="form-note">После вступления ты появишься в списке участников проекта.</p>
-            <FormError error={joinAction.error} />
-            <div className="form-actions">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setSelected("")}
-                disabled={joinAction.busy}
-              >
-                Отмена
-              </Button>
-              <Button loading={joinAction.busy}>Присоединиться</Button>
-            </div>
-          </form>
-        </Modal>
       )}
     </>
   );
 }
+
 export function InvitationView() {
   const { inviteId } = useParams<{ inviteId: string }>();
   const data = useReadyData();

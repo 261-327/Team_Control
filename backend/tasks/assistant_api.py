@@ -67,6 +67,8 @@ def capabilities():
 
 def expire_cloud_turns(thread):
     if provider_name() != "cloudflare":
+        from .assistant_queue import recover_local_turns
+        recover_local_turns(thread)
         return
     # Request-driven cleanup lets the free database sleep when nobody uses it.
     cutoff = timezone.now() - timedelta(seconds=max(settings.ASSISTANT_TIMEOUT * 4, 300))
@@ -217,9 +219,8 @@ def assistant(request):
 @endpoint(("GET", "DELETE"))
 def turn_detail(request, turn_id):
     turn = turn_for(request, turn_id)
-    if request.method == "GET" and provider_name() == "cloudflare":
-        expire_cloud_turns(turn.thread)
-        turn.refresh_from_db()
+    expire_cloud_turns(turn.thread)
+    turn.refresh_from_db()
     if request.method == "DELETE":
         AssistantTurn.objects.filter(pk=turn.pk, status__in=["queued", "running"]).update(
             status="cancelled", finished_at=timezone.now()

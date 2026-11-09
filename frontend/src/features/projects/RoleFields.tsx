@@ -16,7 +16,7 @@ export function RoleFields({
 }) {
   return (
     <>
-      <Field label="Твоя роль в команде" required>
+      <Field label="Роль в команде" required>
         <select
           value={
             value.profession === "developer" && ["ios", "android"].includes(value.specialization)
@@ -76,10 +76,18 @@ export const initialRole: RoleInput = {
   customRole: "",
 };
 
-export function RoleEditor({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+export function RoleEditor({
+  projectId,
+  userId,
+  onClose,
+}: {
+  projectId: string;
+  userId?: string;
+  onClose: () => void;
+}) {
   const data = useReadyData();
   const membership = data.memberships.find(
-    (m) => m.projectId === projectId && m.userId === data.sessionId,
+    (m) => m.projectId === projectId && m.userId === (userId || data.sessionId),
   )!;
   const [role, setRole] = useState<RoleInput>({
     profession: membership?.profession ?? initialRole.profession,
@@ -90,13 +98,20 @@ export function RoleEditor({ projectId, onClose }: { projectId: string; onClose:
   const ui = useUi();
   if (!membership)
     return (
-      <Modal title="Моя роль в проекте" onClose={onClose}>
-        <p role="alert">Ты больше не участвуешь в этом проекте.</p>
+      <Modal
+        title={
+          userId && userId !== data.sessionId ? "Роль участника в проекте" : "Моя роль в проекте"
+        }
+        onClose={onClose}
+      >
+        <p role="alert">Участник больше недоступен в этом проекте.</p>
       </Modal>
     );
   return (
     <Modal
-      title="Моя роль в проекте"
+      title={
+        userId && userId !== data.sessionId ? "Роль участника в проекте" : "Моя роль в проекте"
+      }
       description={data.projects.find((p) => p.id === projectId)?.name}
       onClose={onClose}
       busy={action.busy}
@@ -105,7 +120,10 @@ export function RoleEditor({ projectId, onClose }: { projectId: string; onClose:
         onSubmit={(e) => {
           e.preventDefault();
           void action.run(
-            () => client.updateMyRole(projectId, role),
+            () =>
+              userId && userId !== data.sessionId
+                ? client.updateMemberRole(projectId, userId, role)
+                : client.updateMyRole(projectId, role),
             () => {
               ui.notify("Роль обновлена");
               onClose();

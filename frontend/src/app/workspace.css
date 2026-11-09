@@ -1861,3 +1861,122 @@ select:focus {
     color: var(--muted);
   }
 }
+
+/* Content stays inside its grid/flex cell at every viewport and zoom level. */
+.upcoming-list > a > div,
+.deadline-summary > div,
+.dashboard-aside,
+.task-detail-grid > div,
+.task-detail-page h1,
+.detail-description,
+.task-row-title,
+.notification-item > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.upcoming-list > a > div {
+  flex: 1;
+}
+.upcoming-list strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.comments-read-marker {
+  height: 1px;
+  flex-shrink: 0;
+}
+.task-description-text {
+  overflow-wrap: anywhere;
+}
+.task-description-text.collapsed {
+  max-height: 192px;
+  overflow: hidden;
+}
+.task-description-content > .btn {
+  margin-top: 12px;
+}
+.sheet > .modal-body > .notification-invitation-form {
+  padding: 24px;
+}
+.search-field:focus-within {
+  outline: 2px solid #a77400;
+  outline-offset: 2px;
+}
+.search-field input:focus,
+.search-field input:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border: 0;
+}
+.invite-colleagues {
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.invite-colleagues h3 {
+  margin-bottom: 16px;
+}
+.unread-comments {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #805b00;
+  font-size: 12px;
+  white-space: normal;
+}
+.mini-calendar-controls,
+.mini-calendar-today {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 4px 14px;
+}
+.mini-calendar-controls p {
+  font-size: 13px;
+  text-align: center;
+}
+.mini-calendar-controls .icon-button {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
+.mini-calendar-today {
+  padding-bottom: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.week-strip a {
+  min-height: 56px;
+}
+@media (min-width: 981px) {
+  .auth-page {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .auth-story {
+    align-items: center;
+    padding-inline: clamp(28px, 4vw, 80px);
+  }
+  .auth-story > a,
+  .auth-story-copy,
+  .auth-story-footer {
+    width: 100%;
+    max-width: 480px;
+    margin-inline: auto;
+  }
+  .auth-story-copy {
+    margin-block: auto;
+  }
+  .auth-main {
+    min-width: 0;
+    padding-inline: clamp(28px, 4vw, 80px);
+  }
+}
+@media (max-width: 980px) {
+  .auth-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .auth-story {
+    display: none;
+  }
+}

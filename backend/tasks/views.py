@@ -131,9 +131,7 @@ def register_verify_view(request):
 
 
 def accessible_projects(user):
-    if not settings.PROJECT_SELF_JOIN_ENABLED:
-        return accessible(user)
-    return Project.objects.filter(Q(owner=user) | Q(members=user)).distinct()
+    return accessible(user)
 
 
 def project_participants(project):
@@ -312,8 +310,6 @@ def project_create_view(request):
 def project_detail_view(request, project_id):
     project = get_object_or_404(accessible_projects(request.user), pk=project_id)
     Membership.objects.get_or_create(project=project,user_id=project.owner_id, defaults={'role':'other','custom_role':'Владелец проекта','is_confirmed':True})
-    if settings.PROJECT_SELF_JOIN_ENABLED:
-        Membership.objects.filter(project=project, user=request.user).update(is_confirmed=True)
     boards = project.boards.prefetch_related('columns__tasks__assignees')
     return render(request, 'tasks/project_detail.html', {'project': project, 'boards': boards,
         'participants': project.memberships.filter(is_confirmed=True).select_related('user').order_by('user__username'), 'can_manage_project': project.owner_id == request.user.pk})
@@ -541,9 +537,8 @@ def project_search_view(request):
     query = ''
     if form.is_valid():
         query = form.cleaned_data.get('q', '')
-        if query and settings.PROJECT_SELF_JOIN_ENABLED:
-            projects = (Project.objects.filter(name__icontains=query)
-                        .exclude(Q(owner=request.user) | Q(members=request.user))
+        if query:
+            projects = (accessible(request.user).filter(name__icontains=query)
                         .select_related('owner').order_by('name', 'pk'))
     page = Paginator(projects, 20).get_page(request.GET.get('page'))
     return render(request, 'tasks/project_search.html', {'form': form, 'query': query, 'page': page})
@@ -552,23 +547,8 @@ def project_search_view(request):
 @login_required(login_url='login_request')
 @require_http_methods(['GET', 'POST'])
 def project_join_view(request, project_id):
-    if not settings.PROJECT_SELF_JOIN_ENABLED:
-        return HttpResponseForbidden("Вступление в проект доступно по приглашению руководителя.")
-    project = get_object_or_404(Project, pk=project_id)
-    existing = Membership.objects.filter(project=project, user=request.user).first()
-    if existing and existing.is_confirmed:
-        return redirect('project_detail', project_id=project.pk)
-    form = MembershipRoleForm(request.POST if request.method == 'POST' else None, instance=existing)
-    if request.method == 'POST' and form.is_valid():
-        with transaction.atomic():
-            project = get_object_or_404(Project.objects.select_for_update(), pk=project_id)
-            Membership.objects.update_or_create(project=project, user=request.user, defaults={
-                **{key: form.cleaned_data[key] for key in ('role','developer_specialization','custom_role')},
-                'is_confirmed': True,
-            })
-        messages.success(request, 'Вы участвуете в проекте «' + project.name + '».')
-        return redirect('project_detail', project_id=project.pk)
-    return render(request, 'tasks/project_join.html', {'project': project, 'form': form})
+    return HttpResponseForbidden("Вступление в проект доступно по приглашению руководителя.")
+
 
 
 
@@ -874,8 +854,9 @@ def colleague_invite_view(request, user_id):
 @require_http_methods(['GET', 'POST'])
 def project_invitation_view(request, invitation_id):
     with transaction.atomic():
+        initial = get_object_or_404(ProjectInvitation, pk=invitation_id, recipient=request.user)
+        project = get_object_or_404(Project.objects.select_for_update(), pk=initial.project_id, owner_id=initial.sender_id)
         invitation = get_object_or_404(ProjectInvitation.objects.select_for_update(), pk=invitation_id, recipient=request.user)
-        project = get_object_or_404(Project.objects.select_for_update(), pk=invitation.project_id, owner_id=invitation.sender_id)
         if request.method == 'POST' and request.POST.get('action') == 'decline':
             invitation.delete()
             messages.success(request, 'Приглашение отклонено.')

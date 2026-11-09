@@ -59,7 +59,7 @@ def execute_creation(turn, result, scope):
                 raise APIError("Для другого проекта сначала переключите контекст помощника.")
             project = project_for(user, target_id, manage=True, lock=True)
         current = AssistantTurn.objects.select_for_update().filter(pk=turn.pk).first()
-        if current is None or current.status != "running":
+        if current is None or current.status != "running" or current.worker_id != turn.worker_id:
             return True
         if not user.__class__.objects.filter(pk=user.pk, is_active=True).exists():
             raise APIError("Аккаунт недоступен.")

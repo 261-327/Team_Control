@@ -5,6 +5,7 @@ from django.db.models import Q
 from django.utils import timezone
 from .models import (
     Column,
+    CommentNotification,
     Comment,
     Invitation,
     Material,
@@ -40,6 +41,7 @@ def project_json(project):
     )
     result.update(
         createdAt=stamp(project.created_at),
+        joinPolicy="invitation",
         columns=[
             {
                 "id": status,
@@ -211,7 +213,7 @@ def snapshot(request):
                 "email": person.email
                 if person.pk in visible_users or user.account_type == "staff"
                 else "",
-                "bio": person.bio,
+                "bio": person.bio if person.pk in visible_users else "",
                 "color": COLORS[person.pk % len(COLORS)],
                 "kind": person.account_type,
                 "scopeProjectIds": [
@@ -221,10 +223,13 @@ def snapshot(request):
                 ],
             }
         )
+    unread_counts = {}
+    for task_id in CommentNotification.objects.filter(user=user, read_at=None, comment__task__in=tasks).values_list("comment__task_id", flat=True):
+        unread_counts[task_id] = unread_counts.get(task_id, 0) + 1
     result.update(
         sessionId=str(user.pk),
         projects=[project_json(p) for p in projects],
-        tasks=[task_json(t) for t in tasks],
+        tasks=[{**task_json(t), "unreadCommentCount": unread_counts.get(t.pk, 0)} for t in tasks],
         events=[
             {
                 "id": str(e.pk),

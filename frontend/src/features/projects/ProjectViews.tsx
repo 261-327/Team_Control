@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useReadyData } from "@/providers/DataProvider";
 import { useUi } from "@/providers/UiContext";
 import { client } from "@/services/client";
@@ -527,7 +527,7 @@ export function MembersView() {
   const data = useReadyData();
   const ui = useUi();
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [editingRole, setEditingRole] = useState(false);
+  const [editingRole, setEditingRole] = useState("");
   const [remove, setRemove] = useState("");
   const members = data.memberships
     .filter((m) => m.projectId === projectId)
@@ -591,11 +591,11 @@ export function MembersView() {
                     ? "Преподаватель"
                     : "Участник"}
               </span>
-              {m.userId === data.sessionId && (
+              {(m.userId === data.sessionId || manage) && (
                 <Button
                   className="member-edit-role"
                   variant="secondary"
-                  onClick={() => setEditingRole(true)}
+                  onClick={() => setEditingRole(m.userId)}
                 >
                   Изменить роль
                 </Button>
@@ -652,10 +652,15 @@ export function MembersView() {
           профессия и другие права.
         </p>
       </div>
-      {editingRole && <RoleEditor projectId={projectId} onClose={() => setEditingRole(false)} />}
-      {inviteOpen && (
-        <InviteDialog projectId={projectId} onClose={() => setInviteOpen(false)} />
-      )}{" "}
+      {editingRole && (
+        <RoleEditor
+          key={editingRole}
+          projectId={projectId}
+          userId={editingRole}
+          onClose={() => setEditingRole("")}
+        />
+      )}
+      {inviteOpen && <InviteDialog projectId={projectId} onClose={() => setInviteOpen(false)} />}{" "}
       {remove && (
         <ConfirmDialog
           title="Убрать участника из команды?"
@@ -723,6 +728,7 @@ function InviteDialog({ projectId, onClose }: { projectId: string; onClose: () =
             );
           }}
         >
+          <InviteColleague projectId={projectId} />
           <Field label="Почта участника" hint="Почта, с которой участник войдёт в Сипи" required>
             <input
               autoFocus
@@ -780,6 +786,13 @@ export function ProjectSettingsView() {
     false;
   return (
     <div className="settings-page">
+      <section className="panel settings-panel">
+        <h2>Доступ по приглашению</h2>
+        <p className="muted">
+          Проект виден его участникам. Новых участников приглашает руководитель через раздел
+          «Команда».
+        </p>
+      </section>
       <section className="panel settings-panel">
         <h2>Этапы работы</h2>
         <p className="muted">Настрой названия этапов и допустимое количество задач в колонках.</p>
@@ -960,6 +973,114 @@ export function ProjectSettingsView() {
           </div>
         </ConfirmDialog>
       )}
+    </div>
+  );
+}
+
+function InviteColleague({ projectId }: { projectId: string }) {
+  const data = useReadyData();
+  const [colleagues, setColleagues] = useState<
+    {
+      id: number;
+      userId: number;
+      name: string;
+      username: string;
+      state: string;
+      pendingProjectIds: number[];
+    }[]
+  >([]);
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [sent, setSent] = useState<string[]>([]);
+  const action = useAction();
+  const ui = useUi();
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/colleagues", { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok)
+          throw new Error("Не удалось загрузить коллег. Можно пригласить по почте.");
+        return response.json();
+      })
+      .then((result) => {
+        setColleagues(
+          result.colleagues.filter((row: { state: string }) => row.state === "accepted"),
+        );
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setLoadError(error.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
+  return (
+    <div className="invite-colleagues">
+      <h3>Пригласить коллегу</h3>
+      <Field label="Поиск коллеги">
+        <input
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setSelected("");
+          }}
+          placeholder="Имя или никнейм"
+        />
+      </Field>
+      <Field label="Коллега">
+        <select
+          value={selected}
+          onChange={(event) => setSelected(event.target.value)}
+          disabled={loading}
+        >
+          <option value="">{loading ? "Загрузка…" : "Выбери коллегу"}</option>
+          {colleagues
+            .filter((row) =>
+              `${row.name} ${row.username}`.toLowerCase().includes(query.toLowerCase()),
+            )
+            .map((row) => {
+              const member = data.memberships.some(
+                (m) => m.projectId === projectId && m.userId === String(row.userId),
+              );
+              const pending =
+                sent.includes(String(row.id)) || row.pendingProjectIds.includes(Number(projectId));
+              return (
+                <option key={row.id} value={row.id} disabled={member || pending}>
+                  {row.name} (@{row.username})
+                  {member ? " · В команде" : pending ? " · Приглашён" : ""}
+                </option>
+              );
+            })}
+        </select>
+      </Field>
+      {!loading && !colleagues.length && (
+        <p className="field-hint">
+          Добавь коллег в профиле или используй приглашение по почте ниже.
+        </p>
+      )}
+      <Button
+        type="button"
+        variant="secondary"
+        disabled={!selected}
+        loading={action.busy}
+        onClick={() =>
+          void action.run(
+            () => client.inviteColleague(projectId, selected),
+            () => {
+              setSent((values) => [...values, selected]);
+              setSelected("");
+              ui.notify("Приглашение отправлено. Коллега увидит его в уведомлениях.");
+            },
+          )
+        }
+      >
+        Пригласить коллегу
+      </Button>
+      <FormError error={loadError || action.error} />
+      <p className="form-note">Или создай приглашение по почте</p>
     </div>
   );
 }

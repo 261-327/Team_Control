@@ -652,11 +652,11 @@ def process_turn(turn):
         # Recheck access after inference; membership could change during a long job.
         if not set(scope).issubset(set(accessible(turn.thread.user).values_list("pk", flat=True))):
             raise AssistantUnavailable("Доступ к проектам изменился. Повторите запрос.")
-        AssistantTurn.objects.filter(pk=turn.pk, status="running").update(
+        AssistantTurn.objects.filter(pk=turn.pk, status="running", worker_id=turn.worker_id).update(
             status="succeeded", result=result, scope=scope, image=image, finished_at=timezone.now()
         )
     except (AssistantUnavailable, APIError, Http404) as exc:
-        AssistantTurn.objects.filter(pk=turn.pk, status="running").update(
+        AssistantTurn.objects.filter(pk=turn.pk, status="running", worker_id=turn.worker_id).update(
             status="failed",
             error=(
                 "Проект или исполнитель недоступен. Проверь контекст и участников."
@@ -667,7 +667,7 @@ def process_turn(turn):
         )
     except Exception:
         logger.exception("Assistant worker failed for turn %s", turn.pk)
-        AssistantTurn.objects.filter(pk=turn.pk, status="running").update(
+        AssistantTurn.objects.filter(pk=turn.pk, status="running", worker_id=turn.worker_id).update(
             status="failed",
             error="Не удалось подготовить ответ. Попробуйте ещё раз.",
             finished_at=timezone.now(),

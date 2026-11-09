@@ -5,14 +5,13 @@ import signal
 import threading
 import time
 import uuid
-from datetime import timedelta
 
-from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import close_old_connections
 from django.utils import timezone
 
 from tasks.assistant_service import process_turn
+from tasks.assistant_queue import recover_local_turns
 from tasks.models import AssistantTurn, AssistantWorker
 
 
@@ -54,29 +53,17 @@ class Command(BaseCommand):
         try:
             while not stopping.is_set():
                 close_old_connections()
-                if time.monotonic() - last_cleanup >= 60:
-                    # A crashed process must not leave its conversation stuck forever.
-                    cutoff = timezone.now() - timedelta(
-                        seconds=max(settings.ASSISTANT_TIMEOUT * 2, 1800)
-                    )
-                    AssistantTurn.objects.filter(status="running", started_at__lt=cutoff).update(
-                        status="failed",
-                        error="Обработка прервалась. Повторите запрос.",
-                        finished_at=timezone.now(),
-                    )
-                    AssistantTurn.objects.filter(status="queued", created_at__lt=cutoff).update(
-                        status="failed",
-                        error="Не удалось дождаться обработки. Повторите запрос.",
-                        finished_at=timezone.now(),
-                    )
+                if time.monotonic() - last_cleanup >= 15:
+                    recover_local_turns()
                     last_cleanup = time.monotonic()
                 jobs = AssistantTurn.objects.filter(status="queued")
                 jobs = jobs.filter(mode="logo") if kind == "logo" else jobs.exclude(mode="logo")
                 turn = jobs.select_related("thread__user", "thread__project").first()
                 if turn and AssistantTurn.objects.filter(pk=turn.pk, status="queued").update(
-                    status="running", started_at=timezone.now()
+                    status="running", started_at=timezone.now(), worker_id=worker_id
                 ):
                     active_id = turn.pk
+                    turn.worker_id = worker_id
                     process_turn(turn)
                     active_id = None
                 elif not options["once"]:
@@ -87,7 +74,7 @@ class Command(BaseCommand):
             stopping.set()
             thread.join(timeout=2)
             if active_id:
-                AssistantTurn.objects.filter(pk=active_id, status="running").update(
+                AssistantTurn.objects.filter(pk=active_id, status="running", worker_id=worker_id).update(
                     status="failed",
                     error="Обработка прервалась. Повторите запрос.",
                     finished_at=timezone.now(),

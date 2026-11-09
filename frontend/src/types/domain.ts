@@ -28,6 +28,7 @@ export type Project = {
   columns: { id: Status; name: string; limit: number }[];
 };
 export type Task = {
+  unreadCommentCount?: number;
   position?: number;
   id: string;
   projectId: string;
@@ -134,7 +135,8 @@ export type AssistantHistory = {
 
 export type NotificationItem = {
   id: string;
-  kind: "colleague" | "project" | "legacy_project";
+  kind: "colleague" | "project" | "legacy_project" | "comment";
+  taskId?: string;
   title: string;
   description: string;
   createdAt: string;

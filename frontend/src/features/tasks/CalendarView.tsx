@@ -1,31 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useReadyData } from "@/providers/DataProvider";
 import { useUi } from "@/providers/UiContext";
 import { Button, EmptyState, IconButton } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { dayKey, dateLabel, plural } from "@/lib/format";
 import { createCalendar } from "@/lib/calendar";
-import {
-  calendarPeriod,
-  calendarSwipe,
-  shiftCalendar,
-  type CalendarMode,
-} from "@/lib/calendar-navigation";
+import { calendarPeriod, shiftCalendar, type CalendarMode } from "@/lib/calendar-navigation";
 import { TaskList } from "./TaskViews";
+import { CalendarSwipe } from "./CalendarSwipe";
+import { useSearchParams } from "next/navigation";
 
 export function CalendarView() {
   const data = useReadyData();
   const ui = useUi();
   const today = dayKey(data.now);
-  const [anchor, setAnchor] = useState(today);
+  const searchParams = useSearchParams();
+  const requested = searchParams.get("day") || "";
+  const validDay =
+    /^\d{4}-\d{2}-\d{2}$/.test(requested) &&
+    Number.isFinite(Date.parse(`${requested}T12:00:00Z`)) &&
+    new Date(`${requested}T12:00:00Z`).toISOString().slice(0, 10) === requested;
+  const [anchor, setAnchor] = useState(validDay ? requested : today);
   const [mode, setMode] = useState<CalendarMode>("week");
-  const [selectedDay, setSelectedDay] = useState("");
+  const [selectedDay, setSelectedDay] = useState(validDay ? requested : "");
   const [projectId, setProjectId] = useState("");
-  const gesture = useRef<{ x: number; y: number; time: number } | null>(null);
-  const suppressClickUntil = useRef(0);
   const { start, end, month, cells } = calendarPeriod(anchor, mode);
   const firstKey = start.toISOString().slice(0, 10);
   const lastKey = end.toISOString().slice(0, 10);
@@ -152,54 +153,7 @@ export function CalendarView() {
             />
           </div>
         </div>
-        <div
-          className={`calendar-swipe calendar-${mode}`}
-          onTouchStart={(event) => {
-            const touch = event.touches[0];
-            // Leave edge gestures to browser back/forward navigation.
-            gesture.current =
-              event.touches.length === 1 &&
-              touch.clientX > 24 &&
-              touch.clientX < window.innerWidth - 24
-                ? { x: touch.clientX, y: touch.clientY, time: event.timeStamp }
-                : null;
-          }}
-          onTouchMove={(event) => {
-            const initial = gesture.current;
-            if (!initial) return;
-            const touch = event.touches[0];
-            if (
-              event.touches.length !== 1 ||
-              (Math.abs(touch.clientY - initial.y) > 12 &&
-                Math.abs(touch.clientY - initial.y) > Math.abs(touch.clientX - initial.x))
-            )
-              gesture.current = null;
-          }}
-          onTouchCancel={() => {
-            gesture.current = null;
-          }}
-          onTouchEnd={(event) => {
-            const initial = gesture.current;
-            gesture.current = null;
-            if (!initial || event.touches.length || event.changedTouches.length !== 1) return;
-            const touch = event.changedTouches[0];
-            const direction = calendarSwipe(
-              touch.clientX - initial.x,
-              touch.clientY - initial.y,
-              event.timeStamp - initial.time,
-            );
-            if (direction) {
-              suppressClickUntil.current = performance.now() + 500;
-              navigate(direction);
-            }
-          }}
-          onClickCapture={(event) => {
-            if (event.detail !== 0 && performance.now() < suppressClickUntil.current) {
-              event.preventDefault();
-              event.stopPropagation();
-            }
-          }}
-        >
+        <CalendarSwipe className={`calendar-swipe calendar-${mode}`} onNavigate={navigate}>
           <div className="calendar-weekdays">
             {[
               "Понедельник",
@@ -254,7 +208,7 @@ export function CalendarView() {
               );
             })}
           </div>
-        </div>
+        </CalendarSwipe>
         <p className="calendar-swipe-hint">
           {mode === "week"
             ? "Листай недели свайпом влево или вправо"

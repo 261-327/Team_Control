@@ -17,6 +17,7 @@ import {
   urgency,
 } from "@/lib/format";
 import { canManage } from "@/lib/permissions";
+import { WeekDeadlines } from "./WeekDeadlines";
 import type { Snapshot, Status, Task } from "@/types/domain";
 
 export function StatusBadge({ status, projectId }: { status: Status; projectId?: string }) {
@@ -87,6 +88,7 @@ export function TaskList({ tasks, showProject = true }: { tasks: Task[]; showPro
               </span>
               <div className="task-row-title">
                 <strong>{task.title}</strong>
+                <UnreadComments task={task} />
                 <span>
                   {showProject && (
                     <>
@@ -357,11 +359,6 @@ export function MyTasksView() {
         ]
       : [{ label: tab === "done" ? "Завершённые задачи" : "Все мои задачи", tone: "green", tasks }];
   const canCreate = data.projects.some((p) => canManage(data, p.id));
-  const weekDays = Array.from({ length: 7 }, (_, index) => {
-    const now = new Date(data.now);
-    const weekday = (now.getUTCDay() + 6) % 7;
-    return new Date(Date.parse(data.now) + (index - weekday) * 86400000).toISOString();
-  });
   return (
     <div className="dashboard">
       <div className="workspace-greeting">
@@ -589,59 +586,25 @@ export function MyTasksView() {
           </section>
         </div>
         <aside className="dashboard-aside">
-          <section className="panel week-panel">
-            <div className="panel-heading">
-              <h2>Ближайшие сроки</h2>
-              <Link href="/calendar" aria-label="Открыть календарь">
-                <Icon name="upRight" size={17} />
-              </Link>
-            </div>
-            <p className="week-month">
-              {new Intl.DateTimeFormat("ru-RU", {
-                month: "long",
-                year: "numeric",
-                timeZone: "Europe/Moscow",
-              }).format(new Date(data.now))}{" "}
-              <span>МСК</span>
-            </p>
-            <div className="week-strip">
-              {weekDays.map((day, index) => (
-                <Link
-                  href="/calendar"
-                  key={day}
-                  className={dayKey(day) === dayKey(data.now) ? "current" : ""}
-                >
-                  <span>{["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"][index]}</span>
-                  <strong>{new Date(day).getUTCDate()}</strong>
-                  <i
-                    className={
-                      active.some((t) => dayKey(t.deadlineAt) === dayKey(day)) ? "has-tasks" : ""
-                    }
-                  />
-                </Link>
-              ))}
-            </div>
-            <div className="upcoming-list">
-              {active
-                .filter((t) => !!t.deadlineAt && urgency(t, data.now) !== "overdue")
-                .sort((a, b) => Date.parse(a.deadlineAt) - Date.parse(b.deadlineAt))
-                .slice(0, 3)
-                .map((t) => (
-                  <Link key={t.id} href={`/projects/${t.projectId}/tasks/${t.id}`}>
-                    <span
-                      className={`upcoming-marker ${data.projects.find((p) => p.id === t.projectId)?.color}`}
-                    />
-                    <div>
-                      <strong>{t.title}</strong>
-                      <span>{dateLabel(t.deadlineAt, true)} МСК</span>
-                    </div>
-                  </Link>
-                ))}
-              {!active.length && <p className="muted">Здесь появятся ближайшие дедлайны.</p>}
-            </div>
-          </section>
+          <WeekDeadlines tasks={active} />
         </aside>
       </div>
     </div>
+  );
+}
+
+export function UnreadComments({ task }: { task: Task }) {
+  if (!task.unreadCommentCount) return null;
+  return (
+    <span className="unread-comments">
+      <Icon name="message" size={14} />
+      <span>
+        {plural(task.unreadCommentCount, [
+          "новый комментарий",
+          "новых комментария",
+          "новых комментариев",
+        ])}
+      </span>
+    </span>
   );
 }

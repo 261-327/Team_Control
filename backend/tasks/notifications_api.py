@@ -29,6 +29,24 @@ def incoming_notifications(user):
         rows.append({'id': str(invitation.pk), 'kind': 'legacy_project', 'title': invitation.project.name,
             'description': f'Приглашение в проект от @{invitation.sender.username}',
             'createdAt': invitation.created_at.isoformat(), 'projectId': str(invitation.project_id)})
+    from .models import CommentNotification
+    from .memberships import accessible
+
+    updates = CommentNotification.objects.filter(
+        user=user, read_at=None, comment__task__column__board__project__in=accessible(user),
+    ).select_related("comment__task__column__board").order_by("-comment_id")
+    # One link per task keeps busy conversations from flooding the bell.
+    seen_tasks = set()
+    for notice in updates:
+        task = notice.comment.task
+        if task.pk in seen_tasks:
+            continue
+        seen_tasks.add(task.pk)
+        rows.append({
+            "id": str(notice.comment_id), "kind": "comment", "title": task.title,
+            "description": "Новые комментарии к задаче", "createdAt": notice.comment.created_at.isoformat(),
+            "projectId": str(task.column.board.project_id), "taskId": str(task.pk),
+        })
     return sorted(rows, key=lambda row: row['createdAt'], reverse=True)
 
 
@@ -54,13 +72,17 @@ def respond_notification(request, kind, notification_id):
                 link.delete()
         elif kind in ('project', 'legacy_project'):
             if kind == 'project':
+                initial = get_object_or_404(Invitation, pk=notification_id, email__iexact=request.user.email.strip())
+                get_object_or_404(Project.objects.select_for_update(), pk=initial.project_id)
                 invitation = get_object_or_404(Invitation.objects.select_for_update(), pk=notification_id,
                     email__iexact=request.user.email.strip(), status='pending')
                 if invitation.expires_at <= timezone.now():
                     raise APIError('Срок приглашения истёк.', 'conflict', 409)
             else:
+                initial = get_object_or_404(ProjectInvitation, pk=identifier(notification_id), recipient=request.user)
+                get_object_or_404(Project.objects.select_for_update(), pk=initial.project_id)
                 invitation = get_object_or_404(ProjectInvitation.objects.select_for_update(),
-                    pk=identifier(notification_id), recipient=request.user, sender_id=F('project__owner_id'))
+                    pk=initial.pk, recipient=request.user, sender_id=F('project__owner_id'))
             project = get_object_or_404(Project.objects.select_for_update(), pk=invitation.project_id)
             if action == 'accept':
                 roles = role_values(request.data.get('role'))
