@@ -1898,10 +1898,6 @@ select:focus {
 .sheet > .modal-body > .notification-invitation-form {
   padding: 24px;
 }
-.search-field:focus-within {
-  outline: 2px solid #a77400;
-  outline-offset: 2px;
-}
 .search-field input:focus,
 .search-field input:focus-visible {
   outline: none;

@@ -1145,8 +1145,17 @@ button.stat-card:hover {
   padding: 0 11px;
   min-width: 0;
 }
+
+.search-field:focus-within {
+  border-color: #a77400;
+  outline: 2px solid #a77400;
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
 .search-field > input:not([type="checkbox"]) {
-  border: none;
+  border: none !important;
+  outline: none !important;
   box-shadow: none !important;
   background: transparent;
   padding: 10px 0;
