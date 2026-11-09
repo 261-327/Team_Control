@@ -106,3 +106,33 @@ class NotificationsAPITests(TestCase):
         self.client.logout()
         self.assertEqual(self.client.get('/api/notifications/').status_code, 401)
         self.assertEqual(self.respond('colleague', self.link.pk, 'decline').status_code, 401)
+    def test_discussion_unread_and_bell_notifications(self):
+        """The discussion scenario from PR #77 uses the persisted API contract."""
+        from .models import Board, Column, Comment, Task
+
+        Membership.objects.create(project=self.project, user=self.recipient,
+            role="designer", is_confirmed=True)
+        board = Board.objects.create(project=self.project, name="Test board")
+        column = Column.objects.create(board=board, workflow_status="todo", name="To do")
+        task = Task.objects.create(column=column, title="Discussion", creator=self.sender)
+        task.assignees.set([self.recipient])
+        response = self.client.post(f"/api/tasks/{task.pk}/comments/",
+            json.dumps({"text": "New comment"}), content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(any(item["kind"] == "comment" for item in self.items()))
+
+        reader = Client(enforce_csrf_checks=True)
+        reader.force_login(self.sender)
+        notices = reader.get("/api/notifications/").json()["notifications"]
+        self.assertEqual([item["taskId"] for item in notices if item["kind"] == "comment"], [str(task.pk)])
+        snapshot = reader.get("/api/bootstrap/").json()
+        self.assertEqual(snapshot["tasks"][0]["unreadCommentCount"], 1)
+        self.assertEqual(reader.get(f"/api/tasks/{task.pk}/comments/").status_code, 200)
+        # Merely fetching comments must not mark unseen content as read.
+        self.assertEqual(reader.get("/api/bootstrap/").json()["tasks"][0]["unreadCommentCount"], 1)
+        response = reader.post(f"/api/tasks/{task.pk}/comments/read/",
+            json.dumps({"lastCommentId": str(Comment.objects.get(task=task).pk)}),
+            content_type="application/json", HTTP_X_CSRFTOKEN=reader.cookies["csrftoken"].value)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["snapshot"]["tasks"][0]["unreadCommentCount"], 0)
+        self.assertFalse(any(item["kind"] == "comment" for item in reader.get("/api/notifications/").json()["notifications"]))
