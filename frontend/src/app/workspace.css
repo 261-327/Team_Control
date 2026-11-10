@@ -2085,3 +2085,7 @@ select:focus {
   outline: 2px solid var(--text);
   outline-offset: 2px;
 }
+
+.task-list-heading {
+  scroll-margin-top: 24px;
+}
