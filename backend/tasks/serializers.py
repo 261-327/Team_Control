@@ -211,7 +211,7 @@ def snapshot(request):
                 "name": person.get_full_name().strip() or person.username,
                 "username": person.username if person.pk in visible_users else "",
                 "email": person.email
-                if person.pk in visible_users or user.account_type == "staff"
+                if person.pk in visible_users
                 else "",
                 "bio": person.bio if person.pk in visible_users else "",
                 "color": COLORS[person.pk % len(COLORS)],
@@ -257,6 +257,11 @@ def snapshot(request):
                 "title": m.title,
                 "description": m.description,
                 "url": m.url,
+                "kind": m.kind,
+                "taskId": str(m.task_id) if m.task_id else "",
+                "fileName": m.original_filename,
+                "fileSize": m.file_size,
+                "contentType": m.content_type,
                 "createdBy": str(m.created_by_id or ""),
                 "createdAt": stamp(m.created_at),
             }

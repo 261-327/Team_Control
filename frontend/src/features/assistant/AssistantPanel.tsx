@@ -9,7 +9,9 @@ import { canManage } from "@/lib/permissions";
 import { fromInputDate, toInputDate } from "@/lib/format";
 import { Button, ConfirmDialog, Field, FormError, Modal, useAction } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
+import { FILE_ACCEPT, FILE_FORMATS, fileError, formatFileSize } from "@/lib/attachments";
 import type {
+  AssistantAttachment,
   AssistantDraft,
   AssistantHistory,
   AssistantMode,
@@ -34,6 +36,11 @@ export function AssistantPanel({
 }) {
   const data = useReadyData();
   const [selectedId, setSelectedId] = useState(projectId || "");
+  const accessKey = data.projects
+    .map((project) => project.id)
+    .sort()
+    .join(",");
+  const unavailable = !!selectedId && !data.projects.some((project) => project.id === selectedId);
   return (
     <Modal
       title="Сипи AI"
@@ -42,13 +49,22 @@ export function AssistantPanel({
       sheet
       focusSelector="#assistant-message"
     >
-      <AssistantChat
-        key={`${data.sessionId}:${selectedId}`}
-        projectId={selectedId}
-        initialMessage={initialMessage}
-        onProjectChange={setSelectedId}
-        onClose={onClose}
-      />
+      {unavailable ? (
+        <div role="status">
+          <p>Доступ к проекту изменился. Выбери другой контекст помощника.</p>
+          <Button variant="secondary" onClick={() => setSelectedId("")}>
+            Мои проекты
+          </Button>
+        </div>
+      ) : (
+        <AssistantChat
+          key={`${data.sessionId}:${selectedId}:${accessKey}`}
+          projectId={selectedId}
+          initialMessage={initialMessage}
+          onProjectChange={setSelectedId}
+          onClose={onClose}
+        />
+      )}
     </Modal>
   );
 }
@@ -73,6 +89,11 @@ function AssistantChat({
   const [mode, setMode] = useState<AssistantMode>("chat");
   const [message, setMessage] = useState("");
   const [promptHint, setPromptHint] = useState(initialMessage || "");
+  const [files, setFiles] = useState<AssistantAttachment[]>([]);
+  const [uploading, setUploading] = useState<{ name: string; percent: number } | null>(null);
+  const [uploadError, setUploadError] = useState("");
+  const [failedFile, setFailedFile] = useState<File | null>(null);
+  const uploadController = useRef<AbortController | null>(null);
   const [clearOpen, setClearOpen] = useState(false);
   const [reload, setReload] = useState(0);
   const action = useAction();
@@ -82,6 +103,7 @@ function AssistantChat({
     message: string;
     mode: AssistantMode;
     status: "running";
+    attachments: AssistantAttachment[];
   } | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
@@ -89,13 +111,14 @@ function AssistantChat({
     id: string;
     text: string;
     mode: AssistantMode;
+    attachmentIds: string[];
     controller: AbortController;
     cancelled: AssistantTurn | null;
   } | null>(null);
   const pending = turns.find(inFlight);
   const pendingId = pending?.id;
   const processing = pending || sending;
-  const busy = action.busy || cancellation.busy || !!pending;
+  const busy = action.busy || cancellation.busy || !!pending || !!uploading;
   const ready = mode === "logo" ? capabilities?.imagesReady : capabilities?.chatReady;
   const updateTurn = useCallback((turn: AssistantTurn) => {
     setTurns((old) =>
@@ -112,6 +135,7 @@ function AssistantChat({
       .then((history) => {
         if (!active) return;
         setTurns(history.turns);
+        setFiles(history.pendingAttachments || []);
         setCapabilities(history.capabilities);
         setLoadError("");
       })
@@ -158,21 +182,74 @@ function AssistantChat({
     bottom.current?.scrollIntoView({ behavior: "instant", block: "end" });
   }, [turns.length, last?.status, sending?.id]);
 
+  useEffect(() => () => uploadController.current?.abort(), []);
+
+  const upload = async (file: File) => {
+    if (busy || files.length >= 3) return;
+    const validation = fileError(file);
+    if (validation) {
+      setUploadError(validation);
+      return;
+    }
+    setUploading({ name: file.name, percent: 0 });
+    setUploadError("");
+    setFailedFile(null);
+    const controller = new AbortController();
+    uploadController.current = controller;
+    try {
+      const item = await client.uploadAssistantAttachment(
+        file,
+        projectId || undefined,
+        (percent) => setUploading({ name: file.name, percent }),
+        controller.signal,
+      );
+      setFiles((previous) =>
+        previous.some((entry) => entry.id === item.id) ? previous : [...previous, item],
+      );
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        setUploadError(error instanceof Error ? error.message : "Не удалось прикрепить файл.");
+        setFailedFile(file);
+      }
+    } finally {
+      setUploading(null);
+      uploadController.current = null;
+    }
+  };
+
+  const removeFile = (file: AssistantAttachment) => {
+    void action.run(async () => {
+      await client.deleteAssistantAttachment(file.id);
+      setFiles((previous) => previous.filter((entry) => entry.id !== file.id));
+    });
+  };
+
   const send = (text: string, chosenMode = mode) => {
-    if (!text.trim() || busy || loading) return;
+    const currentText = text.trim() || (files.length ? "Разбери прикреплённые файлы." : "");
+    if (!currentText || busy || loading) return;
+    const attachmentIds = files.map((file) => file.id);
     const previous = request.current;
     const current = {
       id:
-        previous?.text === text.trim() && previous.mode === chosenMode
+        previous?.text === currentText &&
+        previous.mode === chosenMode &&
+        previous.attachmentIds.join() === attachmentIds.join()
           ? previous.id
           : crypto.randomUUID(),
-      text: text.trim(),
+      text: currentText,
+      attachmentIds,
       mode: chosenMode,
       controller: new AbortController(),
       cancelled: null as AssistantTurn | null,
     };
     request.current = current;
-    setSending({ id: current.id, message: current.text, mode: chosenMode, status: "running" });
+    setSending({
+      id: current.id,
+      message: current.text,
+      mode: chosenMode,
+      status: "running",
+      attachments: files,
+    });
     cancellation.setError("");
     void action.run(
       async () => {
@@ -183,6 +260,7 @@ function AssistantChat({
             current.id,
             projectId || undefined,
             current.controller.signal,
+            current.attachmentIds,
           );
         } catch (error) {
           if (current.cancelled) return current.cancelled;
@@ -195,6 +273,7 @@ function AssistantChat({
         updateTurn(turn);
         request.current = null;
         setMessage("");
+        setFiles([]);
         textarea.current?.focus();
       },
     );
@@ -221,7 +300,7 @@ function AssistantChat({
           type="button"
           className="icon-button"
           aria-label="Очистить историю помощника"
-          disabled={busy || !turns.length}
+          disabled={busy || (!turns.length && !files.length)}
           onClick={() => setClearOpen(true)}
         >
           <Icon name="trash" size={17} />
@@ -304,6 +383,7 @@ function AssistantChat({
           <div className="assistant-turn" key={turn.id}>
             <article className="chat-message chat-user">
               <p className="pre-wrap">{turn.message}</p>
+              <AttachedFiles files={turn.attachments || []} />
             </article>
             {turn.status === "succeeded" && (
               <article className="chat-message chat-assistant">
@@ -404,6 +484,7 @@ function AssistantChat({
                   onClick={() => {
                     setMode(turn.mode);
                     setMessage(turn.message);
+                    setFiles(turn.attachments || []);
                     textarea.current?.focus();
                   }}
                 >
@@ -419,6 +500,7 @@ function AssistantChat({
         {sending && !turns.some((turn) => turn.id === sending.id) && (
           <article className="chat-message chat-user">
             <p className="pre-wrap">{sending.message}</p>
+            <AttachedFiles files={sending.attachments} />
           </article>
         )}
         {processing && (
@@ -505,6 +587,44 @@ function AssistantChat({
             Выбери проект в поле «Контекст», чтобы подготовить задачи.
           </p>
         )}
+        <div className="assistant-attachment-controls">
+          <label
+            className="btn btn-ghost assistant-file-picker"
+            aria-disabled={busy || loading || !capabilities?.attachmentsReady || files.length >= 3}
+          >
+            <Icon name="paperclip" size={17} /> Прикрепить файл
+            <input
+              type="file"
+              accept={FILE_ACCEPT}
+              aria-label="Прикрепить файл к сообщению"
+              disabled={busy || loading || !capabilities?.attachmentsReady || files.length >= 3}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (file) void upload(file);
+              }}
+            />
+          </label>
+          <span>До 3 файлов по 3 МБ</span>
+        </div>
+        {uploading && (
+          <div className="file-upload-progress" role="status">
+            <span>
+              {uploading.name} · {uploading.percent}%
+            </span>
+            <progress max={100} value={uploading.percent} aria-label="Загрузка файла помощника" />
+            <Button type="button" variant="ghost" onClick={() => uploadController.current?.abort()}>
+              Отменить загрузку
+            </Button>
+          </div>
+        )}
+        <AttachedFiles files={files} onRemove={removeFile} disabled={busy} />
+        <FormError error={uploadError} />
+        {failedFile && !busy && (
+          <Button type="button" variant="ghost" onClick={() => void upload(failedFile)}>
+            Повторить загрузку
+          </Button>
+        )}
         <FormError error={action.error} />
         <form
           onSubmit={(e) => {
@@ -541,7 +661,11 @@ function AssistantChat({
           <button
             className="send-message"
             disabled={
-              !message.trim() || busy || loading || !ready || (mode === "tasks" && !projectId)
+              (!message.trim() && !files.length) ||
+              busy ||
+              loading ||
+              !ready ||
+              (mode === "tasks" && !projectId)
             }
             aria-label="Отправить сообщение"
           >
@@ -552,6 +676,13 @@ function AssistantChat({
           <span>Enter — отправить · Shift+Enter — новая строка</span>
           <span>{message.length}/4000</span>
         </div>
+        {!!files.length && (
+          <p className="assistant-file-hint">
+            {FILE_FORMATS}. При отправке содержимое файлов получит{" "}
+            {capabilities?.local ? "локальная модель" : "ИИ Cloudflare"}. Для документов
+            используется ограниченный фрагмент текста.
+          </p>
+        )}
         <p className="assistant-disclaimer">
           <Icon name="sparkles" size={11} />
           По просьбе «создай» помощник сразу добавит проект или задачи.
@@ -572,6 +703,8 @@ function AssistantChat({
           onConfirm={async () => {
             await client.clearAssistantHistory(projectId || undefined);
             setTurns([]);
+            setFiles([]);
+            setFailedFile(null);
             setClearOpen(false);
           }}
         />
@@ -736,5 +869,41 @@ function DraftPlan({
         <p className="assistant-hint">Сохранить задачи на доску может руководитель проекта.</p>
       )}
     </section>
+  );
+}
+
+function AttachedFiles({
+  files,
+  onRemove,
+  disabled = false,
+}: {
+  files: AssistantAttachment[];
+  onRemove?: (file: AssistantAttachment) => void;
+  disabled?: boolean;
+}) {
+  if (!files.length) return null;
+  return (
+    <ul className="assistant-attached-files" aria-label="Прикреплённые файлы">
+      {files.map((file) => (
+        <li key={file.id}>
+          <Icon name={file.contentType.startsWith("image/") ? "image" : "file"} size={18} />
+          <a href={file.url}>
+            <strong>{file.fileName}</strong>
+            <span>{formatFileSize(file.fileSize)}</span>
+          </a>
+          {onRemove && (
+            <button
+              type="button"
+              className="icon-button"
+              disabled={disabled}
+              onClick={() => onRemove(file)}
+              aria-label={`Убрать файл «${file.fileName}»`}
+            >
+              <Icon name="close" size={16} />
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }

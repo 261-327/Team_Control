@@ -17,6 +17,8 @@ import {
   useAction,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
+import { MaterialFileUploadForm } from "./MaterialFileUploadForm";
+import { formatFileSize } from "@/lib/attachments";
 import type { Material } from "@/types/domain";
 
 export function MaterialsView() {
@@ -25,6 +27,7 @@ export function MaterialsView() {
   const ui = useUi();
   const [form, setForm] = useState<Material | "new" | null>(null);
   const [remove, setRemove] = useState<Material | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const materials = data.materials.filter((m) => m.projectId === projectId);
   const manage = canManage(data, projectId);
   return (
@@ -35,20 +38,29 @@ export function MaterialsView() {
           <p className="muted">Ссылки на репозиторий, макеты и документы.</p>
         </div>
         {manage && (
-          <Button onClick={() => setForm("new")}>
-            <Icon name="plus" size={17} />
-            Добавить материал
-          </Button>
+          <div className="button-wrap">
+            <Button variant="secondary" onClick={() => setUploadOpen(true)}>
+              <Icon name="file" size={17} />
+              Загрузить файл
+            </Button>
+            <Button onClick={() => setForm("new")}>
+              <Icon name="plus" size={17} />
+              Добавить ссылку
+            </Button>
+          </div>
         )}
       </div>
       <div className="materials-grid">
         {materials.map((m) => {
-          const host = new URL(m.url).hostname;
-          const type = host.includes("github")
-            ? "Код проекта"
-            : host.includes("figma")
-              ? "Дизайн и прототипы"
-              : "Документ / ссылка";
+          const isFile = m.kind === "file";
+          const host = isFile ? "" : new URL(m.url).hostname;
+          const type = isFile
+            ? "Файл проекта"
+            : host.includes("github")
+              ? "Код проекта"
+              : host.includes("figma")
+                ? "Дизайн и прототипы"
+                : "Документ / ссылка";
           return (
             <article className="material-card" key={m.id}>
               <div className="material-top">
@@ -64,11 +76,13 @@ export function MaterialsView() {
                 </span>
                 {manage && (
                   <div className="button-wrap">
-                    <IconButton
-                      icon="edit"
-                      label={`Редактировать «${m.title}»`}
-                      onClick={() => setForm(m)}
-                    />
+                    {!isFile && (
+                      <IconButton
+                        icon="edit"
+                        label={`Редактировать «${m.title}»`}
+                        onClick={() => setForm(m)}
+                      />
+                    )}
                     <IconButton
                       icon="trash"
                       label={`Удалить «${m.title}»`}
@@ -80,13 +94,23 @@ export function MaterialsView() {
               <span className="material-type">{type}</span>
               <h3>{m.title}</h3>
               <p>{m.description || "Без описания"}</p>
-              <a className="material-link" href={m.url} target="_blank" rel="noopener noreferrer">
-                <span>
-                  <Icon name="link" size={15} />
-                  {host}
-                </span>
-                <Icon name="upRight" size={17} />
-              </a>
+              {isFile ? (
+                <a className="material-link" href={`/api/materials/${m.id}/download/`}>
+                  <span>
+                    <Icon name="download" size={15} />
+                    {m.fileName || "Скачать файл"} · {formatFileSize(m.fileSize || 0)}
+                  </span>
+                  <Icon name="download" size={17} />
+                </a>
+              ) : (
+                <a className="material-link" href={m.url} target="_blank" rel="noopener noreferrer">
+                  <span>
+                    <Icon name="link" size={15} />
+                    {host}
+                  </span>
+                  <Icon name="upRight" size={17} />
+                </a>
+              )}
             </article>
           );
         })}
@@ -96,25 +120,34 @@ export function MaterialsView() {
           <EmptyState
             icon="folder"
             title="Материалов пока нет"
-            description="Добавьте ссылку на макеты, репозиторий или документ."
+            description="Добавьте ссылку на макеты, репозиторий или загрузите файл проекта."
             action={
               manage ? (
-                <Button onClick={() => setForm("new")}>
-                  <Icon name="plus" size={16} />
-                  Добавить первый материал
-                </Button>
+                <div className="button-wrap">
+                  <Button variant="secondary" onClick={() => setUploadOpen(true)}>
+                    <Icon name="file" size={16} />
+                    Загрузить файл
+                  </Button>
+                  <Button onClick={() => setForm("new")}>
+                    <Icon name="plus" size={16} />
+                    Добавить ссылку
+                  </Button>
+                </div>
               ) : undefined
             }
           />
         </section>
       )}
       <div className="info-callout">
-        <Icon name="link" size={22} />
+        <Icon name="lock" size={22} />
         <p>
-          Здесь хранятся ссылки. Документы открываются в своём сервисе; доступ к ним настраивается
-          отдельно.
+          Файлы доступны только действующим участникам проекта. Поддерживаются PDF, DOCX, TXT, MD,
+          CSV, PNG и JPEG до 3 МБ; скачивание проверяет доступ на сервере.
         </p>
       </div>
+      {uploadOpen && (
+        <MaterialFileUploadForm projectId={projectId} onClose={() => setUploadOpen(false)} />
+      )}
       {form && (
         <MaterialForm
           key={typeof form === "string" ? "new" : form.id}
@@ -126,7 +159,11 @@ export function MaterialsView() {
       {remove && (
         <ConfirmDialog
           title="Убрать материал из проекта?"
-          description={`Ссылка «${remove.title}» исчезнет из этого списка. Сам документ останется во внешнем сервисе.`}
+          description={
+            remove.kind === "file"
+              ? `Файл «${remove.fileName || remove.title}» и его запись будут удалены из проекта.`
+              : `Ссылка «${remove.title}» исчезнет из этого списка. Сам документ останется во внешнем сервисе.`
+          }
           onClose={() => setRemove(null)}
           onConfirm={async () => {
             await client.deleteMaterial(remove.id);

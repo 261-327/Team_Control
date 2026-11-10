@@ -6,6 +6,8 @@ independently of the controls displayed in the browser.
 
 import json
 import logging
+import os
+import uuid
 from datetime import timedelta
 from functools import wraps
 from smtplib import SMTPException
@@ -21,7 +23,8 @@ from django.core.mail import get_connection, send_mail
 from django.core.validators import URLValidator, validate_email
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import Http404, JsonResponse
+from django.http.response import HttpResponseBase
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
@@ -57,6 +60,7 @@ from .serializers import (
     status_key,
     task_json,
 )
+from .file_uploads import FileUploadError, MAX_FILE_BYTES, download_file, validate_file, upload_request_id
 from .workflow import STATUSES
 
 
@@ -78,7 +82,7 @@ def csrf_failure(request, reason=""):
     return default_csrf_failure(request, reason=reason)
 
 
-def endpoint(methods=("GET",), public=False):
+def endpoint(methods=("GET",), public=False, multipart=False):
     def decorate(fn):
         @never_cache
         @wraps(fn)
@@ -91,7 +95,11 @@ def endpoint(methods=("GET",), public=False):
                 return error("Войдите в аккаунт.", "unauthenticated", 401)
             try:
                 body = {}
-                if request.method in ("POST", "PATCH", "PUT"):
+                if request.method in ("POST", "PATCH", "PUT") and multipart:
+                    if not (request.content_type or "").startswith("multipart/form-data"):
+                        raise APIError("Отправьте файл через форму загрузки.")
+                    body = request.POST.dict()
+                elif request.method in ("POST", "PATCH", "PUT"):
                     if request.content_type != "application/json":
                         raise APIError("Отправьте данные в формате JSON.")
                     try:
@@ -102,9 +110,11 @@ def endpoint(methods=("GET",), public=False):
                         raise APIError("Ожидается объект JSON.")
                 request.data = body
                 result = fn(request, *args, **kwargs)
-                return result if isinstance(result, HttpResponse) else JsonResponse(result or {})
+                return result if isinstance(result, HttpResponseBase) else JsonResponse(result or {})
             except APIError as exc:
                 return error(exc.message, exc.code, exc.status)
+            except FileUploadError as exc:
+                return error(str(exc), exc.code, exc.status)
             except RateLimitUnavailable:
                 return error("Сервис входа временно недоступен. Попробуйте позже.", "unavailable", 503)
             except Http404:
@@ -1289,10 +1299,10 @@ def move_task(request, task_id):
             t.submitted_at = (
                 timezone.now()
                 if status == "in_review"
-                else (None if status in ("todo", "in_progress") else t.submitted_at)
+                else (None if status != "done" else t.submitted_at)
             )
             t.accepted_at = timezone.now() if status == "done" else None
-            if status in ("todo", "in_progress"):
+            if status not in ("in_review", "done"):
                 t.result_url = ""
             elif "resultUrl" in request.data:
                 t.result_url = web_url(request.data, "resultUrl")
@@ -1305,7 +1315,7 @@ def move_task(request, task_id):
             if reason:
                 event_text += f". {reason}"
             # Записываем старый результат в историю, если он был очищен
-            if old_result_url and status in ("todo", "in_progress"):
+            if old_result_url and status not in ("in_review", "done"):
                 event_text += f" [предыдущий результат: {old_result_url}]"
             log_event(t, request.user, event_text)
     return {"snapshot": snapshot(request)}
@@ -1399,19 +1409,47 @@ def read_comments(request, task_id):
     return {"snapshot": snapshot(request)}
 
 
+@endpoint(("POST",))
+def create_column(request, project_id):
+    with transaction.atomic():
+        p = project_for(request.user, project_id, manage=True, lock=True)
+        name, limit = column_values(request.data)
+        names = list(STATUSES.values()) + list(
+            Column.objects.filter(board__project=p).values_list("name", flat=True)
+        )
+        if any(name.casefold() == existing.casefold() for existing in names):
+            raise APIError("Этап с таким названием уже есть.", "conflict", 409)
+        board = p.boards.order_by("pk").first() or Board.objects.create(
+            project=p, name="Основная доска"
+        )
+        last = board.columns.order_by("-position", "-pk").first()
+        Column.objects.create(
+            board=board,
+            name=name,
+            max_tasks=limit,
+            position=max(last.position + 1 if last else 0, len(STATUSES)),
+        )
+    return {"snapshot": snapshot(request)}
+
+
+def column_values(data):
+    limit = data.get("limit")
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 15:
+        raise APIError("Лимит должен быть от 1 до 15.")
+    return text(data, "name", 100, True), limit
+
+
 @endpoint(("PATCH",))
 def update_column(request, project_id, status):
     with transaction.atomic():
         p = project_for(request.user, project_id, manage=True, lock=True)
         col = column_for(p, status)
-        limit = request.data.get("limit")
-        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 15:
-            raise APIError("Лимит должен быть от 1 до 15.")
+        name, limit = column_values(request.data)
         if status_tasks(p, status).count() > limit:
             raise APIError(
                 "В колонке уже больше задач. Сначала переместите часть из них.", "capacity", 409
             )
-        col.name, col.max_tasks = text(request.data, "name", 100, True), limit
+        col.name, col.max_tasks = name, limit
         col.save(update_fields=["name", "max_tasks"])
     return {"snapshot": snapshot(request)}
 
@@ -1419,7 +1457,7 @@ def update_column(request, project_id, status):
 @endpoint(("POST",))
 def materials(request, project_id):
     with transaction.atomic():
-        p = project_for(request.user, project_id, manage=True)
+        p = project_for(request.user, project_id, manage=True, lock=True)
         Material.objects.create(
             project=p,
             created_by=request.user,
@@ -1434,10 +1472,16 @@ def materials(request, project_id):
 def material_detail(request, material_id):
     with transaction.atomic():
         m = get_object_or_404(Material, pk=material_id)
-        project_for(request.user, m.project_id, manage=True)
+        project = project_for(request.user, m.project_id, lock=True)
+        m = get_object_or_404(Material, pk=material_id)
+        own_task_file = m.kind == "file" and m.task_id and m.created_by_id == request.user.pk
+        if not can_manage(request.user, project) and not (request.method == "DELETE" and own_task_file):
+            raise APIError("Удалить файл может его автор или руководитель проекта.", "forbidden", 403)
         if request.method == "DELETE":
-            m.delete()
+            m.delete()  # pre_delete signal removes private bytes after the transaction commits.
         else:
+            if m.kind != "link":
+                raise APIError("Файловый материал нельзя редактировать как ссылку.")
             m.title, m.description, m.url = (
                 text(request.data, "title", 255, True),
                 text(request.data, "description", 2000),
@@ -1445,6 +1489,57 @@ def material_detail(request, material_id):
             )
             m.save(update_fields=["title", "description", "url"])
     return {"snapshot": snapshot(request)}
+
+
+
+MAX_PROJECT_FILE_SIZE = MAX_FILE_BYTES
+
+
+@endpoint(("POST",), multipart=True)
+def material_file_upload(request, project_id):
+    if not settings.PROJECT_FILE_UPLOADS_ENABLED:
+        raise APIError("Постоянное хранилище файлов ещё не настроено.", "storage_unavailable", 503)
+    material = None
+    try:
+        with transaction.atomic():
+            task_id = request.data.get("taskId")
+            project = project_for(request.user, project_id, manage=not bool(task_id), lock=True)
+            task = get_object_or_404(Task, pk=identifier(task_id), column__board__project=project) if task_id else None
+            if not consume("file-upload", (str(request.user.pk),), 40, 3600):
+                raise APIError("Слишком много загрузок. Попробуй позже.", "rate_limit", 429)
+            request_id = upload_request_id(request.data)
+            existing = Material.objects.filter(upload_request_id=request_id).first()
+            if existing:
+                if existing.project_id != project.pk or existing.created_by_id != request.user.pk or existing.task_id != (task.pk if task else None):
+                    raise Http404
+                return {"snapshot": snapshot(request)}
+            uploaded = validate_file(request.FILES.get("file"))
+            material = Material(
+                upload_request_id=request_id,
+                project=project, task=task, created_by=request.user,
+                title=text(request.data, "title", 255) or uploaded.name,
+                description=text(request.data, "description", 2000), kind="file",
+                original_filename=uploaded.name, file_size=len(uploaded.data), content_type=uploaded.content_type,
+            )
+            material.file.save(uuid.uuid4().hex + os.path.splitext(uploaded.name)[1].lower(), uploaded.content(), save=False)
+            material.save()
+    except Exception:
+        if material and material.file and material.file._committed:
+            material.file.delete(save=False)
+        raise
+    return {"snapshot": snapshot(request)}
+
+
+@endpoint(("GET",))
+def material_file_download(request, material_id):
+    if not settings.PROJECT_FILE_UPLOADS_ENABLED:
+        raise APIError("Постоянное хранилище файлов ещё не настроено.", "storage_unavailable", 503)
+    material = get_object_or_404(Material, pk=material_id, kind="file")
+    project_for(request.user, material.project_id)
+    try:
+        return download_file(material.file, material.original_filename)
+    except (OSError, ValueError):
+        raise Http404 from None
 
 
 @endpoint(("POST",))

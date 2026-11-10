@@ -29,6 +29,9 @@ services:
       EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:?Set the sender address}
       WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      MEDIA_ROOT: /app/media
+    volumes:
+      - media_data:/app/media
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/')"]
       interval: 10s
@@ -99,3 +102,4 @@ services:
 
 volumes:
   ollama_models:
+  media_data:

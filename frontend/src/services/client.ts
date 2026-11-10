@@ -11,6 +11,7 @@ import type {
   TaskInput,
   Material,
   AssistantMode,
+  AssistantAttachment,
   AssistantDraft,
   AssistantTurn,
   AssistantHistory,
@@ -31,11 +32,21 @@ const empty = (): Snapshot => ({
   invitations: [],
   connectionError: "",
 });
+class ApiRequestError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 class HttpClient implements DataClient {
   private snapshot: Snapshot | null = null;
   private listeners = new Set<() => void>();
   private started = false;
   private revision = 0;
+  private fileRequests = new WeakMap<File, string>();
   private authRevision = 0;
   private mutations: Promise<void> = Promise.resolve();
   private refreshing: Promise<void> | null = null;
@@ -86,7 +97,10 @@ class HttpClient implements DataClient {
           this.revision++;
           this.publish(empty());
         }
-        throw new Error(data?.error?.message || "Не удалось выполнить запрос. Попробуйте ещё раз.");
+        throw new ApiRequestError(
+          response.status,
+          data?.error?.message || "Не удалось выполнить запрос. Попробуйте ещё раз.",
+        );
       }
       return data as T;
     } catch (error) {
@@ -290,6 +304,147 @@ class HttpClient implements DataClient {
   deleteMaterial = async (id: string) => {
     await this.mutate(`materials/${id}`, "DELETE");
   };
+  createColumn = async (projectId: string, name: string, limit: number) => {
+    await this.mutate(`projects/${projectId}/columns`, "POST", { name, limit });
+  };
+  private upload<T extends { snapshot?: Database }>(
+    path: string,
+    input: Record<string, string | File>,
+    onProgress: (percent: number) => void,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    const authRevision = this.authRevision;
+    const pending = this.mutations.then(() => {
+      if (authRevision !== this.authRevision)
+        throw new Error("Сессия изменилась. Открой форму заново.");
+      this.revision++;
+      return new Promise<T>((resolve, reject) => {
+        if (signal?.aborted) {
+          reject(new DOMException("Загрузка отменена.", "AbortError"));
+          return;
+        }
+        const xhr = new XMLHttpRequest();
+        const form = new FormData();
+        for (const [name, value] of Object.entries(input)) form.append(name, value);
+        if (input.file instanceof File) {
+          const requestId = this.fileRequests.get(input.file) || crypto.randomUUID();
+          this.fileRequests.set(input.file, requestId);
+          form.append("requestId", requestId);
+        }
+        xhr.open("POST", `/api/${path}`);
+        xhr.withCredentials = true;
+        xhr.timeout = 90000;
+        xhr.setRequestHeader("Accept", "application/json");
+        const csrf = document.cookie
+          .split("; ")
+          .find((item) => item.startsWith("csrftoken="))
+          ?.split("=")
+          .slice(1)
+          .join("=");
+        if (csrf) xhr.setRequestHeader("X-CSRFToken", decodeURIComponent(csrf));
+        const abort = () => xhr.abort();
+        signal?.addEventListener("abort", abort, { once: true });
+        const cleanup = () => signal?.removeEventListener("abort", abort);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
+        };
+        xhr.onload = () => {
+          cleanup();
+          if (authRevision !== this.authRevision) {
+            reject(new Error("Сессия изменилась. Открой форму заново."));
+            return;
+          }
+          let result: T & { error?: { message?: string } };
+          try {
+            result = JSON.parse(xhr.responseText);
+          } catch {
+            reject(
+              new Error(
+                xhr.status === 413
+                  ? "Размер файла должен быть до 3 МБ."
+                  : "Не удалось прочитать ответ сервера. Проверь список файлов перед повторной загрузкой.",
+              ),
+            );
+            return;
+          }
+          if (xhr.status < 200 || xhr.status >= 300) {
+            if (xhr.status === 401) this.publish(empty());
+            reject(new Error(result.error?.message || "Не удалось загрузить файл."));
+            return;
+          }
+          this.revision++;
+          if (result.snapshot) this.publish(result.snapshot);
+          onProgress(100);
+          resolve(result);
+        };
+        xhr.onerror = () => {
+          cleanup();
+          reject(
+            new Error(
+              "Не удалось связаться с сервером. Проверь подключение и список файлов перед повторной загрузкой.",
+            ),
+          );
+        };
+        xhr.ontimeout = () => {
+          cleanup();
+          reject(
+            new Error(
+              "Загрузка заняла слишком много времени. Проверь список файлов перед повторной попыткой.",
+            ),
+          );
+        };
+        xhr.onabort = () => {
+          cleanup();
+          reject(new DOMException("Загрузка отменена.", "AbortError"));
+        };
+        xhr.send(form);
+      });
+    });
+    this.mutations = pending.then(
+      () => undefined,
+      () => undefined,
+    );
+    return pending;
+  }
+  uploadMaterialFile = async (
+    projectId: string,
+    input: { title: string; description: string; file: File; taskId?: string },
+    onProgress: (percent: number) => void,
+    signal?: AbortSignal,
+  ) => {
+    await this.upload(
+      `projects/${encodeURIComponent(projectId)}/materials/files/`,
+      {
+        file: input.file,
+        title: input.title,
+        description: input.description,
+        ...(input.taskId ? { taskId: input.taskId } : {}),
+      },
+      onProgress,
+      signal,
+    );
+  };
+  uploadAssistantAttachment = async (
+    file: File,
+    projectId: string | undefined,
+    onProgress: (percent: number) => void,
+    signal?: AbortSignal,
+  ) => {
+    const response = await this.upload<{ attachment: AssistantAttachment; snapshot?: Database }>(
+      "assistant/attachments/",
+      { file, ...(projectId ? { projectId } : {}) },
+      onProgress,
+      signal,
+    );
+    return response.attachment;
+  };
+  deleteAssistantAttachment = async (id: string) => {
+    try {
+      await this.request(`assistant/attachments/${encodeURIComponent(id)}/`, "DELETE");
+    } catch (error) {
+      if (!(error instanceof ApiRequestError && error.status === 404)) throw error;
+    }
+  };
   updateColumn = async (projectId: string, id: Status, name: string, limit: number) => {
     await this.mutate(`projects/${projectId}/columns/${id}`, "PATCH", { name, limit });
   };
@@ -309,13 +464,14 @@ class HttpClient implements DataClient {
     requestId: string,
     projectId?: string,
     signal?: AbortSignal,
+    attachmentIds: string[] = [],
   ) => {
     const authRevision = this.authRevision;
     const revision = this.revision;
     const result = await this.request<{ turn: AssistantTurn; snapshot?: Database }>(
       "assistant",
       "POST",
-      { message, projectId, mode, requestId },
+      { message, projectId, mode, requestId, attachmentIds },
       290000,
       signal,
     );

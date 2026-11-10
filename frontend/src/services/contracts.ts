@@ -1,5 +1,6 @@
 import type {
   AssistantMode,
+  AssistantAttachment,
   AssistantDraft,
   AssistantTurn,
   AssistantHistory,
@@ -86,6 +87,20 @@ export interface DataClient {
     id?: string,
   ): Promise<void>;
   deleteMaterial(id: string): Promise<void>;
+  createColumn(projectId: string, name: string, limit: number): Promise<void>;
+  uploadMaterialFile(
+    projectId: string,
+    input: { title: string; description: string; file: File; taskId?: string },
+    onProgress: (percent: number) => void,
+    signal?: AbortSignal,
+  ): Promise<void>;
+  uploadAssistantAttachment(
+    file: File,
+    projectId: string | undefined,
+    onProgress: (percent: number) => void,
+    signal?: AbortSignal,
+  ): Promise<AssistantAttachment>;
+  deleteAssistantAttachment(id: string): Promise<void>;
   updateColumn(projectId: string, id: Status, name: string, limit: number): Promise<void>;
   assistantHistory(projectId?: string): Promise<AssistantHistory>;
   clearAssistantHistory(projectId?: string): Promise<void>;
@@ -95,6 +110,7 @@ export interface DataClient {
     requestId: string,
     projectId?: string,
     signal?: AbortSignal,
+    attachmentIds?: string[],
   ): Promise<AssistantTurn>;
   assistantTurn(id: string): Promise<AssistantTurn>;
   cancelAssistantTurn(id: string): Promise<AssistantTurn>;

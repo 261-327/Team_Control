@@ -8,6 +8,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Count, F, Q
 from django.http import Http404
 from django.utils import timezone
@@ -20,7 +21,7 @@ from .assistant_providers import (
     provider_name,
     text_model as cloud_text_model,
 )
-from .assistant_actions import creation_intent, execute_creation
+from .assistant_actions import check_context_access, creation_intent, execute_creation
 from .memberships import accessible
 from .models import AssistantTurn, Comment, Material, Membership, Task, TaskEvent, WorkspaceUser
 from .serializers import status_key
@@ -315,6 +316,66 @@ def requested_task_count(message):
 
 def generate_reply(turn):
     context, pids = build_context(turn)
+    attachments = list(turn.files.select_related("thread"))
+    if attachments:
+        if any(item.thread_id != turn.thread_id for item in attachments):
+            raise AssistantUnavailable("Файл недоступен.")
+        content = []
+        remaining = 12000
+        for item in attachments:
+            if not set(pids).issubset(
+                set(accessible(turn.thread.user).values_list("pk", flat=True))
+            ):
+                raise AssistantUnavailable("Доступ к проектам изменился. Повтори запрос.")
+            value = item.extracted_text
+            if item.content_type.startswith("image/"):
+                if provider_name() != "cloudflare":
+                    raise AssistantUnavailable(
+                        "Для анализа изображений нужен облачный помощник. В локальном режиме прикрепи текстовый документ."
+                    )
+                from .assistant_providers import describe_image
+
+                try:
+                    with item.file.open("rb") as stored:
+                        value = describe_image(stored.read(3 * 1024 * 1024 + 1), item.content_type)
+                except (ProviderUnavailable, OSError) as exc:
+                    raise AssistantUnavailable(
+                        "Не удалось прочитать изображение. Проверь доступность и лимит облачного ИИ."
+                    ) from exc
+            excerpt = value[:remaining]
+            remaining -= len(excerpt)
+            content.append(
+                {
+                    "id": str(item.pk),
+                    "title": item.original_filename,
+                    "text": excerpt,
+                    "truncated": len(value) > len(excerpt),
+                }
+            )
+        context["attachments"] = content
+        # Keep the same overall context budget, prioritizing the selected files.
+        for project in context["projects"]:
+            project["description"] = project["description"][:500]
+        fields = (
+            "tasks",
+            "materials",
+            "comments",
+            "memberships",
+            "events",
+            "members",
+            "projects",
+            "counts",
+        )
+        while len(json.dumps(context, ensure_ascii=False)) > 16000:
+            largest = max(
+                fields, key=lambda field: len(json.dumps(context[field], ensure_ascii=False))
+            )
+            if not context[largest]:
+                break
+            context[largest].pop()
+        context["coverage"]["tasksIncluded"] = len(context["tasks"])
+    if not set(pids).issubset(set(accessible(turn.thread.user).values_list("pk", flat=True))):
+        raise AssistantUnavailable("Доступ к проектам изменился. Повтори запрос.")
     intent = creation_intent(turn.message) if turn.mode == "chat" else ""
     if intent:
         return generate_creation(turn, context, intent), pids
@@ -649,12 +710,18 @@ def process_turn(turn):
 
             image = generate_image(result.pop("imagePrompt"))
             result["imageUrl"] = f"/api/assistant/turns/{turn.pk}/image"
-        # Recheck access after inference; membership could change during a long job.
-        if not set(scope).issubset(set(accessible(turn.thread.user).values_list("pk", flat=True))):
-            raise AssistantUnavailable("Доступ к проектам изменился. Повторите запрос.")
-        AssistantTurn.objects.filter(pk=turn.pk, status="running", worker_id=turn.worker_id).update(
-            status="succeeded", result=result, scope=scope, image=image, finished_at=timezone.now()
-        )
+        # Publish under the same parent locks used to revoke project membership.
+        with transaction.atomic():
+            check_context_access(turn.thread.user, scope)
+            AssistantTurn.objects.filter(
+                pk=turn.pk, status="running", worker_id=turn.worker_id
+            ).update(
+                status="succeeded",
+                result=result,
+                scope=scope,
+                image=image,
+                finished_at=timezone.now(),
+            )
     except (AssistantUnavailable, APIError, Http404) as exc:
         AssistantTurn.objects.filter(pk=turn.pk, status="running", worker_id=turn.worker_id).update(
             status="failed",
