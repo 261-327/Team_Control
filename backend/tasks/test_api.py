@@ -919,6 +919,29 @@ class ProjectFileMaterialTests(TestCase):
     def setUp(self):
         self.client.force_login(self.owner)
 
+    @override_settings(PROJECT_FILE_UPLOADS_ENABLED=False)
+    def test_file_endpoints_fail_closed_when_persistent_storage_is_disabled(self):
+        upload = SimpleUploadedFile(
+            "disabled.pdf", b"%PDF-1.7\\nstorage-disabled", content_type="application/pdf"
+        )
+        upload_response = self.client.post(
+            f"/api/projects/{self.project.pk}/materials/files/", {"file": upload}
+        )
+        self.assertEqual(upload_response.status_code, 503)
+        self.assertEqual(upload_response.json()["error"]["code"], "storage_unavailable")
+        self.assertFalse(Material.objects.filter(kind="file").exists())
+
+        material = Material.objects.create(
+            project=self.project,
+            title="Existing file",
+            kind="file",
+            file="project-materials/2026/11/existing.pdf",
+            created_by=self.owner,
+        )
+        download_response = self.client.get(f"/api/materials/{material.pk}/download/")
+        self.assertEqual(download_response.status_code, 503)
+        self.assertEqual(download_response.json()["error"]["code"], "storage_unavailable")
+
     def test_project_file_upload_download_is_private_and_membership_scoped(self):
         content = b"%PDF-1.7\nteam-control-test"
         upload = SimpleUploadedFile("brief.pdf", content, content_type="application/pdf")
