@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useReadyData } from "@/providers/DataProvider";
 import { useUi } from "@/providers/UiContext";
 import { Avatar, Button, EmptyState } from "@/components/ui";
@@ -314,6 +314,18 @@ export function MyTasksView() {
   const user = data.users.find((u) => u.id === data.sessionId)!;
   const [tab, setTab] = useState("attention");
   const [filters, setFilters] = useState(defaultFilters);
+  const taskHeading = useRef<HTMLHeadingElement>(null);
+  const showTasks = (nextTab: string, nextFilters = defaultFilters) => {
+    setTab(nextTab);
+    setFilters(nextFilters);
+    taskHeading.current?.focus({ preventScroll: true });
+    taskHeading.current?.scrollIntoView({
+      block: "start",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "instant"
+        : "smooth",
+    });
+  };
   const allMine = data.tasks.filter((t) => t.assigneeId === user.id);
   const active = allMine.filter((t) => t.status !== "done");
   const overdue = active.filter((t) => urgency(t, data.now) === "overdue");
@@ -401,10 +413,9 @@ export function MyTasksView() {
             </p>
           </div>
           <button
-            onClick={() => {
-              setTab("attention");
-              setFilters({ ...defaultFilters, period: "overdue" });
-            }}
+            type="button"
+            aria-controls="my-tasks-list"
+            onClick={() => showTasks("attention", { ...defaultFilters, period: "overdue" })}
           >
             Посмотреть
             <Icon name="arrow" size={16} />
@@ -476,13 +487,14 @@ export function MyTasksView() {
           <button
             key={stat.label}
             className="stat-card"
-            onClick={() => {
-              setTab(index === 3 ? "done" : index === 0 ? "all" : "attention");
-              setFilters({
+            type="button"
+            aria-controls="my-tasks-list"
+            onClick={() =>
+              showTasks(index === 3 ? "done" : index === 0 ? "all" : "attention", {
                 ...defaultFilters,
                 period: index === 1 ? "today" : index === 2 ? "overdue" : "",
-              });
-            }}
+              })
+            }
           >
             <div>
               <span>{stat.label}</span>
@@ -497,9 +509,18 @@ export function MyTasksView() {
       </div>
       <div className="dashboard-columns">
         <div className="dashboard-primary">
-          <section className="panel tasks-panel">
+          <section
+            className="panel tasks-panel"
+            id="my-tasks-list"
+            aria-labelledby="my-tasks-heading"
+          >
             <div className="panel-heading">
-              <h2>
+              <h2
+                id="my-tasks-heading"
+                ref={taskHeading}
+                tabIndex={-1}
+                className="task-list-heading"
+              >
                 Задачи <span className="count-pill">{active.length}</span>
               </h2>
               <span className="timezone">
