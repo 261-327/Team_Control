@@ -87,6 +87,12 @@ export interface DataClient {
   ): Promise<void>;
   deleteMaterial(id: string): Promise<void>;
   createColumn(projectId: string, name: string, limit: number): Promise<void>;
+  uploadMaterialFile(
+    projectId: string,
+    input: { title: string; description: string; file: File },
+    onProgress: (percent: number) => void,
+    signal?: AbortSignal,
+  ): Promise<void>;
   updateColumn(projectId: string, id: Status, name: string, limit: number): Promise<void>;
   assistantHistory(projectId?: string): Promise<AssistantHistory>;
   clearAssistantHistory(projectId?: string): Promise<void>;

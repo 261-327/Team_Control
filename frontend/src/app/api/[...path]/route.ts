@@ -42,7 +42,11 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
     const upstream = await fetch(url, {
       method: request.method,
       headers,
-      body: ["GET", "HEAD"].includes(request.method) ? undefined : await request.text(),
+      body: ["GET", "HEAD"].includes(request.method)
+        ? undefined
+        : request.headers.get("content-type")?.startsWith("multipart/form-data")
+          ? await request.arrayBuffer()
+          : await request.text(),
       cache: "no-store",
       redirect: "manual",
       signal: AbortSignal.timeout(inference ? 280000 : 90000),
@@ -54,6 +58,8 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
     });
     for (const cookie of upstream.headers.getSetCookie())
       responseHeaders.append("Set-Cookie", cookie);
+    for (const name of ["Content-Disposition", "Content-Length", "X-Content-Type-Options"])
+      if (upstream.headers.has(name)) responseHeaders.set(name, upstream.headers.get(name)!);
     return new Response(request.method === "HEAD" ? null : await upstream.arrayBuffer(), {
       status: upstream.status,
       headers: responseHeaders,

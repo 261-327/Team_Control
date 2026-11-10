@@ -9051,3 +9051,36 @@ button.stat-card:hover {
     margin-left: 0;
   }
 }
+
+
+.file-upload-progress {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+}
+.file-upload-progress__label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.file-upload-progress progress {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--green);
+}
+.material-link span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 560px) {
+  .section-heading > .button-wrap {
+    width: 100%;
+  }
+  .section-heading > .button-wrap .btn {
+    flex: 1;
+  }
+}

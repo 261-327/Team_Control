@@ -1,4 +1,6 @@
-from django.db import models
+from django.db import models, transaction
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db.models.functions import Lower, Trim
@@ -302,12 +304,28 @@ class Comment(models.Model):
 
 
 class Material(models.Model):
+    KIND_CHOICES = [("link", "Ссылка"), ("file", "Файл")]
+
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="materials")
     title = models.CharField(max_length=255)
     description = models.TextField(max_length=2000, blank=True)
-    url = models.URLField(max_length=2000)
+    kind = models.CharField(max_length=8, choices=KIND_CHOICES, default="link")
+    # Private MEDIA_ROOT storage; this directory is never exposed as a public URL.
+    url = models.URLField(max_length=2000, blank=True)
+    file = models.FileField(upload_to="project-materials/%Y/%m/", blank=True)
+    original_filename = models.CharField(max_length=255, blank=True)
+    file_size = models.PositiveBigIntegerField(default=0)
+    content_type = models.CharField(max_length=100, blank=True)
     created_by = models.ForeignKey(WorkspaceUser, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+@receiver(pre_delete, sender=Material)
+def remove_material_file(sender, instance, **kwargs):
+    """Delete private file bytes after the row (or a cascading project delete) commits."""
+    if instance.kind == "file" and instance.file:
+        storage, name = instance.file.storage, instance.file.name
+        transaction.on_commit(lambda: storage.delete(name))
 
 
 class Invitation(models.Model):

@@ -257,6 +257,10 @@ def snapshot(request):
                 "title": m.title,
                 "description": m.description,
                 "url": m.url,
+                "kind": m.kind,
+                "fileName": m.original_filename,
+                "fileSize": m.file_size,
+                "contentType": m.content_type,
                 "createdBy": str(m.created_by_id or ""),
                 "createdAt": stamp(m.created_at),
             }

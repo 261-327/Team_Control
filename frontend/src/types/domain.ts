@@ -64,6 +64,10 @@ export type Material = {
   title: string;
   description: string;
   url: string;
+  kind?: "link" | "file";
+  fileName?: string;
+  fileSize?: number;
+  contentType?: string;
   createdBy: string;
   createdAt: string;
 };
