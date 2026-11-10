@@ -16,6 +16,7 @@ const AssistantPanel = dynamic(() =>
 );
 import type { Task } from "@/types/domain";
 import { urgency } from "@/lib/format";
+import { release } from "@/lib/release";
 
 import { NotificationsBell } from "./NotificationsBell";
 
@@ -238,9 +239,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {!data.projects.length && <p className="sidebar-empty">Здесь появятся твои проекты</p>}
           </nav>
           <div className="sidebar-bottom">
-            <button className="nav-item" onClick={() => setHelp(true)}>
+            <button
+              className="nav-item"
+              onClick={() => {
+                closeNav();
+                setHelp(true);
+              }}
+            >
               <Icon name="help" size={19} />
-              <span>Помощь и о проекте</span>
+              <span className="sidebar-help-text">
+                <span>Помощь и о проекте</span>
+                <small>
+                  v{release.version}
+                  {release.shortRevision && ` · ${release.shortRevision}`}
+                </small>
+              </span>
               <Icon name="upRight" size={14} />
             </button>
             <Link href="/profile" className="sidebar-profile" onClick={closeNav}>
@@ -436,9 +449,49 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           <div className="help-content">
             <Logo />
-            <p>
-              Сипи помогает вести задачи проекта, работать с командой и хранить ссылки на материалы.
-            </p>
+            <section className="site-release" aria-labelledby="site-release-heading">
+              <h3 id="site-release-heading">Сипи {release.version}</h3>
+              <p className="site-release-meta">
+                {release.environment}
+                {release.shortRevision && (
+                  <>
+                    {" "}
+                    · Сборка <code>{release.shortRevision}</code>
+                  </>
+                )}
+              </p>
+              {release.builtAt && (
+                <p className="site-release-meta">
+                  Собрана{" "}
+                  <time dateTime={release.builtAt}>
+                    {new Intl.DateTimeFormat("ru-RU", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      timeZone: "Europe/Moscow",
+                    }).format(new Date(release.builtAt))}{" "}
+                    МСК
+                  </time>
+                </p>
+              )}
+              <h4>Последние изменения</h4>
+              <ul>
+                {release.changes.map((change) => (
+                  <li key={change}>{change}</li>
+                ))}
+              </ul>
+              <p className="site-release-meta">
+                Если сообщаешь об ошибке, укажи версию и номер сборки.
+              </p>
+              {release.commitUrl && (
+                <a href={release.commitUrl} target="_blank" rel="noreferrer">
+                  Эта сборка в GitHub
+                </a>
+              )}
+            </section>
+            <p>Сипи помогает вести задачи проекта, работать с командой и хранить материалы.</p>
             <div>
               <Icon name="tasks" />
               <span>
@@ -457,7 +510,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Icon name="sparkles" />
               <span>
                 <strong>Помощник</strong>
-                <p>Здесь можно посмотреть ближайшие сроки. ИИ-агент будет подключён позже.</p>
+                <p>Создавай проекты и задачи по описанию, задавай вопросы и прикрепляй файлы.</p>
               </span>
             </div>
             <p className="field-hint">

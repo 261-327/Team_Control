@@ -6,6 +6,7 @@ import { useData } from "@/providers/DataProvider";
 import { client } from "@/services/client";
 import { Button, Field, FormError, LoadingState, Logo, useAction } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
+import { release } from "@/lib/release";
 import type { AuthChallenge, Snapshot } from "@/types/domain";
 function safeNext(value: string | null) {
   return value &&
@@ -306,6 +307,10 @@ function LoginForm({ register, data }: { register: boolean; data: Snapshot }) {
         <footer className="auth-footer">
           <Icon name="lock" size={13} />
           Вход с подтверждением по почте
+          <span className="auth-site-version">
+            Сипи {release.version}
+            {release.shortRevision && ` · ${release.shortRevision}`}
+          </span>
         </footer>
       </main>
     </div>
