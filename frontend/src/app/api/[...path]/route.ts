@@ -39,14 +39,18 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
   if (clientIP) headers.set("x-sipi-client-ip", clientIP);
   const inference = path.length === 1 && path[0] === "assistant" && request.method === "POST";
   try {
+    const body = ["GET", "HEAD"].includes(request.method)
+      ? undefined
+      : await readRequestBody(request);
+    if (body === null)
+      return Response.json(
+        { error: { code: "file_too_large", message: "Размер файла должен быть до 3 МБ." } },
+        { status: 413 },
+      );
     const upstream = await fetch(url, {
       method: request.method,
       headers,
-      body: ["GET", "HEAD"].includes(request.method)
-        ? undefined
-        : request.headers.get("content-type")?.startsWith("multipart/form-data")
-          ? await request.arrayBuffer()
-          : await request.text(),
+      body,
       cache: "no-store",
       redirect: "manual",
       signal: AbortSignal.timeout(inference ? 280000 : 90000),
@@ -58,7 +62,7 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
     });
     for (const cookie of upstream.headers.getSetCookie())
       responseHeaders.append("Set-Cookie", cookie);
-    for (const name of ["Content-Disposition", "Content-Length", "X-Content-Type-Options"])
+    for (const name of ["Content-Disposition", "X-Content-Type-Options"])
       if (upstream.headers.has(name)) responseHeaders.set(name, upstream.headers.get(name)!);
     return new Response(request.method === "HEAD" ? null : await upstream.arrayBuffer(), {
       status: upstream.status,
@@ -84,3 +88,29 @@ export {
   proxy as PUT,
   proxy as HEAD,
 };
+
+async function readRequestBody(request: Request): Promise<ArrayBuffer | null> {
+  const limit = 4 * 1024 * 1024;
+  if (Number(request.headers.get("content-length")) > limit) return null;
+  if (!request.body) return new ArrayBuffer(0);
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const buffer = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    buffer.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return buffer.buffer;
+}

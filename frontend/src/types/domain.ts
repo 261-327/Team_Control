@@ -65,6 +65,7 @@ export type Material = {
   description: string;
   url: string;
   kind?: "link" | "file";
+  taskId?: string;
   fileName?: string;
   fileSize?: number;
   contentType?: string;
@@ -122,7 +123,15 @@ export type AssistantReply = {
   sources?: { title: string; href: string }[];
   imageUrl?: string;
 };
+export type AssistantAttachment = {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  contentType: string;
+  url: string;
+};
 export type AssistantTurn = {
+  attachments?: AssistantAttachment[];
   id: string;
   message: string;
   mode: AssistantMode;
@@ -133,8 +142,16 @@ export type AssistantTurn = {
   confirmedAt: string;
 };
 export type AssistantHistory = {
+  pendingAttachments?: AssistantAttachment[];
   turns: AssistantTurn[];
-  capabilities: { model: string; chatReady: boolean; imagesReady: boolean; local: boolean };
+  capabilities: {
+    model: string;
+    chatReady: boolean;
+    imagesReady: boolean;
+    local: boolean;
+    attachmentsReady?: boolean;
+    visionReady?: boolean;
+  };
 };
 
 export type NotificationItem = {

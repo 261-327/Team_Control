@@ -21,6 +21,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { dateLabel } from "@/lib/format";
+import { TaskAttachments } from "./TaskAttachments";
 import { Deadline, StatusBadge } from "./TaskViews";
 
 export function TaskDetailView() {
@@ -216,6 +217,7 @@ export function TaskDetailView() {
               )}
             </section>
           )}
+          <TaskAttachments projectId={projectId} taskId={taskId} />
           <section className="panel discussion-panel">
             <div className="tabs">
               <button

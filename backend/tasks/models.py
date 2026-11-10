@@ -310,9 +310,11 @@ class Material(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField(max_length=2000, blank=True)
     kind = models.CharField(max_length=8, choices=KIND_CHOICES, default="link")
+    task = models.ForeignKey(Task, null=True, blank=True, on_delete=models.CASCADE, related_name="attachments")
     # Private MEDIA_ROOT storage; this directory is never exposed as a public URL.
     url = models.URLField(max_length=2000, blank=True)
     file = models.FileField(upload_to="project-materials/%Y/%m/", blank=True)
+    upload_request_id = models.UUIDField(null=True, blank=True, unique=True)
     original_filename = models.CharField(max_length=255, blank=True)
     file_size = models.PositiveBigIntegerField(default=0)
     content_type = models.CharField(max_length=100, blank=True)
@@ -324,8 +326,7 @@ class Material(models.Model):
 def remove_material_file(sender, instance, **kwargs):
     """Delete private file bytes after the row (or a cascading project delete) commits."""
     if instance.kind == "file" and instance.file:
-        storage, name = instance.file.storage, instance.file.name
-        transaction.on_commit(lambda: storage.delete(name))
+        delete_private_file(instance)
 
 
 class Invitation(models.Model):
@@ -405,6 +406,7 @@ class AssistantTurn(models.Model):
     started_at = models.DateTimeField(null=True)
     finished_at = models.DateTimeField(null=True)
     confirmed_at = models.DateTimeField(null=True)
+    files = models.ManyToManyField("AssistantAttachment", related_name="turns", blank=True)
 
     class Meta:
         ordering = ["created_at", "id"]
@@ -438,3 +440,36 @@ class CommentNotification(models.Model):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["comment", "user"], name="unique_comment_notification")]
+
+
+class FileBlob(models.Model):
+    key = models.CharField(max_length=255, primary_key=True)
+    data = models.BinaryField(editable=False)
+    size = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class AssistantAttachment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    thread = models.ForeignKey(AssistantThread, on_delete=models.CASCADE, related_name="attachments")
+    file = models.FileField(upload_to="assistant-attachments/%Y/%m/")
+    original_filename = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=100)
+    file_size = models.PositiveIntegerField()
+    extracted_text = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+@receiver(pre_delete, sender=AssistantAttachment)
+def remove_assistant_attachment_file(sender, instance, **kwargs):
+    delete_private_file(instance)
+
+
+def delete_private_file(instance):
+    from .file_storage import DatabaseFileStorage
+
+    storage, name = instance.file.storage, instance.file.name
+    if isinstance(storage, DatabaseFileStorage):
+        storage.delete(name)
+    else:
+        transaction.on_commit(lambda: storage.delete(name))

@@ -18,13 +18,13 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sessions.models import Session
 from django.core.paginator import Paginator, EmptyPage
-from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError
 from django.core.mail import get_connection, send_mail
 from django.core.validators import URLValidator, validate_email
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.http import FileResponse, Http404, HttpResponse, JsonResponse
+from django.http import Http404, JsonResponse
+from django.http.response import HttpResponseBase
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
@@ -60,6 +60,7 @@ from .serializers import (
     status_key,
     task_json,
 )
+from .file_uploads import FileUploadError, MAX_FILE_BYTES, download_file, validate_file, upload_request_id
 from .workflow import STATUSES
 
 
@@ -81,7 +82,7 @@ def csrf_failure(request, reason=""):
     return default_csrf_failure(request, reason=reason)
 
 
-def endpoint(methods=("GET",), public=False):
+def endpoint(methods=("GET",), public=False, multipart=False):
     def decorate(fn):
         @never_cache
         @wraps(fn)
@@ -94,7 +95,11 @@ def endpoint(methods=("GET",), public=False):
                 return error("Войдите в аккаунт.", "unauthenticated", 401)
             try:
                 body = {}
-                if request.method in ("POST", "PATCH", "PUT"):
+                if request.method in ("POST", "PATCH", "PUT") and multipart:
+                    if not (request.content_type or "").startswith("multipart/form-data"):
+                        raise APIError("Отправьте файл через форму загрузки.")
+                    body = request.POST.dict()
+                elif request.method in ("POST", "PATCH", "PUT"):
                     if request.content_type != "application/json":
                         raise APIError("Отправьте данные в формате JSON.")
                     try:
@@ -105,9 +110,11 @@ def endpoint(methods=("GET",), public=False):
                         raise APIError("Ожидается объект JSON.")
                 request.data = body
                 result = fn(request, *args, **kwargs)
-                return result if isinstance(result, HttpResponse) else JsonResponse(result or {})
+                return result if isinstance(result, HttpResponseBase) else JsonResponse(result or {})
             except APIError as exc:
                 return error(exc.message, exc.code, exc.status)
+            except FileUploadError as exc:
+                return error(str(exc), exc.code, exc.status)
             except RateLimitUnavailable:
                 return error("Сервис входа временно недоступен. Попробуйте позже.", "unavailable", 503)
             except Http404:
@@ -1465,8 +1472,11 @@ def materials(request, project_id):
 def material_detail(request, material_id):
     with transaction.atomic():
         m = get_object_or_404(Material, pk=material_id)
-        project_for(request.user, m.project_id, manage=True, lock=True)
+        project = project_for(request.user, m.project_id, lock=True)
         m = get_object_or_404(Material, pk=material_id)
+        own_task_file = m.kind == "file" and m.task_id and m.created_by_id == request.user.pk
+        if not can_manage(request.user, project) and not (request.method == "DELETE" and own_task_file):
+            raise APIError("Удалить файл может его автор или руководитель проекта.", "forbidden", 403)
         if request.method == "DELETE":
             m.delete()  # pre_delete signal removes private bytes after the transaction commits.
         else:
@@ -1482,138 +1492,54 @@ def material_detail(request, material_id):
 
 
 
-MAX_PROJECT_FILE_SIZE = 10 * 1024 * 1024
-PROJECT_FILE_SIGNATURES = {
-    ".pdf": ("application/pdf", lambda data: data.startswith(b"%PDF-")),
-    ".png": ("image/png", lambda data: data.startswith(b"\x89PNG\r\n\x1a\n")),
-    ".jpg": ("image/jpeg", lambda data: data.startswith(b"\xff\xd8\xff")),
-    ".jpeg": ("image/jpeg", lambda data: data.startswith(b"\xff\xd8\xff")),
-}
+MAX_PROJECT_FILE_SIZE = MAX_FILE_BYTES
 
 
-@never_cache
+@endpoint(("POST",), multipart=True)
 def material_file_upload(request, project_id):
-    """Save an allow-listed file into private storage after checking its signature."""
     if not settings.PROJECT_FILE_UPLOADS_ENABLED:
-        return error(
-            "Загрузка файлов пока отключена: постоянное хранилище не настроено.",
-            "storage_unavailable",
-            503,
-        )
-    if request.method != "POST":
-        response = error("Метод не поддерживается.", "method_not_allowed", 405)
-        response["Allow"] = "POST"
-        return response
-    if not request.user.is_authenticated:
-        return error("Войдите в аккаунт.", "unauthenticated", 401)
-    if not (request.content_type or "").startswith("multipart/form-data"):
-        return error("Отправьте файл через форму загрузки.", "validation", 400)
-
-    uploaded = request.FILES.get("file")
-    if uploaded is None:
-        return error("Выберите файл для загрузки.", "validation", 400)
-    if uploaded.size <= 0:
-        return error("Пустые файлы загружать нельзя.", "validation", 400)
-    if uploaded.size > MAX_PROJECT_FILE_SIZE:
-        return error("Размер файла не должен превышать 10 МБ.", "file_too_large", 413)
-
-    safe_input_name = uploaded.name.replace("\\", "/").rsplit("/", 1)[-1]
-    extension = os.path.splitext(safe_input_name)[1].lower()
-    signature = PROJECT_FILE_SIGNATURES.get(extension)
-    if signature is None:
-        return error("Разрешены только PDF, PNG и JPEG.", "unsupported_file_type", 415)
-    content_type, matches = signature
-    sample = uploaded.read(16)
-    uploaded.seek(0)
-    if not matches(sample):
-        return error("Содержимое файла не соответствует разрешённому формату.", "invalid_file", 415)
-
-    original_name = "".join(char for char in safe_input_name if ord(char) >= 32 and ord(char) != 127)
-    original_name = original_name[:255] or "file" + extension
-    title = request.POST.get("title", "").strip()[:255] or original_name
-    description = request.POST.get("description", "").strip()
-    if len(description) > 2000:
-        return error("Описание не должно превышать 2000 символов.", "validation", 400)
-
+        raise APIError("Постоянное хранилище файлов ещё не настроено.", "storage_unavailable", 503)
     material = None
     try:
         with transaction.atomic():
-            project = project_for(request.user, project_id, manage=True, lock=True)
+            task_id = request.data.get("taskId")
+            project = project_for(request.user, project_id, manage=not bool(task_id), lock=True)
+            task = get_object_or_404(Task, pk=identifier(task_id), column__board__project=project) if task_id else None
+            if not consume("file-upload", (str(request.user.pk),), 40, 3600):
+                raise APIError("Слишком много загрузок. Попробуй позже.", "rate_limit", 429)
+            request_id = upload_request_id(request.data)
+            existing = Material.objects.filter(upload_request_id=request_id).first()
+            if existing:
+                if existing.project_id != project.pk or existing.created_by_id != request.user.pk or existing.task_id != (task.pk if task else None):
+                    raise Http404
+                return {"snapshot": snapshot(request)}
+            uploaded = validate_file(request.FILES.get("file"))
             material = Material(
-                project=project,
-                created_by=request.user,
-                title=title,
-                description=description,
-                kind="file",
-                original_filename=original_name,
-                file_size=uploaded.size,
-                content_type=content_type,
-                url="",
+                upload_request_id=request_id,
+                project=project, task=task, created_by=request.user,
+                title=text(request.data, "title", 255) or uploaded.name,
+                description=text(request.data, "description", 2000), kind="file",
+                original_filename=uploaded.name, file_size=len(uploaded.data), content_type=uploaded.content_type,
             )
-            # The storage key is random and never derived from the supplied filename.
-            material.file.save(
-                uuid.uuid4().hex + extension,
-                ContentFile(uploaded.read()),
-                save=False,
-            )
+            material.file.save(uuid.uuid4().hex + os.path.splitext(uploaded.name)[1].lower(), uploaded.content(), save=False)
             material.save()
-    except APIError as exc:
-        if material and material.file:
-            material.file.delete(save=False)
-        return error(exc.message, exc.code, exc.status)
-    except Http404:
-        if material and material.file:
-            material.file.delete(save=False)
-        return error("Проект не найден или недоступен.", "not_found", 404)
     except Exception:
-        if material and material.file:
+        if material and material.file and material.file._committed:
             material.file.delete(save=False)
-        logger.exception("Project material upload failed")
-        return error(
-            "Не удалось сохранить файл. Проверьте свободное место и попробуйте снова.",
-            "storage_error",
-            507,
-        )
-
-    return JsonResponse({"snapshot": snapshot(request)})
+        raise
+    return {"snapshot": snapshot(request)}
 
 
-@never_cache
+@endpoint(("GET",))
 def material_file_download(request, material_id):
     if not settings.PROJECT_FILE_UPLOADS_ENABLED:
-        return error(
-            "Скачивание файлов временно недоступно: постоянное хранилище не настроено.",
-            "storage_unavailable",
-            503,
-        )
-    if request.method != "GET":
-        response = error("Метод не поддерживается.", "method_not_allowed", 405)
-        response["Allow"] = "GET"
-        return response
-    if not request.user.is_authenticated:
-        return error("Войдите в аккаунт.", "unauthenticated", 401)
+        raise APIError("Постоянное хранилище файлов ещё не настроено.", "storage_unavailable", 503)
+    material = get_object_or_404(Material, pk=material_id, kind="file")
+    project_for(request.user, material.project_id)
     try:
-        material = get_object_or_404(Material, pk=material_id, kind="file")
-        project_for(request.user, material.project_id)
-        if not material.file:
-            raise Http404
-        stored = material.file.open("rb")
-    except APIError as exc:
-        return error(exc.message, exc.code, exc.status)
-    except (Http404, OSError, ValueError):
-        return error("Файл не найден или доступ к проекту отозван.", "not_found", 404)
-
-    # FileResponse streams the private file; it does not buffer up to 10 MiB in RAM.
-    # Django builds a safe RFC 6266 Content-Disposition header for Unicode filenames.
-    response = FileResponse(
-        stored,
-        as_attachment=True,
-        filename=material.original_filename or "download",
-        content_type="application/octet-stream",
-    )
-    response["X-Content-Type-Options"] = "nosniff"
-    response["Cache-Control"] = "private, no-store"
-    return response
+        return download_file(material.file, material.original_filename)
+    except (OSError, ValueError):
+        raise Http404 from None
 
 
 @endpoint(("POST",))

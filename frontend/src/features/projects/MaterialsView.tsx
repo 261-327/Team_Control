@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useReadyData } from "@/providers/DataProvider";
 import { useUi } from "@/providers/UiContext";
 import { client } from "@/services/client";
@@ -17,6 +17,8 @@ import {
   useAction,
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
+import { MaterialFileUploadForm } from "./MaterialFileUploadForm";
+import { formatFileSize } from "@/lib/attachments";
 import type { Material } from "@/types/domain";
 
 export function MaterialsView() {
@@ -139,15 +141,12 @@ export function MaterialsView() {
       <div className="info-callout">
         <Icon name="lock" size={22} />
         <p>
-          Файлы доступны только действующим участникам проекта. Разрешены PDF, PNG и JPEG до 10 МБ;
-          скачивание проверяет доступ на сервере.
+          Файлы доступны только действующим участникам проекта. Поддерживаются PDF, DOCX, TXT, MD,
+          CSV, PNG и JPEG до 3 МБ; скачивание проверяет доступ на сервере.
         </p>
       </div>
       {uploadOpen && (
-        <MaterialFileUploadForm
-          projectId={projectId}
-          onClose={() => setUploadOpen(false)}
-        />
+        <MaterialFileUploadForm projectId={projectId} onClose={() => setUploadOpen(false)} />
       )}
       {form && (
         <MaterialForm
@@ -160,9 +159,11 @@ export function MaterialsView() {
       {remove && (
         <ConfirmDialog
           title="Убрать материал из проекта?"
-          description={remove.kind === "file"
-            ? `Файл «${remove.fileName || remove.title}» и его запись будут удалены из проекта.`
-            : `Ссылка «${remove.title}» исчезнет из этого списка. Сам документ останется во внешнем сервисе.`}
+          description={
+            remove.kind === "file"
+              ? `Файл «${remove.fileName || remove.title}» и его запись будут удалены из проекта.`
+              : `Ссылка «${remove.title}» исчезнет из этого списка. Сам документ останется во внешнем сервисе.`
+          }
           onClose={() => setRemove(null)}
           onConfirm={async () => {
             await client.deleteMaterial(remove.id);
@@ -240,139 +241,6 @@ function MaterialForm({
             Отмена
           </Button>
           <Button loading={action.busy}>{material ? "Сохранить" : "Добавить материал"}</Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
-
-function formatFileSize(size: number) {
-  if (size < 1024) return `${size} Б`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(0)} КБ`;
-  return `${(size / (1024 * 1024)).toFixed(1)} МБ`;
-}
-
-function MaterialFileUploadForm({
-  projectId,
-  onClose,
-}: {
-  projectId: string;
-  onClose: () => void;
-}) {
-  const ui = useUi();
-  const [file, setFile] = useState<File | null>(null);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [progress, setProgress] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const controller = useRef<AbortController | null>(null);
-
-  const close = () => {
-    if (busy) controller.current?.abort();
-    onClose();
-  };
-
-  return (
-    <Modal
-      title="Загрузить файл"
-      description="PDF, PNG или JPEG. Максимальный размер — 10 МБ."
-      onClose={close}
-      busy={busy}
-    >
-      <form
-        onSubmit={async (event) => {
-          event.preventDefault();
-          if (!file || busy) return;
-          const ext = file.name.split(".").pop()?.toLowerCase();
-          if (!["pdf", "png", "jpg", "jpeg"].includes(ext || "")) {
-            setError("Выберите файл PDF, PNG или JPEG.");
-            return;
-          }
-          if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
-            setError("Файл должен быть больше 0 и не превышать 10 МБ.");
-            return;
-          }
-          setBusy(true);
-          setError("");
-          setProgress(0);
-          controller.current = new AbortController();
-          try {
-            await client.uploadMaterialFile(
-              projectId,
-              { title: title.trim() || file.name, description, file },
-              setProgress,
-              controller.current.signal,
-            );
-            ui.notify("Файл добавлен в материалы проекта");
-            onClose();
-          } catch (cause) {
-            if (!(cause instanceof DOMException && cause.name === "AbortError")) {
-              setError(cause instanceof Error ? cause.message : "Не удалось загрузить файл.");
-            }
-          } finally {
-            setBusy(false);
-            controller.current = null;
-          }
-        }}
-      >
-        <Field label="Файл" hint="PDF, PNG, JPG или JPEG; до 10 МБ" required>
-          <input
-            type="file"
-            accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
-            required
-            disabled={busy}
-            onChange={(event) => {
-              const selected = event.target.files?.[0] || null;
-              setFile(selected);
-              if (selected && !title) setTitle(selected.name);
-              setError("");
-            }}
-          />
-        </Field>
-        <Field label="Название материала">
-          <input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            maxLength={255}
-            placeholder="Например, техническое задание"
-            disabled={busy}
-          />
-        </Field>
-        <Field label="Описание">
-          <textarea
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            maxLength={2000}
-            rows={3}
-            placeholder="Кратко о содержимом файла"
-            disabled={busy}
-          />
-        </Field>
-        {busy && (
-          <div className="file-upload-progress" aria-live="polite">
-            <div className="file-upload-progress__label">
-              <span>Загрузка файла</span>
-              <strong>{progress}%</strong>
-            </div>
-            <progress value={progress} max={100} aria-label="Прогресс загрузки файла" />
-          </div>
-        )}
-        <FormError error={error} />
-        <div className="form-actions">
-          {busy ? (
-            <Button type="button" variant="secondary" onClick={() => controller.current?.abort()}>
-              Отменить загрузку
-            </Button>
-          ) : (
-            <Button type="button" variant="secondary" onClick={close}>
-              Отмена
-            </Button>
-          )}
-          <Button loading={busy} disabled={!file || busy}>
-            Загрузить
-          </Button>
         </div>
       </form>
     </Modal>

@@ -258,6 +258,7 @@ def snapshot(request):
                 "description": m.description,
                 "url": m.url,
                 "kind": m.kind,
+                "taskId": str(m.task_id) if m.task_id else "",
                 "fileName": m.original_filename,
                 "fileSize": m.file_size,
                 "contentType": m.content_type,

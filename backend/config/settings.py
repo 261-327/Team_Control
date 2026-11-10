@@ -159,14 +159,16 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", str(BASE_DIR / "media"))).resolve()
 DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024
-PROJECT_MEDIA_STORAGE = os.environ.get("PROJECT_MEDIA_STORAGE", "filesystem").strip().lower()
-if PROJECT_MEDIA_STORAGE not in {"filesystem", "s3"}:
-    raise RuntimeError("PROJECT_MEDIA_STORAGE must be filesystem or s3")
+PROJECT_MEDIA_STORAGE = os.environ.get(
+    "PROJECT_MEDIA_STORAGE", "database" if SIPI_VERCEL_SERVICES else "filesystem"
+).strip().lower()
+PROJECT_FILES_TOTAL_BYTES = 100 * 1024 * 1024
+if PROJECT_MEDIA_STORAGE not in {"filesystem", "database", "s3"}:
+    raise RuntimeError("PROJECT_MEDIA_STORAGE must be filesystem, database or s3")
 
-# Serverless functions have an ephemeral/read-only filesystem. Keep file uploads
-# disabled there until a private persistent object store is explicitly configured.
+# Serverless uploads require persistent database or private object storage.
 PROJECT_FILE_UPLOADS_ENABLED = (
-    not SIPI_VERCEL_SERVICES or PROJECT_MEDIA_STORAGE == "s3"
+    not SIPI_VERCEL_SERVICES or PROJECT_MEDIA_STORAGE in {"database", "s3"}
 )
 
 if PROJECT_MEDIA_STORAGE == "s3":
@@ -208,6 +210,8 @@ if PROJECT_MEDIA_STORAGE == "s3":
             "object_parameters": {"CacheControl": "private, no-store"},
         },
     }
+elif PROJECT_MEDIA_STORAGE == "database":
+    _default_file_storage = {"BACKEND": "tasks.file_storage.DatabaseFileStorage"}
 else:
     _default_file_storage = {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
