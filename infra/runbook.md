@@ -72,19 +72,11 @@ docker compose --env-file .env.server -f compose.server.yaml -f compose.server-d
 ~~~sh
 df -h
 docker system df
-df -h /mnt/team-control-backups/postgres
 ~~~
 
-2. Проверь, что отдельное backup-хранилище действительно подключено:
+Резервная копия PostgreSQL отправляется напрямую в Cloudflare R2, полный архив на локальном диске приложения не создаётся. Проверь использование bucket и наличие свежих объектов в приватном R2 через Cloudflare Dashboard или rclone с отдельным bucket-scoped ключом.
 
-~~~sh
-mountpoint -q /mnt/team-control-backups/postgres
-findmnt /mnt/team-control-backups/postgres
-~~~
-
-3. Если mount отсутствует, останови запуск резервирования и восстанови подключение. backup.sh по умолчанию откажется писать на локальный диск сервера.
-
-Не запускай docker system prune --volumes, docker volume prune и не удаляй PostgreSQL/media volumes. Не удаляй последнюю успешную резервную копию. Старые архивы можно удалять только после проверки новой копии и доступности отдельного хранилища.
+Не запускай docker system prune --volumes, docker volume prune и не удаляй PostgreSQL/media volumes. Не удаляй последнюю успешную резервную копию. Старые архивы автоматически удаляются только после успешной загрузки и проверки новой копии.
 
 ## 4. Резервная копия не создалась
 
