@@ -96,14 +96,15 @@ sudo journalctl -u team-control-backup.service -n 100 --no-pager
 sudo systemctl list-timers team-control-backup.timer
 ~~~
 
-2. Проверь наличие mount, права на каталог, свободное место и доступность PostgreSQL:
+2. Проверь версию rclone и PostgreSQL:
 
 ~~~sh
-mountpoint -q /mnt/team-control-backups/postgres
-df -h /mnt/team-control-backups/postgres
+rclone version
 pg_dump --version
 psql -X -w -qAt -d postgres -c 'SHOW server_version'
 ~~~
+
+Если BACKUP_DB_MODE=docker, команды PostgreSQL проверяй через Docker Compose, как описано в backup.md. Проверь Account ID, bucket, bucket-scoped API key, разрешения Object Read & Write и сетевой доступ к R2. Не выводи и не копируй Secret Access Key в логи или issue.
 
 3. Исправь первопричину и запусти сервис вручную:
 
@@ -112,7 +113,7 @@ sudo systemctl start team-control-backup.service
 sudo systemctl status team-control-backup.service --no-pager
 ~~~
 
-4. Убедись, что новая копия и её SHA-256 появились на отдельном хранилище, затем проверь их командами из backup.md.
+4. Убедись, что в приватном R2 bucket появились три объекта: .dump, .dump.sha256 и .dump.meta. Проверь checksum и пробное восстановление командами из backup.md.
 
 Не отмечай запуск успешным по одному наличию файла. Не удаляй старые копии, если новый архив не прошёл проверку.
 
