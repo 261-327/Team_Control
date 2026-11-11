@@ -58,14 +58,14 @@ else
 fi
 ~~~
 
-2. Если используется база из compose.server-db.yaml, проверь её состояние и последние сообщения:
+3. Если используется база из compose.server-db.yaml, проверь её состояние и последние сообщения:
 
 ~~~sh
 docker compose --env-file .env.server -f compose.server.yaml -f compose.server-db.yaml ps db
 docker compose --env-file .env.server -f compose.server.yaml -f compose.server-db.yaml logs --tail=100 db
 ~~~
 
-3. Проверь адрес, порт, имя БД, права пользователя и доступность сетевого маршрута. Не печатай .env.server целиком и не отправляй пароль в чат или issue.
+4. Проверь адрес, порт, имя БД, права пользователя и доступность сетевого маршрута. Не печатай .env.server целиком и не отправляй пароль в чат или issue.
 
 Не запускай миграции вручную, flush, удаление volume или восстановление поверх рабочей базы без отдельного согласованного плана.
 
