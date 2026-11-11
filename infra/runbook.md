@@ -40,18 +40,22 @@ docker compose --env-file .env.server -f compose.server.yaml restart backend
 
 ## 2. PostgreSQL недоступен
 
-1. Проверь сетевое подключение к базе:
-
-~~~sh
-PGPASSWORD="$DB_PASSWORD" pg_isready -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -U "$DB_USER"
-~~~
-
-Для этой команды перед запуском в защищённой shell-сессии должны быть загружены переменные из .env.server:
+1. Загрузи переменные в защищённой shell-сессии, не выводя их на экран:
 
 ~~~sh
 set -a
 . ./.env.server
 set +a
+~~~
+
+2. Проверь PostgreSQL в зависимости от режима:
+
+~~~sh
+if [ "$BACKUP_DB_MODE" = "docker" ]; then
+  docker compose --env-file .env.server -f compose.server.yaml -f compose.server-db.yaml exec -T db pg_isready -U "$DB_USER" -d "$DB_NAME"
+else
+  PGPASSWORD="$DB_PASSWORD" pg_isready -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -U "$DB_USER"
+fi
 ~~~
 
 2. Если используется база из compose.server-db.yaml, проверь её состояние и последние сообщения:
@@ -91,12 +95,20 @@ sudo systemctl list-timers team-control-backup.timer
 2. Проверь версию rclone и PostgreSQL:
 
 ~~~sh
+set -a
+. ./.env.server
+set +a
 rclone version
-pg_dump --version
-psql -X -w -qAt -d postgres -c 'SHOW server_version'
+if [ "$BACKUP_DB_MODE" = "docker" ]; then
+  docker compose --env-file .env.server -f compose.server.yaml -f compose.server-db.yaml exec -T db pg_dump --version
+  docker compose --env-file .env.server -f compose.server.yaml -f compose.server-db.yaml exec -T db psql -X -w -qAt -U "$DB_USER" -d postgres -c 'SHOW server_version'
+else
+  pg_dump --version
+  psql -X -w -qAt -d postgres -c 'SHOW server_version'
+fi
 ~~~
 
-Если BACKUP_DB_MODE=docker, команды PostgreSQL проверяй через Docker Compose, как описано в backup.md. Проверь Account ID, bucket, bucket-scoped API key, разрешения Object Read & Write и сетевой доступ к R2. Не выводи и не копируй Secret Access Key в логи или issue.
+Проверь Account ID, bucket, bucket-scoped API key, разрешения Object Read & Write и сетевой доступ к R2. Не выводи и не копируй Secret Access Key в логи или issue.
 
 3. Исправь первопричину и запусти сервис вручную:
 
