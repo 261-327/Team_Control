@@ -40,11 +40,13 @@ set +a
 BACKUP_DB_MODE="${BACKUP_DB_MODE:-host}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 R2_PREFIX="${R2_PREFIX:-team-control/postgres}"
+R2_ENDPOINT="${R2_ENDPOINT:-https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com}"
 DB_PORT="${DB_PORT:-5432}"
 
 [[ "$BACKUP_DB_MODE" == "host" || "$BACKUP_DB_MODE" == "docker" ]] || fail "BACKUP_DB_MODE должен быть host или docker."
 [[ "$DB_NAME" =~ ^[A-Za-z0-9_-]+$ ]] || fail "DB_NAME содержит неподдерживаемые символы."
-[[ "$R2_BUCKET" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]] || fail "Проверь имя R2_BUCKET."
+[[ "$R2_BUCKET" =~ ^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$ ]] || fail "Проверь имя R2_BUCKET."
+[[ "$R2_ENDPOINT" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]] || fail "R2_ENDPOINT должен быть HTTPS endpoint без пути. Для EU bucket используй endpoint с .eu.r2.cloudflarestorage.com."
 [[ "$R2_PREFIX" =~ ^[A-Za-z0-9/_-]+$ ]] || fail "R2_PREFIX может содержать только латинские буквы, цифры, /, _ и -."
 [[ "$R2_PREFIX" != /* && "$R2_PREFIX" != */ && "$R2_PREFIX" != *//* ]] || fail "R2_PREFIX не должен начинаться/заканчиваться на / или содержать //."
 [[ "$BACKUP_RETENTION_DAYS" =~ ^[1-9][0-9]*$ ]] || fail "BACKUP_RETENTION_DAYS должен быть положительным целым числом."
@@ -77,7 +79,7 @@ export RCLONE_CONFIG_R2_TYPE=s3
 export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
 export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
 export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
-export RCLONE_CONFIG_R2_ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+export RCLONE_CONFIG_R2_ENDPOINT="$R2_ENDPOINT"
 export RCLONE_CONFIG_R2_REGION=auto
 export RCLONE_CONFIG_R2_ACL=private
 export RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true
