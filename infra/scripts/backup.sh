@@ -134,7 +134,6 @@ trap on_error ERR
 
 log "Проверяю подключения к PostgreSQL и Cloudflare R2."
 db_psql "$DB_NAME" 'SELECT 1' >/dev/null
-rclone mkdir "$remote_dir"
 rclone lsf "$remote_dir" >/dev/null
 
 log "Создаю custom dump и отправляю поток напрямую в R2. Полный архив на локальный диск не записывается."
