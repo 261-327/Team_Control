@@ -36,6 +36,9 @@ BACKUP_DB_MODE=docker
 
 R2_ACCOUNT_ID=<account-id>
 R2_BUCKET=team-control-backups
+# Standard: https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+# EU jurisdiction: https://<ACCOUNT_ID>.eu.r2.cloudflarestorage.com
+R2_ENDPOINT=
 R2_ACCESS_KEY_ID=<access-key-id>
 R2_SECRET_ACCESS_KEY=<secret-access-key>
 R2_PREFIX=team-control/postgres
@@ -92,6 +95,7 @@ DB_SSLMODE=prefer
 
 R2_ACCOUNT_ID=<account-id>
 R2_BUCKET=team-control-backups
+R2_ENDPOINT=<endpoint-for-this-bucket>
 R2_ACCESS_KEY_ID=<bucket-scoped-access-key>
 R2_SECRET_ACCESS_KEY=<bucket-scoped-secret>
 R2_PREFIX=team-control/postgres
@@ -147,7 +151,7 @@ export RCLONE_CONFIG_R2_TYPE=s3
 export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
 export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
 export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
-export RCLONE_CONFIG_R2_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+export RCLONE_CONFIG_R2_ENDPOINT="${R2_ENDPOINT:-https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com}"
 export RCLONE_CONFIG_R2_REGION=auto
 export RCLONE_CONFIG_R2_ACL=private
 export RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true
