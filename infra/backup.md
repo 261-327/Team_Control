@@ -32,7 +32,7 @@
 # Режим подключения к PostgreSQL:
 # host — сервер может подключиться к DB_HOST напрямую;
 # docker — PostgreSQL запущен сервисом db из compose.server-db.yaml.
-BACKUP_DB_MODE=host
+BACKUP_DB_MODE=docker
 
 R2_ACCOUNT_ID=<account-id>
 R2_BUCKET=team-control-backups
