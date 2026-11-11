@@ -44,7 +44,7 @@ BACKUP_RETENTION_DAYS=7
 Из корня репозитория на сервере:
 
 ~~~sh
-ENV_FILE=/opt/team-control/.env.server ./infra/scripts/backup.sh
+ENV_FILE=/opt/team-control/.env.server bash ./infra/scripts/backup.sh
 ~~~
 
 Путь /opt/team-control замени на фактический каталог репозитория. Скрипт проверяет версию клиента, доступное место, успешность pg_dump, непустой архив и возможность прочитать его список объектов. Только после проверки он создаёт checksum и метаданные, а затем удаляет архивы старше BACKUP_RETENTION_DAYS. По умолчанию хранится семь дней.
@@ -104,13 +104,13 @@ print("Учебные записи созданы")
 Создай копию и восстанови её в новое пустое имя с суффиксом _restore_test:
 
 ~~~sh
-ENV_FILE=.env.backup-test BACKUP_ALLOW_LOCAL_DIR=true ./infra/scripts/backup.sh
+ENV_FILE=.env.backup-test BACKUP_ALLOW_LOCAL_DIR=true bash ./infra/scripts/backup.sh
 
 latest_dump="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'postgres-team_control_backup_fixture-*.dump' -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2-)"
 ENV_FILE=.env.backup-test \
 RESTORE_TEST_DB=team_control_restore_test \
 RESTORE_CONFIRM_TARGET=team_control_restore_test \
-./infra/scripts/restore-test.sh "$latest_dump"
+bash ./infra/scripts/restore-test.sh "$latest_dump"
 ~~~
 
 После восстановления проверь связи через Django, направив Django на тестовую восстановленную базу:
