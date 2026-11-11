@@ -39,6 +39,7 @@ set +a
 : "${DB_USER:?В ENV_FILE не задан DB_USER}"
 : "${DB_PASSWORD:?В ENV_FILE не задан DB_PASSWORD}"
 
+[[ "${RESTORE_TEST_CLUSTER_CONFIRM:-}" == "I_CONFIRMED_ISOLATED_TEST_POSTGRESQL" ]] || fail "Перед запуском укажи RESTORE_TEST_CLUSTER_CONFIRM=I_CONFIRMED_ISOLATED_TEST_POSTGRESQL только для отдельного тестового PostgreSQL."
 [[ "$DB_NAME" == *_backup_fixture ]] || fail "Источник восстановления должен быть отдельной учебной базой с именем, оканчивающимся на _backup_fixture."
 BACKUP_FILE="$1"
 [[ -f "$BACKUP_FILE" && -s "$BACKUP_FILE" ]] || fail "Файл резервной копии не найден или пуст."
@@ -57,6 +58,9 @@ export PGUSER="$DB_USER"
 export PGPASSWORD="$DB_PASSWORD"
 export PGSSLMODE="${DB_SSLMODE:-prefer}"
 export PGCONNECT_TIMEOUT="${PGCONNECT_TIMEOUT:-10}"
+
+fixture_marker="$(psql -X -w -qAt -d "$DB_NAME" -c "SELECT marker FROM public.backup_test_fixture WHERE marker = 'team-control-backup-test-only'")"
+[[ "$fixture_marker" == "team-control-backup-test-only" ]] || fail "В исходной базе нет обязательной тестовой метки. Отказ от восстановления."
 
 log "Проверяю контрольную сумму файла."
 sha256sum --check "$BACKUP_FILE.sha256" >/dev/null
