@@ -41,7 +41,7 @@ set +a
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 [[ "$BACKUP_RETENTION_DAYS" =~ ^[1-9][0-9]*$ ]] || fail "BACKUP_RETENTION_DAYS должен быть положительным целым числом."
 
-for command_name in pg_dump pg_restore psql sha256sum df find mktemp mountpoint tr awk; do
+for command_name in pg_dump pg_restore psql sha256sum df find mktemp mountpoint findmnt tr awk; do
   command -v "$command_name" >/dev/null 2>&1 || fail "Не найдена команда $command_name."
 done
 
@@ -54,6 +54,14 @@ esac
 
 if [[ "${BACKUP_ALLOW_LOCAL_DIR:-false}" != "true" ]]; then
   mountpoint -q -- "$BACKUP_DIR_REAL" || fail "BACKUP_DIR не является точкой монтирования. Не записываю архив на локальный диск сервера."
+  backup_fstype="$(findmnt --noheadings --output FSTYPE --target "$BACKUP_DIR_REAL" | tr -d ' ')"
+  case "$backup_fstype" in
+    nfs|nfs4|cifs|smb3|fuse.rclone|fuse.sshfs|fuse.s3fs|fuse.goofys|ceph|ceph-fuse)
+      ;;
+    *)
+      fail "BACKUP_DIR смонтирован как '$backup_fstype', но это не распознанное удалённое хранилище. Разрешены NFS, SMB/CIFS и поддерживаемые FUSE/S3 mounts."
+      ;;
+  esac
 fi
 
 export PGHOST="$DB_HOST"
