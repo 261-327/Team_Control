@@ -153,10 +153,115 @@ export RCLONE_CONFIG_R2_ACL=private
 export RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true
 
 remote_dir="R2:$R2_BUCKET/$R2_PREFIX/$DB_NAME"
-latest_dump="$(rclone lsf "$remote_dir" --files-only | grep -E '\.dump$' | LC_ALL=C sort | tail -n 1)"
+latest_dump="$(rclone lsf "$remote_dir" --files-only | grep -E '\.dump
+~~~
+
+Локальная машина для тестового восстановления должна иметь свободное место под один дамп. Это не занимает место на основном сервере приложения.
+
+Восстанови архив в новую БД. Требуются два явных подтверждения — изолированный тестовый PostgreSQL и точное имя новой БД:
+
+~~~sh
+ENV_FILE=.env.backup-test \
+RESTORE_TEST_DB=team_control_restore_test \
+RESTORE_CONFIRM_TARGET=team_control_restore_test \
+RESTORE_TEST_CLUSTER_CONFIRM=I_CONFIRMED_ISOLATED_TEST_POSTGRESQL \
+bash ./infra/scripts/restore-test.sh "$test_backup_dir/$latest_dump"
+~~~
+
+Скрипт:
+- проверяет checksum и структуру custom dump;
+- проверяет тестовую метку исходной базы;
+- отказывается, если целевая база уже существует;
+- создаёт новую базу с суффиксом _restore_test;
+- восстанавливает туда данные;
+- не очищает и не изменяет существующие базы.
+
+## 6. Проверить восстановленные связи через Django
+
+На тестовой машине (переменные DB_HOST, DB_USER и DB_PASSWORD должны по-прежнему указывать на тестовый PostgreSQL):
+
+~~~sh
+DB_NAME=team_control_restore_test python backend/manage.py shell -c '
+from tasks.models import WorkspaceUser, Project, Membership, Task
+user = WorkspaceUser.objects.get(username="backup-smoke-user")
+project = Project.objects.get(name="Backup restore fixture", owner=user)
+membership = Membership.objects.get(user=user, project=project)
+task = Task.objects.select_related("creator", "column__board__project__owner").get(title="Backup restore smoke test")
+assert task.creator_id == user.pk
+assert task.column.board.project_id == project.pk
+assert task.column.board.project.owner_id == user.pk
+assert membership.is_confirmed
+print("OK: пользователь, проект, участие и задача восстановлены; связи сохранены")
+'
+~~~
+
+Ожидаемый результат: OK. Запиши дату и время, версии PostgreSQL и фактическую продолжительность восстановления. Только после успешной проверки можно считать пробное восстановление выполненным.
+
+Если целевая база team_control_restore_test уже существует, скрипт остановится. Не удаляй её автоматически; любое удаление тестовой базы — только после ручной проверки её имени и назначения.
+
+## 7. Ежедневный запуск через systemd
+
+Сначала вручную добейся успешного backup и тестового восстановления. Затем на Linux-сервере создай unit-файлы (пути и пользователя замени фактическими).
+
+/etc/systemd/system/team-control-backup.service:
+
+~~~ini
+[Unit]
+Description=Team Control PostgreSQL backup to Cloudflare R2
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=<пользователь-сервиса>
+Group=<группа-сервиса>
+WorkingDirectory=/opt/team-control
+Environment=ENV_FILE=/opt/team-control/.env.server
+ExecStart=/bin/bash /opt/team-control/infra/scripts/backup.sh
+UMask=0077
+~~~
+
+/etc/systemd/system/team-control-backup.timer:
+
+~~~ini
+[Unit]
+Description=Daily Team Control PostgreSQL backup
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=15m
+Unit=team-control-backup.service
+
+[Install]
+WantedBy=timers.target
+~~~
+
+Включение и проверка:
+
+~~~sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now team-control-backup.timer
+sudo systemctl list-timers team-control-backup.timer
+sudo systemctl start team-control-backup.service
+sudo systemctl status team-control-backup.service --no-pager
+sudo journalctl -u team-control-backup.service -n 50 --no-pager
+~~~
+
+Расписание считается проверенным только после успешного запуска timer и появления новой копии, checksum и metadata в R2. В учебной среде проверь отрицательный сценарий: временно укажи неверные реквизиты тестового bucket, запусти service и убедись, что systemd показывает ошибку, а старые копии не удаляются. Не ломай credentials рабочего сервера для проверки.
+
+## 8. Ограничения и периодичность
+
+- PostgreSQL dump содержит схему и данные базы, но не секреты, .env.server и не пользовательские файлы в R2/media. Их резервирование описывается отдельно в infra/media-backup.md и infra/object-storage.md.
+- Ежедневный backup означает потенциальную потерю изменений после последней успешной копии (RPO до 24 часов).
+- R2 bucket должен оставаться приватным; backup API key ограничивается только этим bucket.
+- Скрипт не пишет полный архив на локальный диск сервера. Rclone использует один multipart chunk 8 MiB с одной параллельной загрузкой; при разрыве потока запуск завершается ошибкой и не сообщает об успехе.
+- Восстановление проверяется вручную не реже одного раза в месяц и после существенного изменения схемы или версии PostgreSQL. Дату и длительность фиксирует ответственный.
+ | LC_ALL=C sort | tail -n 1)"
 test -n "$latest_dump"
-rclone copyto "$remote_dir/$latest_dump" "./$latest_dump"
-rclone copyto "$remote_dir/$latest_dump.sha256" "./$latest_dump.sha256"
+test_backup_dir="$(mktemp -d)"
+rclone copyto "$remote_dir/$latest_dump" "$test_backup_dir/$latest_dump"
+rclone copyto "$remote_dir/$latest_dump.sha256" "$test_backup_dir/$latest_dump.sha256"
 ~~~
 
 Локальная машина для тестового восстановления должна иметь свободное место под один дамп. Это не занимает место на основном сервере приложения.
