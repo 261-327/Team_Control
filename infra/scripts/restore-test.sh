@@ -63,7 +63,12 @@ fixture_marker="$(psql -X -w -qAt -d "$DB_NAME" -c "SELECT marker FROM public.ba
 [[ "$fixture_marker" == "team-control-backup-test-only" ]] || fail "В исходной базе нет обязательной тестовой метки. Отказ от восстановления."
 
 log "Проверяю контрольную сумму файла."
-sha256sum --check "$BACKUP_FILE.sha256" >/dev/null
+backup_dir="$(cd -- "$(dirname -- "$BACKUP_FILE")" && pwd -P)"
+backup_name="$(basename -- "$BACKUP_FILE")"
+(
+  cd -- "$backup_dir"
+  sha256sum --check "$backup_name.sha256" >/dev/null
+)
 pg_restore --list "$BACKUP_FILE" >/dev/null
 
 database_exists="$(psql -X -w -qAt -d postgres -c "SELECT 1 FROM pg_database WHERE datname = '$RESTORE_TEST_DB'")"
