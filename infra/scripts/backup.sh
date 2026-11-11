@@ -103,8 +103,8 @@ pg_dump --format=custom --no-owner --no-acl --dbname="$DB_NAME" |
     --s3-chunk-size 8M --streaming-upload-cutoff 1M \
     rcat "$remote_file"
 
-remote_listing="$(rclone ls "$remote_file")"
-remote_size="$(awk 'NR == 1 {print $1}' <<< "$remote_listing")"
+remote_listing="$(rclone ls "$remote_dir")"
+remote_size="$(awk -v target="$base_name" '$2 == target {print $1; exit}' <<< "$remote_listing")"
 [[ "$remote_size" =~ ^[0-9]+$ ]] && (( remote_size > 0 )) || fail "Объект в R2 отсутствует или пуст."
 
 # Читаем объект обратно потоком, без сохранения на диск, проверяем архив и checksum.
@@ -131,6 +131,12 @@ trap 'rm -f -- "$metadata"' EXIT
 rclone --buffer-size 0 rcat "$remote_file.meta" < "$metadata"
 rm -f -- "$metadata"
 trap on_error ERR
+
+# Убеждаемся, что все три объекта видны в R2 до ротации старых копий.
+uploaded_objects="$(rclone lsf "$remote_dir" --files-only)"
+grep -Fxq "$base_name" <<< "$uploaded_objects" || fail "Не найден архив в R2 после загрузки."
+grep -Fxq "$base_name.sha256" <<< "$uploaded_objects" || fail "Не найдена SHA-256 контрольная сумма в R2."
+grep -Fxq "$base_name.meta" <<< "$uploaded_objects" || fail "Не найданы метаданные копии в R2."
 
 # Ротация запускается только после загрузки и проверки нового архива и sidecar-файлов.
 rclone delete --min-age "\${BACKUP_RETENTION_DAYS}d" "$remote_dir"
