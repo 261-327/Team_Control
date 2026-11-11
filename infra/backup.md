@@ -1,85 +1,106 @@
-# Резервное копирование и проверка восстановления PostgreSQL
+# Резервное копирование PostgreSQL в Cloudflare R2
 
-## Что входит в копию
+## Архитектура
 
-Скрипт infra/scripts/backup.sh создаёт PostgreSQL dump в формате custom (pg_dump -Fc). В копию входят схема и данные выбранной базы. Файл проверяется через pg_restore --list, для него создаётся SHA-256 и отдельный файл метаданных с датой UTC и версиями PostgreSQL.
+Резервная копия PostgreSQL отправляется потоком из pg_dump в Cloudflare R2 через S3 API с помощью rclone. Полный архив не создаётся на системном диске приложения. После загрузки скрипт читает объект из R2 потоком, вычисляет SHA-256, сохраняет контрольную сумму и метаданные.
 
-Скрипт не копирует .env.server, пароли, настройки сервера или пользовательские файлы. Для загруженных файлов действует отдельная инструкция media-backup.md. Если используется S3/R2, резервную копию объектов нужно согласовать по времени с дампом БД; сам PostgreSQL dump не содержит байты из внешнего bucket.
+Используется отдельный закрытый R2 bucket, предназначенный только для резервных копий. Не смешивай backup с пользовательскими материалами проекта и не используй для него тот же ключ, что у Django.
 
-## Требования к хранилищу
+Файлы:
+- infra/scripts/backup.sh — потоковый backup и очистка архивов старше срока хранения.
+- infra/scripts/restore-test.sh — восстановление локально скачанного дампа только в новую тестовую БД.
+- infra/runbook.md — диагностика типичных сбоев.
 
-Резервные копии не должны занимать место на системном диске приложения и не должны попадать в Git. BACKUP_DIR должен быть корнем уже подключённого удалённого закрытого хранилища вне сервера: например, NFS/SMB, SSHFS или S3-совместимого хранилища через rclone/s3fs. Обычный локальный раздел или Docker volume не подходят.
+## 1. Подготовить Cloudflare R2
 
-Пример для Linux:
+В Cloudflare Dashboard:
 
-~~~sh
-sudo mkdir -p /mnt/team-control-backups/postgres
-sudo chown <пользователь-сервиса>:<группа-сервиса> /mnt/team-control-backups/postgres
-sudo chmod 700 /mnt/team-control-backups/postgres
-mountpoint -q /mnt/team-control-backups/postgres
-findmnt /mnt/team-control-backups/postgres
-~~~
+1. Открой R2 Object Storage и создай отдельный приватный bucket, например team-control-backups. Не включай публичный доступ.
+2. В Manage R2 API Tokens создай ключ с разрешением Object Read & Write и ограничь его только этим bucket. Не используй глобальный ключ аккаунта.
+3. Сохрани Access Key ID и Secret Access Key в защищённом окружении сервера. Secret Access Key показывается при создании; его нельзя публиковать в Git, issue, PR, переписке или логах.
+4. Возьми Account ID из S3 API endpoint вида https://<ACCOUNT_ID>.r2.cloudflarestorage.com.
 
-Последние две команды должны подтвердить, что отдельное хранилище действительно подключено. Обычный каталог на том же сервере не считается внешней резервной копией.
+Для восстановления на отдельной тестовой машине понадобится доступ на чтение этого же bucket. Используй тот же ключ только в приватном локальном файле, не добавляй его в репозиторий.
 
-До согласования места хранения не покупай платный тариф и не запускай расписание. Используй уже доступное команде закрытое хранилище. Доступ к нему должен быть только у ответственных за эксплуатацию; публичные ссылки запрещены.
+Официальная инструкция: https://developers.cloudflare.com/r2/examples/rclone/. Нужен rclone версии 1.59 или новее.
 
-## Настройка
+## 2. Настройки сервера
 
-1. Установи клиент PostgreSQL на сервере (pg_dump, pg_restore, psql, createdb). Основная версия клиента должна быть такой же или новее версии сервера. Для текущего compose.server-db.yaml используется PostgreSQL 15.
-2. В защищённом .env.server добавь параметры, не коммить этот файл:
+В защищённый .env.server добавь параметры:
 
 ~~~dotenv
-BACKUP_DIR=/mnt/team-control-backups/postgres
+# Режим подключения к PostgreSQL:
+# host — сервер может подключиться к DB_HOST напрямую;
+# docker — PostgreSQL запущен сервисом db из compose.server-db.yaml.
+BACKUP_DB_MODE=host
+
+R2_ACCOUNT_ID=<account-id>
+R2_BUCKET=team-control-backups
+R2_ACCESS_KEY_ID=<access-key-id>
+R2_SECRET_ACCESS_KEY=<secret-access-key>
+R2_PREFIX=team-control/postgres
 BACKUP_RETENTION_DAYS=7
 ~~~
 
-3. Убедись, что пользователь, от имени которого запускается скрипт, может читать .env.server, подключаться к PostgreSQL и писать в BACKUP_DIR.
-4. Проверь подключение к точке монтирования после перезагрузки сервера. Не запускай скрипт, если mount отсутствует: по умолчанию он откажется записывать копии на локальный диск.
+Не коммить заполненный .env.server. В репозитории есть только шаблон .env.server.example.
 
-Пароль БД берётся из защищённого ENV_FILE через переменную DB_PASSWORD; пароль не передаётся аргументом командной строки и не записывается в лог. Не используй set -x при запуске.
+Режим PostgreSQL:
+- BACKUP_DB_MODE=host: установлены pg_dump и psql на сервере, а адрес DB_HOST доступен из host-системы.
+- BACKUP_DB_MODE=docker: PostgreSQL работает в Compose-сервисе db и подключён через compose.server-db.yaml. Запускай скрипт из каталога репозитория; Docker Compose должен иметь доступ к существующему контейнеру и его внешнему volume.
 
-## Ручное создание копии
+Скрипт использует текущие DB_NAME и DB_USER. Для режима host также нужны DB_HOST, DB_PASSWORD и DB_PORT. В режиме docker команды pg_dump и psql выполняются внутри контейнера БД; сам дамп передаётся из контейнера напрямую в rclone.
 
-Из корня репозитория на сервере:
+## 3. Проверить доступ к R2
+
+Установи rclone версии 1.59 или новее. Скрипт создаёт временную конфигурацию remote R2 через переменные окружения; ключи не записываются в rclone.conf.
+
+После заполнения .env.server из корня репозитория запусти:
 
 ~~~sh
 ENV_FILE=/opt/team-control/.env.server bash ./infra/scripts/backup.sh
 ~~~
 
-Путь /opt/team-control замени на фактический каталог репозитория. Скрипт проверяет версию клиента, доступное место, успешность pg_dump, непустой архив и возможность прочитать его список объектов. Только после проверки он создаёт checksum и метаданные, а затем удаляет архивы старше BACKUP_RETENTION_DAYS. По умолчанию хранится семь дней.
+Путь /opt/team-control замени на реальный путь репозитория на сервере.
 
-Проверить последнюю копию:
+Первая проверка одновременно проверит подключение к БД, доступ к bucket, загрузит дамп, скачает поток для вычисления SHA-256, сохранит checksum/metadata и покажет итог. Полный архив на локальный диск сервера не записывается.
 
-~~~sh
-cd /mnt/team-control-backups/postgres
-sha256sum -c postgres-<имя-базы>-<дата>-<pid>.dump.sha256
-pg_restore --list postgres-<имя-базы>-<дата>-<pid>.dump
-cat postgres-<имя-базы>-<дата>-<pid>.dump.meta
-~~~
+Параметры передачи ограничены: один upload transfer, один multipart chunk 8 MiB. Это снижает потребление памяти rclone. Потоковую загрузку нельзя автоматически повторить с середины, если соединение оборвалось: неудачный запуск должен завершиться ошибкой, следующий запуск создаст новый архив с новым именем.
 
-В журнал попадает время начала/окончания и результат, но не содержимое базы, пароли или OTP-коды.
+Путь объектов:
+R2:<bucket>/<prefix>/<DB_NAME>/postgres-<DB_NAME>-<UTC timestamp>-<pid>.dump
 
-## Пробное восстановление на учебной базе
+Для каждого архива рядом хранятся:
+- .dump.sha256 — SHA-256 полного объекта;
+- .dump.meta — время UTC, имя базы, версии PostgreSQL/rclone, размер и SHA-256.
 
-Восстановление выполняется только на отдельном PostgreSQL для тестирования. Не используй .env.server с адресом рабочей базы. Не восстанавливай архив поверх рабочей базы и не очищай существующие базы.
+Срок хранения по умолчанию — семь дней. Удаление старых объектов выполняется только после успешной загрузки и проверки новой копии и ограничено каталогом конкретной базы.
 
-Ниже пример из Linux/WSL с отдельным файлом .env.backup-test, который не нужно добавлять в Git. В нём должны быть реквизиты именно изолированного тестового PostgreSQL (не production) и имя исходной базы, заканчивающееся на _backup_fixture:
+## 4. Пробное восстановление — только отдельно от сервера приложения
+
+Восстановление проверь на отдельной тестовой машине или отдельном тестовом PostgreSQL, который не подключён к рабочей базе. Не используй production .env.server.
+
+Создай локальный файл .env.backup-test вне Git. Укажи в нём параметры отдельной тестовой БД, суффикс базы _backup_fixture и R2-параметры с доступом к bucket:
 
 ~~~dotenv
+BACKUP_DB_MODE=host
 DB_HOST=127.0.0.1
-DB_PORT=5432
+DB_PORT=55432
 DB_NAME=team_control_backup_fixture
 DB_USER=postgres_user
-DB_PASSWORD=<пароль учебной базы>
+DB_PASSWORD=<пароль отдельной тестовой БД>
 DB_SSLMODE=prefer
-BACKUP_DIR=/tmp/team-control-backups
+
+R2_ACCOUNT_ID=<account-id>
+R2_BUCKET=team-control-backups
+R2_ACCESS_KEY_ID=<bucket-scoped-access-key>
+R2_SECRET_ACCESS_KEY=<bucket-scoped-secret>
+R2_PREFIX=team-control/postgres
 BACKUP_RETENTION_DAYS=7
 ~~~
 
-Для локальной учебной проверки каталог может быть обычным временным каталогом. Это разрешается только явным параметром BACKUP_ALLOW_LOCAL_DIR=true; на сервере этот параметр не задавай.
+Порт 55432 здесь — пример порта отдельного тестового PostgreSQL. Не направляй этот файл на производственную базу.
 
-Сначала создай пустую учебную базу, примени миграции Django и добавь специальную метку. Метка обязательна: скрипт восстановления проверяет её до создания целевой БД, чтобы не запускаться по ошибке на production-сервере:
+Загрузи значения из тестового файла и создай тестовую базу с миграциями Django:
 
 ~~~sh
 set -a
@@ -88,11 +109,15 @@ set +a
 
 PGPASSWORD="$DB_PASSWORD" createdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB_NAME"
 python backend/manage.py migrate --noinput
+~~~
 
+Добавь обязательную тестовую метку, которую проверяет скрипт восстановления:
+
+~~~sh
 PGPASSWORD="$DB_PASSWORD" psql -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "CREATE TABLE public.backup_test_fixture (marker text PRIMARY KEY); INSERT INTO public.backup_test_fixture(marker) VALUES ('team-control-backup-test-only');"
 ~~~
 
-После этого создай вымышленные связанные записи:
+Создай связанные вымышленные данные:
 
 ~~~sh
 python backend/manage.py shell -c '
@@ -107,20 +132,56 @@ print("Учебные записи созданы")
 '
 ~~~
 
-Создай копию и восстанови её в новое пустое имя с суффиксом _restore_test:
+Создай backup этой учебной базы — архив попадёт в отдельный каталог team_control_backup_fixture в R2:
 
 ~~~sh
-ENV_FILE=.env.backup-test BACKUP_ALLOW_LOCAL_DIR=true bash ./infra/scripts/backup.sh
+ENV_FILE=.env.backup-test bash ./infra/scripts/backup.sh
+~~~
 
-latest_dump="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'postgres-team_control_backup_fixture-*.dump' -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2-)"
+## 5. Скачать дамп на тестовую машину и восстановить
+
+Для скачивания настрой rclone remote R2 на тестовой машине теми же переменными окружения (не храни ключ в Git):
+
+~~~sh
+export RCLONE_CONFIG_R2_TYPE=s3
+export RCLONE_CONFIG_R2_PROVIDER=Cloudflare
+export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
+export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+export RCLONE_CONFIG_R2_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+export RCLONE_CONFIG_R2_REGION=auto
+export RCLONE_CONFIG_R2_ACL=private
+export RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true
+
+remote_dir="R2:$R2_BUCKET/$R2_PREFIX/$DB_NAME"
+latest_dump="$(rclone lsf "$remote_dir" --files-only | grep -E '\.dump$' | LC_ALL=C sort | tail -n 1)"
+test -n "$latest_dump"
+rclone copyto "$remote_dir/$latest_dump" "./$latest_dump"
+rclone copyto "$remote_dir/$latest_dump.sha256" "./$latest_dump.sha256"
+~~~
+
+Локальная машина для тестового восстановления должна иметь свободное место под один дамп. Это не занимает место на основном сервере приложения.
+
+Восстанови архив в новую БД. Требуются два явных подтверждения — изолированный тестовый PostgreSQL и точное имя новой БД:
+
+~~~sh
 ENV_FILE=.env.backup-test \
 RESTORE_TEST_DB=team_control_restore_test \
 RESTORE_CONFIRM_TARGET=team_control_restore_test \
 RESTORE_TEST_CLUSTER_CONFIRM=I_CONFIRMED_ISOLATED_TEST_POSTGRESQL \
-bash ./infra/scripts/restore-test.sh "$latest_dump"
+bash ./infra/scripts/restore-test.sh "./$latest_dump"
 ~~~
 
-После восстановления проверь связи через Django, направив Django на тестовую восстановленную базу:
+Скрипт:
+- проверяет checksum и структуру custom dump;
+- проверяет тестовую метку исходной базы;
+- отказывается, если целевая база уже существует;
+- создаёт новую базу с суффиксом _restore_test;
+- восстанавливает туда данные;
+- не очищает и не изменяет существующие базы.
+
+## 6. Проверить восстановленные связи через Django
+
+На тестовой машине (переменные DB_HOST, DB_USER и DB_PASSWORD должны по-прежнему указывать на тестовый PostgreSQL):
 
 ~~~sh
 DB_NAME=team_control_restore_test python backend/manage.py shell -c '
@@ -137,17 +198,19 @@ print("OK: пользователь, проект, участие и задач�
 '
 ~~~
 
-Команды выше рассчитаны на учебный PostgreSQL, в котором уже есть тестовый пользователь Django. Не используй их против production. Если база team_control_restore_test уже существует, скрипт остановится; не удаляй её автоматически. Удалять можно только после ручной проверки, что это именно одноразовая тестовая база.
+Ожидаемый результат: OK. Запиши дату и время, версии PostgreSQL и фактическую продолжительность восстановления. Только после успешной проверки можно считать пробное восстановление выполненным.
 
-## Ежедневный запуск через systemd
+Если целевая база team_control_restore_test уже существует, скрипт остановится. Не удаляй её автоматически; любое удаление тестовой базы — только после ручной проверки её имени и назначения.
 
-Сначала вручную добейся успешного запуска и восстановления, проверь внешний mount и права. Затем добавь systemd unit на Linux-сервере. Пути и имя системного пользователя замени фактическими.
+## 7. Ежедневный запуск через systemd
 
-Файл /etc/systemd/system/team-control-backup.service:
+Сначала вручную добейся успешного backup и тестового восстановления. Затем на Linux-сервере создай unit-файлы (пути и пользователя замени фактическими).
+
+/etc/systemd/system/team-control-backup.service:
 
 ~~~ini
 [Unit]
-Description=Team Control PostgreSQL backup
+Description=Team Control PostgreSQL backup to Cloudflare R2
 Wants=network-online.target
 After=network-online.target
 
@@ -161,7 +224,7 @@ ExecStart=/bin/bash /opt/team-control/infra/scripts/backup.sh
 UMask=0077
 ~~~
 
-Файл /etc/systemd/system/team-control-backup.timer:
+/etc/systemd/system/team-control-backup.timer:
 
 ~~~ini
 [Unit]
@@ -188,12 +251,12 @@ sudo systemctl status team-control-backup.service --no-pager
 sudo journalctl -u team-control-backup.service -n 50 --no-pager
 ~~~
 
-Фактическое расписание считается проверенным только после успешного запуска таймера и появления новой копии на отдельном хранилище. Проверь также неуспешный сценарий в учебной среде: отключи тестовое хранилище, запусти сервис и убедись, что systemd показывает ошибку, а старые архивы не удаляются.
+Расписание считается проверенным только после успешного запуска timer и появления новой копии, checksum и metadata в R2. В учебной среде проверь отрицательный сценарий: временно укажи неверные реквизиты тестового bucket, запусти service и убедись, что systemd показывает ошибку, а старые копии не удаляются. Не ломай credentials рабочего сервера для проверки.
 
-## Ограничения и периодичность
+## 8. Ограничения и периодичность
 
-- Копируются только данные PostgreSQL. Файлы из media/S3 резервируются отдельно по media-backup.md и object-storage.md.
-- Секреты и .env.server не входят в дамп. Для них нужно отдельное защищённое хранение.
-- При ежедневной копии возможна потеря изменений, сделанных после последнего успешного запуска. Это нормальная точка восстановления (RPO до 24 часов).
-- После каждого изменения формата/версии PostgreSQL и после крупных миграций сделай дополнительную проверку восстановления.
-- Ответственный вручную проверяет восстановление не реже одного раза в месяц и фиксирует дату и затраченное время.
+- PostgreSQL dump содержит схему и данные базы, но не секреты, .env.server и не пользовательские файлы в R2/media. Их резервирование описывается отдельно в infra/media-backup.md и infra/object-storage.md.
+- Ежедневный backup означает потенциальную потерю изменений после последней успешной копии (RPO до 24 часов).
+- R2 bucket должен оставаться приватным; backup API key ограничивается только этим bucket.
+- Скрипт не пишет полный архив на локальный диск сервера. Rclone использует один multipart chunk 8 MiB с одной параллельной загрузкой; при разрыве потока запуск завершается ошибкой и не сообщает об успехе.
+- Восстановление проверяется вручную не реже одного раза в месяц и после существенного изменения схемы или версии PostgreSQL. Дату и длительность фиксирует ответственный.
