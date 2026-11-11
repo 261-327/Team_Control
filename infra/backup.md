@@ -79,11 +79,7 @@ BACKUP_RETENTION_DAYS=7
 
 Для локальной учебной проверки каталог может быть обычным временным каталогом. Это разрешается только явным параметром BACKUP_ALLOW_LOCAL_DIR=true; на сервере этот параметр не задавай.
 
-Сначала создай пустую учебную базу и специальную метку. Затем примени миграции Django к ней и создай вымышленные связанные записи. Метка обязательна: скрипт восстановления проверяет её до создания целевой БД, чтобы не запускаться по ошибке на production-сервере:
-
-~~~sh
-PGPASSWORD="$DB_PASSWORD" psql -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "CREATE TABLE public.backup_test_fixture (marker text PRIMARY KEY); INSERT INTO public.backup_test_fixture(marker) VALUES ('team-control-backup-test-only');"
-~~~
+Сначала создай пустую учебную базу, примени миграции Django и добавь специальную метку. Метка обязательна: скрипт восстановления проверяет её до создания целевой БД, чтобы не запускаться по ошибке на production-сервере:
 
 ~~~sh
 set -a
@@ -93,6 +89,12 @@ set +a
 PGPASSWORD="$DB_PASSWORD" createdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB_NAME"
 python backend/manage.py migrate --noinput
 
+PGPASSWORD="$DB_PASSWORD" psql -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "CREATE TABLE public.backup_test_fixture (marker text PRIMARY KEY); INSERT INTO public.backup_test_fixture(marker) VALUES ('team-control-backup-test-only');"
+~~~
+
+После этого создай вымышленные связанные записи:
+
+~~~sh
 python backend/manage.py shell -c '
 from tasks.models import WorkspaceUser, Project, Membership, Board, Column, Task
 user = WorkspaceUser.objects.create_user(username="backup-smoke-user", email="backup-smoke@example.invalid", password="temporary-test-only")
@@ -114,6 +116,7 @@ latest_dump="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'postgres-team_contr
 ENV_FILE=.env.backup-test \
 RESTORE_TEST_DB=team_control_restore_test \
 RESTORE_CONFIRM_TARGET=team_control_restore_test \
+RESTORE_TEST_CLUSTER_CONFIRM=I_CONFIRMED_ISOLATED_TEST_POSTGRESQL \
 bash ./infra/scripts/restore-test.sh "$latest_dump"
 ~~~
 
