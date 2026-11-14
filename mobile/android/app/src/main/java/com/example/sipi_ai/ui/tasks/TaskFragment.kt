@@ -9,21 +9,28 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.sipi_ai.R
 import com.example.sipi_ai.data.Task
 import com.example.sipi_ai.data.TaskRepository
+import com.example.sipi_ai.data.ApiClient
+import com.example.sipi_ai.data.UserStore
 import com.example.sipi_ai.data.TaskStatus
+import com.example.sipi_ai.data.TaskTab
 import com.example.sipi_ai.databinding.FragmentTaskBinding
+import com.example.sipi_ai.ui.common.openTask
 import com.example.sipi_ai.util.russianPlural
 import com.google.android.material.snackbar.Snackbar
 
 class TaskFragment : Fragment(R.layout.fragment_task) {
 
-    private val status by lazy { TaskStatus.entries[requireArguments().getInt(ARG_STATUS)] }
-    private val taskAdapter = TaskAdapter { task -> submitForReview(task) }
+    private val tab by lazy { TaskTab.entries[requireArguments().getInt(ARG_TAB)] }
+    private val taskAdapter = TaskAdapter(
+        onSubmitForReview = { task -> submitForReview(task) },
+        onClick = { task -> requireContext().openTask(task.id) },
+    )
     private var binding: FragmentTaskBinding? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         binding = FragmentTaskBinding.bind(view).apply {
-            tvTabTitle.setText(status.tabTitleRes)
+            tvTabTitle.setText(tab.tabTitleRes)
             recyclerViewTasks.layoutManager = LinearLayoutManager(requireContext())
             recyclerViewTasks.adapter = taskAdapter
         }
@@ -41,9 +48,11 @@ class TaskFragment : Fragment(R.layout.fragment_task) {
         super.onDestroyView()
     }
 
+    fun refreshTasks() = showTasks()
+
     private fun showTasks() {
         val binding = binding ?: return
-        val tasks = TaskRepository.withStatus(status)
+        val tasks = TaskRepository.mineIn(tab)
         taskAdapter.submitList(tasks)
 
         val countPhrase = russianPlural(
@@ -56,26 +65,33 @@ class TaskFragment : Fragment(R.layout.fragment_task) {
         binding.tvTaskCount.isVisible = tasks.isNotEmpty()
         binding.emptyState.isVisible = tasks.isEmpty()
         binding.recyclerViewTasks.isVisible = tasks.isNotEmpty()
+        (activity as? StatsHost)?.refreshStats()
     }
 
     private fun submitForReview(task: Task) {
-        TaskRepository.updateStatus(task.id, TaskStatus.REVIEW)
-        showTasks()
-
-        Snackbar.make(requireView(), R.string.task_submitted, Snackbar.LENGTH_LONG)
-            .setAnchorView(requireActivity().findViewById<View>(R.id.bottomNavigationView))
-            .setAction(R.string.action_undo) {
-                TaskRepository.updateStatus(task.id, task.status)
+        ApiClient.moveTask(task.id, "in_review", { response ->
+            response.onSuccess { snapshot ->
+                ApiClient.applySnapshot(snapshot.optJSONObject("snapshot") ?: snapshot, UserStore(requireContext()))
                 showTasks()
+                Snackbar.make(requireView(), R.string.task_submitted, Snackbar.LENGTH_LONG)
+                    .setAnchorView(requireActivity().findViewById<View>(R.id.bottomNavigationView))
+                    .show()
+            }.onFailure {
+                Snackbar.make(requireView(), it.message ?: "Не удалось обновить задачу", Snackbar.LENGTH_LONG).show()
             }
-            .show()
+        })
+    }
+
+    /** Активити, которое показывает статистику над вкладками и должно обновляться после изменений. */
+    interface StatsHost {
+        fun refreshStats()
     }
 
     companion object {
-        private const val ARG_STATUS = "status"
+        private const val ARG_TAB = "tab"
 
-        fun newInstance(status: TaskStatus): TaskFragment = TaskFragment().apply {
-            arguments = bundleOf(ARG_STATUS to status.ordinal)
+        fun newInstance(tab: TaskTab): TaskFragment = TaskFragment().apply {
+            arguments = bundleOf(ARG_TAB to tab.ordinal)
         }
     }
 }

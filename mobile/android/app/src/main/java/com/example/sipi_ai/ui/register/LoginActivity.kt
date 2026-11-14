@@ -1,47 +1,69 @@
-package com.example.sipi_ai // ВАЖНО: проверь, чтобы пакет совпадал с твоим!
+package com.example.sipi_ai.ui.register
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Button
-import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.example.sipi_ai.ui.register.RegisterActivity
-import com.example.sipi_ai.ui.register.VerifyCodeActivity
+import com.example.sipi_ai.R
+import com.example.sipi_ai.data.ApiClient
+import com.example.sipi_ai.databinding.ActivityLoginBinding
+import com.example.sipi_ai.ui.main.MainActivity
 
 class LoginActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityLoginBinding
+    private var userChoseAuthFlow = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_login)
+        binding = ActivityLoginBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        ApiClient.initialize(this)
 
-        val btnLogin = findViewById<Button>(R.id.btnLogin)
-        val tvGoToRegister = findViewById<TextView>(R.id.tvGoToRegister)
-
-        // Переход на экран ввода кода
-        // Находим поле ввода почты
-        val etLoginEmail = findViewById<android.widget.EditText>(R.id.etLoginEmail)
-
-        tvGoToRegister.setOnClickListener {
-            val intent = Intent(this, RegisterActivity::class.java)
-            startActivity(intent)
+        val skipRestore = intent.getBooleanExtra(EXTRA_SKIP_SESSION_RESTORE, false)
+        if (!skipRestore) ApiClient.loadSnapshot { result ->
+            if (!userChoseAuthFlow && !isFinishing && result.getOrNull()?.optString("sessionId").orEmpty().isNotBlank()) openMain()
         }
-
-        btnLogin.setOnClickListener {
-            // Берем текст, который пользователь ввел в поле
-            val email = etLoginEmail.text.toString().trim()
-
-            // Проверяем, не пустое ли поле (чтобы не отправлять пустоту)
-            if (email.isEmpty()) {
-                android.widget.Toast.makeText(this, "Введите почту", android.widget.Toast.LENGTH_SHORT).show()
-                return@setOnClickListener // Останавливаем код, если поле пустое
+        binding.tvGoToRegister.setOnClickListener {
+            userChoseAuthFlow = true
+            startActivity(Intent(this, RegisterActivity::class.java))
+        }
+        binding.btnLogin.setOnClickListener {
+            userChoseAuthFlow = true
+            val username = binding.etLoginEmail.text.toString().trim()
+            val password = binding.etLoginPassword.text.toString()
+            if (username.isBlank() || password.isBlank()) {
+                Toast.makeText(this, "Введите логин/почту и пароль", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
-
-            // Создаем намерение перейти на экран кода
-            val intent = Intent(this, VerifyCodeActivity::class.java)
-
-            // Передаем РЕАЛЬНУЮ почту, которую ввел пользователь
-            intent.putExtra("USER_EMAIL", email)
-
-            startActivity(intent)
+            binding.btnLogin.isEnabled = false
+            ApiClient.warmUp { ready ->
+                ready.onSuccess {
+                    ApiClient.login(username, password) { response ->
+                        binding.btnLogin.isEnabled = true
+                        response.onSuccess { email ->
+                            startActivity(Intent(this, VerifyCodeActivity::class.java).putExtra(VerifyCodeActivity.EXTRA_EMAIL, email))
+                        }.onFailure { showError(it) }
+                    }
+                }.onFailure {
+                    binding.btnLogin.isEnabled = true
+                    showError(it)
+                }
+            }
         }
+    }
+
+    private fun openMain() {
+        startActivity(Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        })
+        finish()
+    }
+
+    private fun showError(error: Throwable) {
+        Toast.makeText(this, error.message ?: getString(R.string.login_error_empty_email), Toast.LENGTH_LONG).show()
+    }
+
+    companion object {
+        const val EXTRA_SKIP_SESSION_RESTORE = "skip_session_restore"
     }
 }

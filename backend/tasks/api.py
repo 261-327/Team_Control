@@ -912,6 +912,24 @@ def project_detail(request, project_id):
     return {"snapshot": snapshot(request)}
 
 
+@endpoint(("PATCH",))
+def project_settings(request, project_id):
+    """Update editable project metadata without changing membership roles."""
+    with transaction.atomic():
+        project = project_for(request.user, project_id, manage=True, lock=True)
+        fields = []
+        if "name" in request.data:
+            project.name = text(request.data, "name", 255, True)
+            fields.append("name")
+        if "description" in request.data:
+            project.description = text(request.data, "description", 10000)
+            fields.append("description")
+        if not fields:
+            raise APIError("Укажите название или описание проекта.")
+        project.save(update_fields=fields)
+    return {"snapshot": snapshot(request)}
+
+
 
 @endpoint(("GET",))
 def project_members(request, project_id):
@@ -1105,7 +1123,7 @@ def log_event(task, user, message):
 def tasks(request):
     with transaction.atomic():
         p = project_for(request.user, request.data.get("projectId"), manage=True, lock=True)
-        values, assignee = task_input(request.data, p)
+        values, assignee = task_input(request.data, p, allow_unassigned=True)
         col = column_for(p, "todo")
         existing = list(status_tasks(p, "todo"))
         if len(existing) >= col.max_tasks:
@@ -1118,7 +1136,7 @@ def tasks(request):
             position=max((t.position for t in existing), default=-1) + 1,
             **values,
         )
-        t.assignees.set([assignee])
+        t.assignees.set([assignee] if assignee else [])
         log_event(t, request.user, "Создана задача")
     return {"task": task_json(t), "snapshot": snapshot(request)}
 
@@ -1222,7 +1240,7 @@ def task_detail(request, task_id):
             if str(request.data.get("projectId")) != str(project.pk):
                 raise APIError("Нельзя перенести задачу в другой проект.")
 
-            values, assignee = task_input(request.data, project)
+            values, assignee = task_input(request.data, project, allow_unassigned=True)
 
             for key, value in values.items():
                 setattr(task, key, value)
@@ -1238,8 +1256,9 @@ def task_detail(request, task_id):
                 .first()
             )
 
-            if first_assignee_id != assignee.pk:
-                task.assignees.set([assignee])
+            target_assignee_id = assignee.pk if assignee else None
+            if first_assignee_id != target_assignee_id:
+                task.assignees.set([assignee] if assignee else [])
 
             log_event(
                 task,

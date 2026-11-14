@@ -33,6 +33,7 @@ path(
     api.project_members,
 ),
     path("projects/<int:project_id>/", api.project_detail),
+    path("projects/<int:project_id>/settings/", api.project_settings),
     path("projects/<int:project_id>/join/", api.join_project),
     path("projects/<int:project_id>/leave/", api.leave_project),
     path("projects/<int:project_id>/my-role/", api.update_my_role),

@@ -52,10 +52,21 @@
         </LinearLayout>
 
         <TextView
-            android:id="@+id/tvTaskTitle"
+            android:id="@+id/tvTaskMeta"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/text_hint"
+            android:textSize="12sp"
+            tools:text="SIP-1 · Сипи проект для вуза · Дизайн" />
+
+        <TextView
+            android:id="@+id/tvTaskTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
             android:textColor="@color/text_primary"
             android:textSize="17sp"
             android:textStyle="bold"
