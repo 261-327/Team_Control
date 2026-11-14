@@ -4,11 +4,14 @@ import android.app.Activity
 import android.content.Context
 import android.view.LayoutInflater
 import android.widget.Toast
+import android.widget.AdapterView
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import com.example.sipi_ai.R
 import com.example.sipi_ai.data.Project
 import com.example.sipi_ai.data.ProjectRepository
+import com.example.sipi_ai.data.ApiClient
+import com.example.sipi_ai.data.UserStore
 import com.example.sipi_ai.databinding.DialogInputBinding
 import com.example.sipi_ai.databinding.DialogProjectBinding
 import com.example.sipi_ai.ui.assistant.AssistantActivity
@@ -40,6 +43,19 @@ fun Context.openAssistant(projectId: Long? = null) = startActivity(AssistantActi
 /** Диалог создания проекта. Не закрывается, пока не введено название. */
 fun Activity.showCreateProjectDialog(onCreated: (Project) -> Unit) {
     val binding = DialogProjectBinding.inflate(LayoutInflater.from(this))
+    val roleValues = resources.getStringArray(R.array.project_role_values)
+    val specializationValues = resources.getStringArray(R.array.project_specialization_values)
+    binding.spProjectSpecialization.setSelection(specializationValues.indexOf("android").coerceAtLeast(0))
+    binding.tvProjectSpecializationLabel.visibility = android.view.View.VISIBLE
+    binding.spProjectSpecialization.visibility = android.view.View.VISIBLE
+    binding.spProjectRole.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+        override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        override fun onItemSelected(parent: AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+            val showSpecialization = roleValues.getOrNull(position) == "developer"
+            binding.tvProjectSpecializationLabel.visibility = if (showSpecialization) android.view.View.VISIBLE else android.view.View.GONE
+            binding.spProjectSpecialization.visibility = if (showSpecialization) android.view.View.VISIBLE else android.view.View.GONE
+        }
+    }
     val dialog = MaterialAlertDialogBuilder(this)
         .setTitle(R.string.project_dialog_title)
         .setView(binding.root)
@@ -53,10 +69,28 @@ fun Activity.showCreateProjectDialog(onCreated: (Project) -> Unit) {
                 binding.etProjectName.error = getString(R.string.project_error_name)
                 return@setOnClickListener
             }
-            val project = ProjectRepository.create(name, binding.etProjectDescription.text.toString())
-            dialog.dismiss()
-            Toast.makeText(this, R.string.project_created, Toast.LENGTH_SHORT).show()
-            onCreated(project)
+            val positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            positive.isEnabled = false
+            ApiClient.initialize(this)
+            val role = roleValues[binding.spProjectRole.selectedItemPosition]
+            val specialization = specializationValues[binding.spProjectSpecialization.selectedItemPosition]
+            ApiClient.createProject(name, binding.etProjectDescription.text.toString(), role, specialization) { result ->
+                positive.isEnabled = true
+                result.onSuccess { response ->
+                    ApiClient.applyMutation(response, UserStore(this))
+                    val id = response.optJSONObject("project")?.optString("id")?.toLongOrNull()
+                    val project = id?.let { ProjectRepository.get(it) }
+                    if (project == null) {
+                        Toast.makeText(this, "Проект сохранён, но не найден в обновлённом списке", Toast.LENGTH_LONG).show()
+                    } else {
+                        dialog.dismiss()
+                        Toast.makeText(this, R.string.project_created, Toast.LENGTH_SHORT).show()
+                        onCreated(project)
+                    }
+                }.onFailure {
+                    Toast.makeText(this, it.message ?: "Не удалось создать проект", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
     dialog.show()

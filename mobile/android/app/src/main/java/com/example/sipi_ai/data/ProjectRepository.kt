@@ -7,32 +7,25 @@ object ProjectRepository {
 
     const val COLOR_COUNT = 6
 
-    private var nextProjectId = 3L
+    private var nextProjectId = 1L
     private var nextMemberId = 1L
 
     /** Приглашённые участники (текущего пользователя здесь нет — он [Members.ME_ID]). */
     private val invited = mutableListOf<Member>()
 
-    private val projects = mutableListOf(
-        Project(
-            id = 1,
-            key = "SIP",
-            name = "Сипи проект для вуза",
-            description = "Трекер для политеха",
-            season = "Осень 2026",
-            colorIndex = 0,
-        ),
-        Project(
-            id = 2,
-            key = "SER",
-            name = "Сервис навигации",
-            description = "",
-            season = "Осень 2026",
-            colorIndex = 1,
-        ),
-    )
+    private val projects = mutableListOf<Project>()
 
     fun all(): List<Project> = projects.toList()
+
+    @Synchronized
+    fun replaceFromServer(serverProjects: List<Project>, members: List<Member>) {
+        projects.clear()
+        projects.addAll(serverProjects)
+        invited.clear()
+        invited.addAll(members.filter { it.id != Members.ME_ID })
+        nextProjectId = (serverProjects.maxOfOrNull { it.id } ?: 0L) + 1L
+        nextMemberId = (members.maxOfOrNull { it.id } ?: 0L) + 1L
+    }
 
     fun get(id: Long): Project? = projects.firstOrNull { it.id == id }
 
@@ -76,13 +69,4 @@ object ProjectRepository {
 
     fun invitedMember(id: Long): Member? = invited.firstOrNull { it.id == id }
 
-    fun addMaterial(projectId: Long, fileName: String) {
-        val project = get(projectId) ?: return
-        update(project.copy(materials = project.materials + fileName))
-    }
-
-    fun removeMaterial(projectId: Long, fileName: String) {
-        val project = get(projectId) ?: return
-        update(project.copy(materials = project.materials - fileName))
-    }
 }

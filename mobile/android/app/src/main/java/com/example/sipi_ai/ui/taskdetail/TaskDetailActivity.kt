@@ -13,9 +13,11 @@ import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.sipi_ai.R
 import com.example.sipi_ai.data.Members
+import com.example.sipi_ai.data.ApiClient
 import com.example.sipi_ai.data.ProjectRepository
 import com.example.sipi_ai.data.TaskRepository
 import com.example.sipi_ai.data.TaskStatus
+import com.example.sipi_ai.data.UserStore
 import com.example.sipi_ai.databinding.ActivityTaskDetailBinding
 import com.example.sipi_ai.ui.common.MemberNames
 import com.example.sipi_ai.ui.taskedit.TaskEditActivity
@@ -38,6 +40,7 @@ class TaskDetailActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityTaskDetailBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        ApiClient.initialize(this)
         taskId = intent.getLongExtra(EXTRA_TASK_ID, -1L)
 
         setSupportActionBar(binding.toolbarTask)
@@ -149,9 +152,15 @@ class TaskDetailActivity : AppCompatActivity() {
     private fun sendComment() {
         val text = binding.etComment.text.toString()
         if (text.isBlank()) return
-        TaskRepository.addComment(taskId, Members.ME_ID, text)
-        binding.etComment.text?.clear()
-        render()
+        binding.btnSendComment.isEnabled = false
+        ApiClient.addComment(taskId, text) { result ->
+            binding.btnSendComment.isEnabled = true
+            result.onSuccess {
+                ApiClient.applyMutation(it, UserStore(this))
+                binding.etComment.text?.clear()
+                render()
+            }.onFailure { Toast.makeText(this, it.message ?: "Не удалось отправить комментарий", Toast.LENGTH_LONG).show() }
+        }
     }
 
     private fun showStatusDialog() {
@@ -161,9 +170,22 @@ class TaskDetailActivity : AppCompatActivity() {
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.task_change_status)
             .setSingleChoiceItems(labels, statuses.indexOf(task.status)) { dialog, which ->
-                TaskRepository.updateStatus(taskId, statuses[which])
                 dialog.dismiss()
-                render()
+                val next = statuses[which]
+                val wireStatus = when (next) {
+                    TaskStatus.TODO -> "todo"
+                    TaskStatus.IN_PROGRESS -> "in_progress"
+                    TaskStatus.REVIEW -> "in_review"
+                    TaskStatus.DONE -> "done"
+                }
+                val reason = if (task.status == TaskStatus.REVIEW && next == TaskStatus.IN_PROGRESS)
+                    "Исправления отмечены в приложении" else null
+                ApiClient.moveTask(taskId, wireStatus, { result ->
+                    result.onSuccess {
+                        ApiClient.applyMutation(it, UserStore(this))
+                        render()
+                    }.onFailure { Toast.makeText(this, it.message ?: "Не удалось изменить статус", Toast.LENGTH_LONG).show() }
+                }, reason)
             }
             .setNegativeButton(R.string.action_cancel, null)
             .show()
@@ -176,9 +198,13 @@ class TaskDetailActivity : AppCompatActivity() {
             .setMessage(getString(R.string.task_delete_message, task.title))
             .setNegativeButton(R.string.action_cancel, null)
             .setPositiveButton(R.string.action_delete) { _, _ ->
-                TaskRepository.delete(taskId)
-                Toast.makeText(this, R.string.task_deleted, Toast.LENGTH_SHORT).show()
-                finish()
+                ApiClient.deleteTask(taskId) { result ->
+                    result.onSuccess {
+                        ApiClient.applyMutation(it, UserStore(this))
+                        Toast.makeText(this, R.string.task_deleted, Toast.LENGTH_SHORT).show()
+                        finish()
+                    }.onFailure { Toast.makeText(this, it.message ?: "Не удалось удалить задачу", Toast.LENGTH_LONG).show() }
+                }
             }
             .show()
     }

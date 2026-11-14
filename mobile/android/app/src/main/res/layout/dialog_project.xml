@@ -27,4 +27,33 @@
         android:importantForAutofill="no"
         android:inputType="textMultiLine|textCapSentences"
         android:minLines="3" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Роль в проекте"
+        android:textColor="?attr/colorOnSurface" />
+
+    <Spinner
+        android:id="@+id/spProjectRole"
+        style="@style/SipiEditText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:entries="@array/project_roles" />
+
+    <TextView
+        android:id="@+id/tvProjectSpecializationLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Направление разработки"
+        android:textColor="?attr/colorOnSurface" />
+
+    <Spinner
+        android:id="@+id/spProjectSpecialization"
+        style="@style/SipiEditText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:entries="@array/project_specializations" />
 </LinearLayout>

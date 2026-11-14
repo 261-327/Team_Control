@@ -7,6 +7,8 @@ import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import com.example.sipi_ai.R
 import com.example.sipi_ai.data.ProjectRepository
+import com.example.sipi_ai.data.ApiClient
+import com.example.sipi_ai.data.UserStore
 import com.example.sipi_ai.databinding.FragmentProjectSettingsBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
@@ -18,12 +20,11 @@ class ProjectSettingsFragment : Fragment(R.layout.fragment_project_settings) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         val b = FragmentProjectSettingsBinding.bind(view)
+        ApiClient.initialize(requireContext())
         val project = ProjectRepository.get(projectId) ?: return
 
         b.etSettingsName.setText(project.name)
         b.etSettingsDescription.setText(project.description)
-        b.etSettingsSeason.setText(project.season)
-
         b.btnSaveSettings.setOnClickListener {
             val current = ProjectRepository.get(projectId) ?: return@setOnClickListener
             val name = b.etSettingsName.text.toString().trim()
@@ -31,15 +32,17 @@ class ProjectSettingsFragment : Fragment(R.layout.fragment_project_settings) {
                 b.etSettingsName.error = getString(R.string.project_error_name)
                 return@setOnClickListener
             }
-            ProjectRepository.update(
-                current.copy(
-                    name = name,
-                    description = b.etSettingsDescription.text.toString().trim(),
-                    season = b.etSettingsSeason.text.toString().trim().ifEmpty { current.season },
-                ),
-            )
-            Toast.makeText(requireContext(), R.string.settings_saved, Toast.LENGTH_SHORT).show()
-            (activity as? ProjectActivity)?.refreshHeader()
+            b.btnSaveSettings.isEnabled = false
+            ApiClient.updateProject(projectId, name, b.etSettingsDescription.text.toString().trim()) { result ->
+                b.btnSaveSettings.isEnabled = true
+                result.onSuccess {
+                    ApiClient.applyMutation(it, UserStore(requireContext()))
+                    Toast.makeText(requireContext(), R.string.settings_saved, Toast.LENGTH_SHORT).show()
+                    (activity as? ProjectActivity)?.refreshHeader()
+                }.onFailure {
+                    Toast.makeText(requireContext(), it.message ?: "Не удалось сохранить проект", Toast.LENGTH_LONG).show()
+                }
+            }
         }
 
         b.btnDeleteProject.setOnClickListener {
@@ -49,8 +52,14 @@ class ProjectSettingsFragment : Fragment(R.layout.fragment_project_settings) {
                 .setMessage(getString(R.string.settings_delete_message, current.name))
                 .setNegativeButton(R.string.action_cancel, null)
                 .setPositiveButton(R.string.action_delete) { _, _ ->
-                    ProjectRepository.delete(projectId)
-                    requireActivity().finish()
+                    ApiClient.deleteProject(projectId) { result ->
+                        result.onSuccess {
+                            ApiClient.applyMutation(it, UserStore(requireContext()))
+                            requireActivity().finish()
+                        }.onFailure {
+                            Toast.makeText(requireContext(), it.message ?: "Не удалось удалить проект", Toast.LENGTH_LONG).show()
+                        }
+                    }
                 }
                 .show()
         }

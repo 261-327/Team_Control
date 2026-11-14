@@ -9,6 +9,7 @@ import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import com.example.sipi_ai.R
 import com.example.sipi_ai.data.Members
+import com.example.sipi_ai.data.ApiClient
 import com.example.sipi_ai.data.ProjectRepository
 import com.example.sipi_ai.data.TaskRepository
 import com.example.sipi_ai.data.UserStore
@@ -27,6 +28,7 @@ class ProfileActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityProfileBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        ApiClient.initialize(this)
 
         setSupportActionBar(binding.toolbarProfile)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
@@ -93,9 +95,16 @@ class ProfileActivity : AppCompatActivity() {
             binding.etProfileName.error = getString(R.string.profile_name_error)
             return
         }
-        UserStore(this).saveProfile(name, binding.etProfileAbout.text.toString().trim())
-        Toast.makeText(this, R.string.profile_saved, Toast.LENGTH_SHORT).show()
-        renderHeader()
+        binding.btnSaveProfile.isEnabled = false
+        ApiClient.updateProfile(name, binding.etProfileAbout.text.toString().trim()) { result ->
+            binding.btnSaveProfile.isEnabled = true
+            result.onSuccess {
+                ApiClient.applyMutation(it, UserStore(this))
+                UserStore(this).saveProfile(name, binding.etProfileAbout.text.toString().trim())
+                Toast.makeText(this, R.string.profile_saved, Toast.LENGTH_SHORT).show()
+                renderHeader()
+            }.onFailure { Toast.makeText(this, it.message ?: "Не удалось сохранить профиль", Toast.LENGTH_LONG).show() }
+        }
     }
 
     private fun confirmLogout() {
@@ -104,11 +113,15 @@ class ProfileActivity : AppCompatActivity() {
             .setMessage(R.string.profile_logout_message)
             .setNegativeButton(R.string.action_cancel, null)
             .setPositiveButton(R.string.profile_logout) { _, _ ->
-                UserStore(this).clear()
-                startActivity(
-                    Intent(this, LoginActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
-                )
+                ApiClient.logout { result ->
+                    result.onSuccess {
+                        ApiClient.clearSession()
+                        UserStore(this).clear()
+                        startActivity(Intent(this, LoginActivity::class.java)
+                            .putExtra(LoginActivity.EXTRA_SKIP_SESSION_RESTORE, true)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+                    }.onFailure { Toast.makeText(this, it.message ?: "Не удалось выйти", Toast.LENGTH_LONG).show() }
+                }
             }
             .show()
     }

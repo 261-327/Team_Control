@@ -2,74 +2,53 @@ package com.example.sipi_ai.ui.register
 
 import android.content.Intent
 import android.os.Bundle
-import android.view.View
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.sipi_ai.R
+import com.example.sipi_ai.data.ApiClient
 import com.example.sipi_ai.data.UserStore
 import com.example.sipi_ai.databinding.ActivityRegisterBinding
 
 class RegisterActivity : AppCompatActivity() {
-
     private lateinit var binding: ActivityRegisterBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityRegisterBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        setupRoleSpinner()
-
+        ApiClient.initialize(this)
         binding.btnRegister.setOnClickListener { register() }
     }
 
-    private fun setupRoleSpinner() {
-        val adapter = ArrayAdapter.createFromResource(
-            this,
-            R.array.register_roles,
-            android.R.layout.simple_spinner_item
-        )
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.spinnerRole.adapter = adapter
-
-        // Группа нужна только студентам
-        binding.spinnerRole.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                if (position == ROLE_STUDENT) {
-                    binding.llGroupContainer.visibility = View.VISIBLE
-                } else {
-                    binding.llGroupContainer.visibility = View.GONE
-                    binding.etGroup.text?.clear()
-                }
-            }
-
-            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
-        }
-    }
-
     private fun register() {
-        val fullName = binding.etFullName.text.toString().trim()
+        val name = binding.etFullName.text.toString().trim()
         val email = binding.etEmail.text.toString().trim()
-        val isStudent = binding.spinnerRole.selectedItemPosition == ROLE_STUDENT
-        val group = binding.etGroup.text.toString().trim()
-
-        if (fullName.isEmpty() || email.isEmpty() || (isStudent && group.isEmpty())) {
+        val username = binding.etUsername.text.toString().trim()
+        val password = binding.etPassword.text.toString()
+        if (name.isBlank() || email.isBlank() || username.isBlank() || password.isBlank()) {
             Toast.makeText(this, R.string.register_error_empty_fields, Toast.LENGTH_SHORT).show()
             return
         }
 
-        UserStore(this).save(fullName, email)
-        Toast.makeText(this, R.string.register_success, Toast.LENGTH_SHORT).show()
-
-        val intent = Intent(this, VerifyCodeActivity::class.java)
-        intent.putExtra(VerifyCodeActivity.EXTRA_EMAIL, email)
-        startActivity(intent)
-        finish()
+        binding.btnRegister.isEnabled = false
+        ApiClient.warmUp { ready ->
+            ready.onSuccess {
+                ApiClient.register(name, username, email, password) { response ->
+                    binding.btnRegister.isEnabled = true
+                    response.onSuccess { address ->
+                        UserStore(this).save(name, address)
+                        startActivity(Intent(this, VerifyCodeActivity::class.java).putExtra(VerifyCodeActivity.EXTRA_EMAIL, address))
+                        finish()
+                    }.onFailure { showError(it) }
+                }
+            }.onFailure {
+                binding.btnRegister.isEnabled = true
+                showError(it)
+            }
+        }
     }
 
-    private companion object {
-        const val ROLE_STUDENT = 0
+    private fun showError(error: Throwable) {
+        Toast.makeText(this, error.message ?: getString(R.string.register_error_empty_fields), Toast.LENGTH_LONG).show()
     }
 }

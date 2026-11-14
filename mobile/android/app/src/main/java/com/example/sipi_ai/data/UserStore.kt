@@ -16,10 +16,21 @@ class UserStore(context: Context) {
     val about: String
         get() = prefs.getString(KEY_ABOUT, null).orEmpty()
 
+    val serverId: Long?
+        get() = prefs.getString(KEY_SERVER_ID, null)?.toLongOrNull()
+
     fun save(fullName: String, email: String) {
         prefs.edit {
             putString(KEY_FULL_NAME, fullName)
             putString(KEY_EMAIL, email)
+        }
+    }
+
+    fun saveIdentity(fullName: String, email: String, serverId: String) {
+        prefs.edit {
+            putString(KEY_FULL_NAME, fullName)
+            putString(KEY_EMAIL, email)
+            putString(KEY_SERVER_ID, serverId)
         }
     }
 
@@ -39,5 +50,6 @@ class UserStore(context: Context) {
         const val KEY_FULL_NAME = "USER_NAME"
         const val KEY_EMAIL = "USER_EMAIL"
         const val KEY_ABOUT = "USER_ABOUT"
+        const val KEY_SERVER_ID = "USER_SERVER_ID"
     }
 }

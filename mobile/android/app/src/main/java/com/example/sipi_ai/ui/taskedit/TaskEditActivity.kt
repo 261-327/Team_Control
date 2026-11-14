@@ -13,10 +13,12 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.sipi_ai.R
 import com.example.sipi_ai.data.Directions
+import com.example.sipi_ai.data.ApiClient
 import com.example.sipi_ai.data.Members
 import com.example.sipi_ai.data.Project
 import com.example.sipi_ai.data.ProjectRepository
 import com.example.sipi_ai.data.TaskRepository
+import com.example.sipi_ai.data.UserStore
 import com.example.sipi_ai.databinding.ActivityTaskEditBinding
 import com.example.sipi_ai.ui.common.MemberNames
 import com.example.sipi_ai.util.formatDeadline
@@ -37,6 +39,7 @@ class TaskEditActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityTaskEditBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        ApiClient.initialize(this)
 
         setSupportActionBar(binding.toolbarEdit)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
@@ -149,15 +152,21 @@ class TaskEditActivity : AppCompatActivity() {
         val description = binding.etDescription.text.toString()
         val direction = Directions.all[binding.spinnerDirection.selectedItemPosition.coerceAtLeast(0)]
 
-        val id = editingId
-        if (id == null) {
-            TaskRepository.create(project.id, title, description, selectedAssignee, deadline, direction)
-        } else {
-            TaskRepository.update(id, project.id, title, description, selectedAssignee, deadline, direction)
+        binding.btnSaveTask.isEnabled = false
+        val completed: (Result<org.json.JSONObject>) -> Unit = { response ->
+            binding.btnSaveTask.isEnabled = true
+            response.onSuccess {
+                ApiClient.applyMutation(it, UserStore(this))
+                Toast.makeText(this, R.string.task_form_saved, Toast.LENGTH_SHORT).show()
+                setResult(RESULT_OK)
+                finish()
+            }.onFailure {
+                Toast.makeText(this, it.message ?: "Не удалось сохранить задачу", Toast.LENGTH_LONG).show()
+            }
         }
-        Toast.makeText(this, R.string.task_form_saved, Toast.LENGTH_SHORT).show()
-        setResult(RESULT_OK)
-        finish()
+        val id = editingId
+        if (id == null) ApiClient.createTask(project.id, title, description, selectedAssignee, deadline, direction, completed)
+        else ApiClient.updateTask(id, project.id, title, description, selectedAssignee, deadline, direction, completed)
     }
 
     companion object {

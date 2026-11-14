@@ -3,7 +3,6 @@ package com.example.sipi_ai.data
 import com.example.sipi_ai.util.daysUntil
 import com.example.sipi_ai.util.isSameDay
 import com.example.sipi_ai.util.startOfDay
-import java.util.Calendar
 
 object TaskRepository {
 
@@ -13,54 +12,18 @@ object TaskRepository {
     private val counters = mutableMapOf<Long, Int>()
     private var nextId = 1L
 
-    init {
-        create(
-            projectId = 1, title = "Сделать прототип UI",
-            description = "Разработать дизайн главной страницы в Figma: шапка, список задач, " +
-                "нижняя навигация, пустое состояние списка и адаптация под маленькие экраны.",
-            assigneeId = Members.ME_ID, deadlineMillis = deadlineInDays(1), direction = "Дизайн",
-            status = TaskStatus.IN_PROGRESS, attachmentName = "layout_v1.png",
-        )
-        create(
-            projectId = 1, title = "Подключить API задач",
-            description = "Заменить тестовые данные на запросы к серверу.",
-            assigneeId = Members.ME_ID, deadlineMillis = deadlineInDays(5), direction = "Разработка",
-            status = TaskStatus.IN_PROGRESS, attachmentName = "api_contract.md",
-        )
-        create(
-            projectId = 1, title = "Проверить экран календаря",
-            description = "Пройтись по переключению месяцев и списку задач на день.",
-            assigneeId = Members.ME_ID, deadlineMillis = deadlineInDays(10), direction = "Тестирование",
-            status = TaskStatus.REVIEW,
-        )
-        create(
-            projectId = 1, title = "Обновить иконку приложения",
-            description = "Заменить стандартную иконку на логотип Сипи.",
-            assigneeId = Members.ME_ID, deadlineMillis = deadlineInDays(-1), direction = "Дизайн",
-            status = TaskStatus.TODO, attachmentName = "logo.svg",
-        )
-        create(
-            projectId = 1, title = "Создать Android-приложение для трекера",
-            description = "Разработать мобильное приложение на Android с функционалом учета задач, " +
-                "включая локальное хранение данных и интеграция с веб-сайтом",
-            assigneeId = null, deadlineMillis = null, direction = "Разработка",
-            status = TaskStatus.TODO,
-        )
-        create(
-            projectId = 1, title = "Создать веб-сайт для трекера",
-            description = "Разработать веб-интерфейс с функционалом учета задач, проектов и команд.",
-            assigneeId = null, deadlineMillis = null, direction = "Разработка",
-            status = TaskStatus.REVIEW,
-        )
-        create(
-            projectId = 1, title = "Создать iOS-приложение для трекера",
-            description = "Разработать мобильное приложение на iOS с функционалом учета задач.",
-            assigneeId = null, deadlineMillis = null, direction = "Разработка",
-            status = TaskStatus.DONE,
-        )
-    }
-
     fun all(): List<Task> = tasks.toList()
+
+    @Synchronized
+    fun replaceFromServer(serverTasks: List<Task>) {
+        tasks.clear()
+        tasks.addAll(serverTasks)
+        counters.clear()
+        serverTasks.groupBy { it.projectId }.forEach { (projectId, items) ->
+            counters[projectId] = items.size
+        }
+        nextId = (serverTasks.maxOfOrNull { it.id } ?: 0L) + 1L
+    }
 
     fun get(id: Long): Task? = tasks.firstOrNull { it.id == id }
 
@@ -208,12 +171,4 @@ object TaskRepository {
         return number
     }
 
-    private fun deadlineInDays(days: Int): Long =
-        Calendar.getInstance().apply {
-            add(Calendar.DAY_OF_YEAR, days)
-            set(Calendar.HOUR_OF_DAY, 18)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
 }

@@ -181,6 +181,32 @@
     <string name="project_description_hint">Краткое описание</string>
     <string name="project_error_name">Введите название проекта</string>
     <string name="project_created">Проект создан</string>
+    <string-array name="project_roles">
+        <item>Разработчик</item>
+        <item>Дизайнер</item>
+        <item>Аналитик</item>
+        <item>Безопасник</item>
+        <item>Тестировщик</item>
+    </string-array>
+    <string-array name="project_role_values">
+        <item>developer</item>
+        <item>designer</item>
+        <item>analyst</item>
+        <item>security</item>
+        <item>tester</item>
+    </string-array>
+    <string-array name="project_specializations">
+        <item>Бекенд</item>
+        <item>Фронтенд</item>
+        <item>Мобильное (iOS)</item>
+        <item>Мобильное (Android)</item>
+    </string-array>
+    <string-array name="project_specialization_values">
+        <item>backend</item>
+        <item>frontend</item>
+        <item>ios</item>
+        <item>android</item>
+    </string-array>
     <string name="project_not_found">Проект не найден</string>
 
     <!-- Доска -->
@@ -197,7 +223,10 @@
 
     <!-- Команда / материалы / настройки -->
     <string name="team_invite">Пригласить участника</string>
-    <string name="team_invite_hint">Имя и фамилия участника</string>
+    <string name="team_invite_hint">Электронная почта участника</string>
+    <string name="project_leave_title">Покинуть проект?</string>
+    <string name="project_leave_message">Вы потеряете доступ к задачам и материалам этого проекта.</string>
+    <string name="project_leave">Покинуть</string>
     <string name="team_invite_error">Введите имя участника</string>
     <string name="team_remove_title">Убрать из проекта?</string>
     <string name="team_remove_message">%1$s больше не будет участником проекта.</string>
@@ -205,8 +234,10 @@
     <string name="team_leader">Руководитель</string>
     <string name="team_member">Участник</string>
     <string name="materials_empty">Материалов пока нет</string>
-    <string name="materials_empty_hint">Добавь файлы, которые пригодятся команде</string>
-    <string name="materials_add">Добавить материал</string>
+    <string name="materials_empty_hint">Добавь ссылку, которая пригодится команде</string>
+    <string name="materials_add">Добавить ссылку</string>
+    <string name="material_title_hint">Название</string>
+    <string name="material_url_hint">Ссылка, начиная с https://</string>
     <string name="materials_from_task">Из задачи %1$s</string>
     <string name="materials_added">Добавлено вручную</string>
     <string name="settings_name_label">Название проекта</string>
@@ -313,7 +344,7 @@
     <string name="login_title">Вход</string>
     <string name="login_subtitle">Рады видеть вас снова</string>
     <string name="login_email_label">Почта</string>
-    <string name="login_email_hint">example@mail.ru</string>
+    <string name="login_email_hint">Логин или почта</string>
     <string name="login_submit">Войти</string>
     <string name="login_go_to_register">Нет аккаунта? Зарегистрироваться</string>
     <string name="login_error_empty_email">Введите почту</string>

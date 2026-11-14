@@ -16,6 +16,7 @@ import com.example.sipi_ai.data.TaskRepository
 import com.example.sipi_ai.data.TaskStatus
 import com.example.sipi_ai.data.TaskTab
 import com.example.sipi_ai.data.UserStore
+import com.example.sipi_ai.data.ApiClient
 import com.example.sipi_ai.databinding.ActivityMainBinding
 import com.example.sipi_ai.databinding.NavHeaderBinding
 import com.example.sipi_ai.ui.calendar.CalendarActivity
@@ -56,13 +57,28 @@ class MainActivity : AppCompatActivity(), TaskFragment.StatsHost {
         setUpToolbarAndDrawer()
         setUpTabs()
         binding.fabAssistant.setOnClickListener { openAssistant() }
+        ApiClient.initialize(this)
     }
 
     override fun onResume() {
         super.onResume()
-        refreshHeader()
-        refreshDrawerProjects()
-        refreshStats()
+        ApiClient.loadSnapshot { result ->
+            result.onSuccess { snapshot ->
+                if (snapshot.optString("sessionId").isBlank()) {
+                    startActivity(Intent(this, com.example.sipi_ai.ui.register.LoginActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    })
+                    return@onSuccess
+                }
+                ApiClient.applySnapshot(snapshot, UserStore(this))
+                refreshHeader()
+                refreshDrawerProjects()
+                refreshStats()
+                supportFragmentManager.fragments.filterIsInstance<TaskFragment>().forEach { it.refreshTasks() }
+            }.onFailure {
+                android.widget.Toast.makeText(this, it.message ?: "Не удалось загрузить данные с сервера", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {

@@ -16,6 +16,10 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.sipi_ai.R
 import com.example.sipi_ai.data.Project
 import com.example.sipi_ai.data.ProjectRepository
+import com.example.sipi_ai.data.ApiClient
+import com.example.sipi_ai.data.Directions
+import com.example.sipi_ai.data.Members
+import com.example.sipi_ai.data.UserStore
 import com.example.sipi_ai.databinding.ActivityAssistantBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
@@ -36,6 +40,7 @@ class AssistantActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityAssistantBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        ApiClient.initialize(this)
 
         setSupportActionBar(binding.toolbarAssistant)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
@@ -112,20 +117,60 @@ class AssistantActivity : AppCompatActivity() {
 
         messages += ChatMessage(nextMessageId++, fromUser = true, text = text)
         val reply = AssistantEngine.reply(text, mode, contextProjectId)
-        messages += ChatMessage(nextMessageId++, fromUser = false, text = reply.text, drafts = reply.drafts)
-
         binding.etMessage.text?.clear()
-        // Помощник мог создать проект — обновляем список контекстов
-        loadContexts()
+        messages += ChatMessage(nextMessageId++, fromUser = true, text = text)
         renderMessages()
+        if (reply.createProjectName != null) {
+            binding.btnSendMessage.isEnabled = false
+            ApiClient.createProject(reply.createProjectName, reply.createProjectDescription) { result ->
+                result.onSuccess { response ->
+                    ApiClient.applyMutation(response, UserStore(this))
+                    val projectId = response.optJSONObject("project")?.optString("id")?.toLongOrNull()
+                    if (projectId == null) finishWrite(reply, 0, IllegalStateException("Сервер не вернул созданный проект"))
+                    else createTaskBatch(projectId, reply.taskTitles, 0) { count, error -> finishWrite(reply, count, error) }
+                }.onFailure { finishWrite(reply, 0, it) }
+            }
+        } else if (reply.taskTitles.isNotEmpty() && reply.taskProjectId != null) {
+            binding.btnSendMessage.isEnabled = false
+            createTaskBatch(reply.taskProjectId, reply.taskTitles, 0) { count, error -> finishWrite(reply, count, error) }
+        } else {
+            messages += ChatMessage(nextMessageId++, fromUser = false, text = reply.text, drafts = reply.drafts)
+            loadContexts()
+            renderMessages()
+        }
     }
 
     private fun addDrafts(message: ChatMessage) {
-        val added = AssistantEngine.addDrafts(message.drafts, contextProjectId)
-        if (added == 0) return
-        val index = messages.indexOfFirst { it.id == message.id }
-        if (index != -1) messages[index] = messages[index].copy(draftsAdded = true)
-        Toast.makeText(this, R.string.assistant_drafts_added, Toast.LENGTH_SHORT).show()
+        val projectId = contextProjectId ?: projects.firstOrNull()?.id ?: return
+        createTaskBatch(projectId, message.drafts, 0) { count, error ->
+            if (error == null && count == message.drafts.size) {
+                val index = messages.indexOfFirst { it.id == message.id }
+                if (index != -1) messages[index] = messages[index].copy(draftsAdded = true)
+                Toast.makeText(this, R.string.assistant_drafts_added, Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, error?.message ?: "Сохранено задач: $count", Toast.LENGTH_LONG).show()
+            }
+            renderMessages()
+        }
+    }
+
+    private fun createTaskBatch(projectId: Long, titles: List<String>, index: Int, done: (Int, Throwable?) -> Unit) {
+        if (index >= titles.size) { done(index, null); return }
+        ApiClient.createTask(projectId, titles[index], "", Members.ME_ID, null, Directions.TEAM) { result ->
+            result.onSuccess {
+                ApiClient.applyMutation(it, UserStore(this))
+                createTaskBatch(projectId, titles, index + 1, done)
+            }.onFailure { done(index, it) }
+        }
+    }
+
+    private fun finishWrite(reply: AssistantReply, savedTasks: Int, error: Throwable?) {
+        binding.btnSendMessage.isEnabled = true
+        loadContexts()
+        val message = if (error == null) reply.text else if (reply.createProjectName != null && savedTasks > 0)
+            "Проект «${reply.createProjectName}» создан, сохранено задач: $savedTasks. ${error.message.orEmpty()}"
+        else error.message ?: "Не удалось сохранить изменения"
+        messages += ChatMessage(nextMessageId++, fromUser = false, text = message)
         renderMessages()
     }
 

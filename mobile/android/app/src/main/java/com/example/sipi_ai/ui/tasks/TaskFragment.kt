@@ -9,6 +9,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.sipi_ai.R
 import com.example.sipi_ai.data.Task
 import com.example.sipi_ai.data.TaskRepository
+import com.example.sipi_ai.data.ApiClient
+import com.example.sipi_ai.data.UserStore
 import com.example.sipi_ai.data.TaskStatus
 import com.example.sipi_ai.data.TaskTab
 import com.example.sipi_ai.databinding.FragmentTaskBinding
@@ -46,6 +48,8 @@ class TaskFragment : Fragment(R.layout.fragment_task) {
         super.onDestroyView()
     }
 
+    fun refreshTasks() = showTasks()
+
     private fun showTasks() {
         val binding = binding ?: return
         val tasks = TaskRepository.mineIn(tab)
@@ -65,16 +69,17 @@ class TaskFragment : Fragment(R.layout.fragment_task) {
     }
 
     private fun submitForReview(task: Task) {
-        TaskRepository.updateStatus(task.id, TaskStatus.REVIEW)
-        showTasks()
-
-        Snackbar.make(requireView(), R.string.task_submitted, Snackbar.LENGTH_LONG)
-            .setAnchorView(requireActivity().findViewById<View>(R.id.bottomNavigationView))
-            .setAction(R.string.action_undo) {
-                TaskRepository.updateStatus(task.id, task.status)
+        ApiClient.moveTask(task.id, "in_review", { response ->
+            response.onSuccess { snapshot ->
+                ApiClient.applySnapshot(snapshot.optJSONObject("snapshot") ?: snapshot, UserStore(requireContext()))
                 showTasks()
+                Snackbar.make(requireView(), R.string.task_submitted, Snackbar.LENGTH_LONG)
+                    .setAnchorView(requireActivity().findViewById<View>(R.id.bottomNavigationView))
+                    .show()
+            }.onFailure {
+                Snackbar.make(requireView(), it.message ?: "Не удалось обновить задачу", Snackbar.LENGTH_LONG).show()
             }
-            .show()
+        })
     }
 
     /** Активити, которое показывает статистику над вкладками и должно обновляться после изменений. */

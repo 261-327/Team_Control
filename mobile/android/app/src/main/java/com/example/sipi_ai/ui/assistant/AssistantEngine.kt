@@ -15,6 +15,10 @@ data class AssistantReply(
     val text: String,
     /** Черновики задач, которые можно добавить на доску кнопкой в сообщении. */
     val drafts: List<String> = emptyList(),
+    val createProjectName: String? = null,
+    val createProjectDescription: String = "",
+    val taskProjectId: Long? = null,
+    val taskTitles: List<String> = emptyList(),
 )
 
 /**
@@ -48,14 +52,6 @@ object AssistantEngine {
             AssistantMode.ASSISTANT -> assistantReply(input, projectId)
         }
 
-    /** Добавляет черновики на доску проекта. Возвращает число созданных задач. */
-    fun addDrafts(drafts: List<String>, projectId: Long?): Int {
-        val project = (projectId?.let { ProjectRepository.get(it) } ?: ProjectRepository.all().firstOrNull())
-            ?: return 0
-        drafts.forEach { createTask(project.id, it) }
-        return drafts.size
-    }
-
     private fun assistantReply(input: String, projectId: Long?): AssistantReply {
         val text = input.trim()
 
@@ -65,14 +61,17 @@ object AssistantEngine {
             if (name.isEmpty()) return AssistantReply("Напиши название проекта в кавычках: Создай проект «Название».")
             val rawIdea = create.groupValues.getOrNull(2).orEmpty()
             val idea = rawIdea.replace(trailingAddTasksRegex, "").trim()
-            val project = ProjectRepository.create(name, idea)
             val count = addTasksRegex.find(text)?.groupValues?.get(1)?.toIntOrNull()?.coerceIn(0, MAX_TASKS) ?: 0
             val created = (0 until count).map { starterTasks[it % starterTasks.size] }
-            created.forEach { createTask(project.id, it) }
 
             val tasksPart = if (created.isEmpty()) "" else
                 "\nДобавил на доску ${tasksWord(created.size)}:\n" + created.joinToString("\n") { "• $it" }
-            return AssistantReply("Создал проект «${project.name}» (${project.key}).$tasksPart")
+            return AssistantReply(
+                "Создал проект «$name».$tasksPart",
+                createProjectName = name,
+                createProjectDescription = idea,
+                taskTitles = created,
+            )
         }
 
         val add = addTasksRegex.find(text)
@@ -81,9 +80,10 @@ object AssistantEngine {
                 ?: return AssistantReply("Чтобы добавить задачи, выбери проект в поле «Контекст».")
             val count = (add.groupValues[1].toIntOrNull() ?: 0).coerceIn(1, MAX_TASKS)
             val created = (0 until count).map { starterTasks[it % starterTasks.size] }
-            created.forEach { createTask(project.id, it) }
             return AssistantReply(
                 "Добавил в «${project.name}» ${tasksWord(count)}:\n" + created.joinToString("\n") { "• $it" },
+                taskProjectId = project.id,
+                taskTitles = created,
             )
         }
 
@@ -138,16 +138,6 @@ object AssistantEngine {
         }
         return builder.toString()
     }
-
-    private fun createTask(projectId: Long, title: String): Task =
-        TaskRepository.create(
-            projectId = projectId,
-            title = title,
-            description = "",
-            assigneeId = Members.ME_ID,
-            deadlineMillis = null,
-            direction = Directions.TEAM,
-        )
 
     private fun tasksWord(count: Int): String =
         "$count " + russianPlural(count, "задачу", "задачи", "задач")

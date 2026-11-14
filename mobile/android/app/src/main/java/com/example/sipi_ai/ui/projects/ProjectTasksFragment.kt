@@ -11,9 +11,11 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.sipi_ai.R
 import com.example.sipi_ai.data.Directions
+import com.example.sipi_ai.data.ApiClient
 import com.example.sipi_ai.data.Task
 import com.example.sipi_ai.data.TaskRepository
 import com.example.sipi_ai.data.TaskStatus
+import com.example.sipi_ai.data.UserStore
 import com.example.sipi_ai.databinding.FragmentProjectTasksBinding
 import com.example.sipi_ai.databinding.ViewBoardColumnBinding
 import com.example.sipi_ai.ui.common.openTask
@@ -134,16 +136,26 @@ class ProjectTasksFragment : Fragment(R.layout.fragment_project_tasks) {
 
     private fun move(task: Task, status: TaskStatus) {
         val previous = task.status
-        TaskRepository.updateStatus(task.id, status)
-        render()
-        Snackbar.make(
-            requireView(),
-            getString(R.string.task_moved, getString(status.style.label)),
-            Snackbar.LENGTH_LONG,
-        ).setAction(R.string.action_undo) {
-            TaskRepository.updateStatus(task.id, previous)
-            render()
-        }.show()
+        val wire = status.toWireStatus()
+        val reason = if (previous == TaskStatus.REVIEW && status == TaskStatus.IN_PROGRESS)
+            "Исправления отмечены в приложении" else null
+        ApiClient.moveTask(task.id, wire, { response ->
+            response.onSuccess {
+                ApiClient.applyMutation(it, UserStore(requireContext()))
+                render()
+                Snackbar.make(requireView(), getString(R.string.task_moved, getString(status.style.label)), Snackbar.LENGTH_LONG)
+                    .setAction(R.string.action_undo) {
+                        val undoReason = if (status == TaskStatus.REVIEW && previous == TaskStatus.IN_PROGRESS)
+                            "Возврат статуса" else null
+                        ApiClient.moveTask(task.id, previous.toWireStatus(), { undo ->
+                            undo.onSuccess {
+                                ApiClient.applyMutation(it, UserStore(requireContext()))
+                                render()
+                            }.onFailure { Snackbar.make(requireView(), it.message ?: "Не удалось отменить перенос", Snackbar.LENGTH_LONG).show() }
+                        }, undoReason)
+                    }.show()
+            }.onFailure { Snackbar.make(requireView(), it.message ?: "Не удалось переместить задачу", Snackbar.LENGTH_LONG).show() }
+        }, reason)
     }
 
     private fun confirmDelete(task: Task) {
@@ -152,8 +164,12 @@ class ProjectTasksFragment : Fragment(R.layout.fragment_project_tasks) {
             .setMessage(getString(R.string.task_delete_message, task.title))
             .setNegativeButton(R.string.action_cancel, null)
             .setPositiveButton(R.string.action_delete) { _, _ ->
-                TaskRepository.delete(task.id)
-                render()
+                ApiClient.deleteTask(task.id) { result ->
+                    result.onSuccess {
+                        ApiClient.applyMutation(it, UserStore(requireContext()))
+                        render()
+                    }.onFailure { Snackbar.make(requireView(), it.message ?: "Не удалось удалить задачу", Snackbar.LENGTH_LONG).show() }
+                }
             }
             .show()
     }
@@ -163,6 +179,13 @@ class ProjectTasksFragment : Fragment(R.layout.fragment_project_tasks) {
         TaskStatus.IN_PROGRESS -> R.drawable.ic_autorenew
         TaskStatus.REVIEW -> R.drawable.ic_assignment
         TaskStatus.DONE -> R.drawable.ic_check_circle
+    }
+
+    private fun TaskStatus.toWireStatus(): String = when (this) {
+        TaskStatus.TODO -> "todo"
+        TaskStatus.IN_PROGRESS -> "in_progress"
+        TaskStatus.REVIEW -> "in_review"
+        TaskStatus.DONE -> "done"
     }
 
     companion object {

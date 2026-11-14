@@ -44,21 +44,6 @@
             android:inputType="textMultiLine|textCapSentences"
             android:minLines="3" />
 
-        <TextView
-            style="@style/SipiFieldLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/settings_season_label" />
-
-        <EditText
-            android:id="@+id/etSettingsSeason"
-            style="@style/SipiEditText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:importantForAutofill="no"
-            android:inputType="textCapSentences"
-            android:maxLength="30" />
-
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btnSaveSettings"
             style="@style/SipiPrimaryButton"
