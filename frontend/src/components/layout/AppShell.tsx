@@ -304,7 +304,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 <Icon name="search" size={17} />
                 <span>Поиск по пространству</span>
-                <kbd>⌘ K</kbd>
               </button>
               <NotificationsBell key={data.sessionId} attention={attention} />
               <Link className="topbar-avatar" href="/profile" aria-label="Открыть профиль">
