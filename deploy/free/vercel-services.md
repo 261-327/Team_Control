@@ -75,6 +75,48 @@ IP берётся из [платформенного заголовка Vercel](
 
 Эти изменения добавляют защиту API от перебора и массовой отправки. Прежняя политика сообщений о существовании аккаунта не меняется: восстановление отвечает одинаково для известной и неизвестной почты, а сообщения регистрации о занятом адресе сохраняются. Старые HTML auth views не переведены на этот limiter; в Services у `/legacy` нет публичного маршрута. При отдельной публикации legacy-интерфейса потребуется собственная проверка его ограничений.
 
+## 3.1. Постоянное приватное хранилище файлов материалов
+
+Vercel Functions имеют read-only filesystem; `/tmp` — временное пространство и не подходит для постоянных пользовательских файлов. Поэтому в Services-профиле загрузка и скачивание файлов материалов остаются отключёнными, пока не включено внешнее object storage. Локальная разработка и Docker Compose продолжают использовать FileSystemStorage / volume.
+
+Для файлов используется S3-совместимый backend Django через `django-storages`. Для этого проекта выбран Backblaze B2 с приватным bucket и S3 API.
+
+### Настройка Backblaze B2
+
+1. В Backblaze Console открой **Buckets** и проверь, что bucket `team-control-private-media` имеет тип доступа **Private**.
+2. Открой сведения bucket и скопируй S3 endpoint. Для текущей конфигурации ожидаются `https://s3.eu-central-003.backblazeb2.com` и region `eu-central-003`; если панель показывает другое, используй значения из панели.
+3. Создай Application Key, ограниченный этим bucket. Выдай только необходимые приложению права на чтение, запись, удаление и перечисление файлов. Не включай доступ ко всем bucket names без необходимости.
+4. В настройках окружения **backend-сервиса** добавь:
+   - `PROJECT_MEDIA_STORAGE=s3`
+   - `OBJECT_STORAGE_ENDPOINT_URL=https://s3.eu-central-003.backblazeb2.com`
+   - `OBJECT_STORAGE_BUCKET=team-control-private-media`
+   - `OBJECT_STORAGE_ACCESS_KEY_ID=<Application Key ID>`
+   - `OBJECT_STORAGE_SECRET_ACCESS_KEY=<Application Key>`
+   - `OBJECT_STORAGE_REGION=eu-central-003`
+5. Добавляй эти значения только в Production backend environment. Не добавляй ключи в Preview, frontend, `NEXT_PUBLIC_*`, Git, issue, PR или логи. После изменения окружения перезапусти/переразверни backend.
+
+В текущей архитектуре `sipi.prettiqs.workers.dev` — дополнительный Cloudflare Worker reverse proxy к `sipi-pilot.vercel.app`, а не место размещения приложения. Next.js и Django развернуты в Vercel Services; переменные B2 задаются в Vercel Project → Settings → Environment Variables для Production. Не помещай ключи в Cloudflare Worker. Если архитектура размещения будет изменена, переменные нужно перенести в окружение нового Django backend.
+
+Bucket остаётся закрытым; публичные URL не формируются. Скачивание идёт через Django endpoint после проверки членства, а не через публичный URL bucket. Не включай публичный доступ ради обхода авторизации.
+
+### Поведение при отсутствии конфигурации
+
+Если `SIPI_VERCEL_SERVICES=true`, но `PROJECT_MEDIA_STORAGE=s3` не включён, сайт и остальные функции продолжают запускаться, однако endpoints загрузки и скачивания возвращают `503 storage_unavailable`. Это намеренная fail-closed защита: нельзя сохранять пользовательские документы во временную файловую систему serverless-функции. В локальной разработке и Docker файловые endpoints работают через локальный storage.
+
+### Перенос файлов и проверка
+
+Если файлы уже лежат в Docker volume `media_data`, сначала сделай резервную копию volume и БД, затем запусти management command из среды, где исходный `MEDIA_ROOT` доступен и уже настроен S3 backend:
+
+```sh
+cd backend
+python manage.py migrate_material_files_to_object_storage --dry-run
+python manage.py migrate_material_files_to_object_storage
+```
+
+Команда сверяет размер и SHA-256, пропускает уже совпадающие объекты и обновляет имя объекта в БД только после проверки загрузки. Исходные файлы не удаляет. Если прежние файлы находились только на ephemeral filesystem и экземпляр уже был пересоздан, восстановить их из этой среды невозможно — нужен архив/volume backup или повторная загрузка исходников.
+
+На тестовом bucket проверь загрузку, скачивание авторизованным участником, отказ постороннему пользователю, удаление, повторный деплой и доступ с нового экземпляра. Не используй реальные пользовательские документы до успешного восстановления вместе с БД.
+
 ## 4. Проверить живой стенд
 
 По фактическому Production URL, отдельным тестовым аккаунтом:

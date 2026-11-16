@@ -159,8 +159,62 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", str(BASE_DIR / "media"))).resolve()
 DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024
+PROJECT_MEDIA_STORAGE = os.environ.get("PROJECT_MEDIA_STORAGE", "filesystem").strip().lower()
+if PROJECT_MEDIA_STORAGE not in {"filesystem", "s3"}:
+    raise RuntimeError("PROJECT_MEDIA_STORAGE must be filesystem or s3")
+
+# Serverless functions have an ephemeral/read-only filesystem. Keep file uploads
+# disabled there until a private persistent object store is explicitly configured.
+PROJECT_FILE_UPLOADS_ENABLED = (
+    not SIPI_VERCEL_SERVICES or PROJECT_MEDIA_STORAGE == "s3"
+)
+
+if PROJECT_MEDIA_STORAGE == "s3":
+    _object_storage_endpoint = os.environ.get("OBJECT_STORAGE_ENDPOINT_URL", "").strip().rstrip("/")
+    _object_storage_bucket = os.environ.get("OBJECT_STORAGE_BUCKET", "").strip()
+    _object_storage_access_key = os.environ.get("OBJECT_STORAGE_ACCESS_KEY_ID", "").strip()
+    _object_storage_secret_key = os.environ.get("OBJECT_STORAGE_SECRET_ACCESS_KEY", "")
+    _object_storage_region = os.environ.get("OBJECT_STORAGE_REGION", "auto").strip() or "auto"
+
+    if not all((_object_storage_endpoint, _object_storage_bucket,
+                _object_storage_access_key, _object_storage_secret_key)):
+        raise RuntimeError(
+            "Object storage is enabled but its endpoint, bucket or credentials are missing"
+        )
+    _parsed_storage_endpoint = urlsplit(_object_storage_endpoint)
+    if (
+        _parsed_storage_endpoint.scheme != "https"
+        or not _parsed_storage_endpoint.hostname
+        or _parsed_storage_endpoint.path not in ("", "/")
+        or _parsed_storage_endpoint.query
+        or _parsed_storage_endpoint.fragment
+    ):
+        raise RuntimeError("OBJECT_STORAGE_ENDPOINT_URL must be a valid HTTPS endpoint without a path")
+
+    _default_file_storage = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "bucket_name": _object_storage_bucket,
+            "endpoint_url": _object_storage_endpoint,
+            "region_name": _object_storage_region,
+            "access_key": _object_storage_access_key,
+            "secret_key": _object_storage_secret_key,
+            "signature_version": "s3v4",
+            "addressing_style": "path",
+            "default_acl": None,
+            "querystring_auth": True,
+            "querystring_expire": 60,
+            "file_overwrite": False,
+            "object_parameters": {"CacheControl": "private, no-store"},
+        },
+    }
+else:
+    _default_file_storage = {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    }
+
 STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "default": _default_file_storage,
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 

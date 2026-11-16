@@ -1413,6 +1413,12 @@ PROJECT_FILE_SIGNATURES = {
 @never_cache
 def material_file_upload(request, project_id):
     """Save an allow-listed file into private storage after checking its signature."""
+    if not settings.PROJECT_FILE_UPLOADS_ENABLED:
+        return error(
+            "Загрузка файлов пока отключена: постоянное хранилище не настроено.",
+            "storage_unavailable",
+            503,
+        )
     if request.method != "POST":
         response = error("Метод не поддерживается.", "method_not_allowed", 405)
         response["Allow"] = "POST"
@@ -1493,6 +1499,12 @@ def material_file_upload(request, project_id):
 
 @never_cache
 def material_file_download(request, material_id):
+    if not settings.PROJECT_FILE_UPLOADS_ENABLED:
+        return error(
+            "Скачивание файлов временно недоступно: постоянное хранилище не настроено.",
+            "storage_unavailable",
+            503,
+        )
     if request.method != "GET":
         response = error("Метод не поддерживается.", "method_not_allowed", 405)
         response["Allow"] = "GET"

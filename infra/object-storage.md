@@ -1,0 +1,58 @@
+# Постоянное приватное хранилище материалов
+
+## Архитектура
+
+Production использует S3-совместимое объектное хранилище для байтов файлов. Django сохраняет в PostgreSQL метаданные и ключ объекта. Bucket закрытый; приложение не публикует публичные URL объектов. Каждый download проходит через Django и повторно проверяет членство пользователя в проекте.
+
+Локальная разработка и Docker Compose по умолчанию используют FileSystemStorage. В serverless-профиле без настроенного object storage endpoints файлов возвращают 503, а не записывают данные во временную файловую систему.
+
+## Выбранный провайдер: Backblaze B2
+
+Для проекта выбран Backblaze B2 с S3-compatible API. Создай отдельный bucket с типом доступа **Private**. Не включай публичный доступ.
+
+Для текущего bucket:
+
+- Bucket: `team-control-private-media`
+- S3 endpoint: `https://s3.eu-central-003.backblazeb2.com`
+- Region: `eu-central-003`
+
+Перед настройкой сверь endpoint и регион в Backblaze Console → Buckets → выбранный bucket → Endpoint. Если панель показывает другое значение, используй именно его: регион нельзя угадывать или заменять.
+
+## Переменные окружения backend
+
+- `PROJECT_MEDIA_STORAGE=s3`
+- `OBJECT_STORAGE_ENDPOINT_URL=https://s3.eu-central-003.backblazeb2.com`
+- `OBJECT_STORAGE_BUCKET=team-control-private-media`
+- `OBJECT_STORAGE_ACCESS_KEY_ID` — Key ID созданного Application Key
+- `OBJECT_STORAGE_SECRET_ACCESS_KEY` — Application Key
+- `OBJECT_STORAGE_REGION=eu-central-003`
+
+Для Application Key ограничь доступ выбранным bucket и используй только необходимые права чтения, записи, удаления и перечисления файлов. Не включай доступ ко всем bucket names, если он не требуется приложению. Секретный ключ показывается при создании: сохрани его в менеджере секретов и не отправляй в чат.
+
+В текущей архитектуре публичный `sipi.prettiqs.workers.dev` — это Cloudflare Worker reverse proxy к `sipi-pilot.vercel.app`; он не размещает Django. Django работает как backend service в Vercel Services. Поэтому переменные добавляются в Vercel Project → Settings → Environment Variables для **Production** (backend service). Не добавляй секреты в настройки Worker, Git, issue, PR, frontend, `NEXT_PUBLIC_*` или логи.
+
+## Перенос локальных файлов
+
+Если исходные файлы существуют в `MEDIA_ROOT`, включи S3 backend и выполни из backend-каталога:
+
+```sh
+python manage.py migrate_material_files_to_object_storage --dry-run
+python manage.py migrate_material_files_to_object_storage
+```
+
+Команда сверяет размер и SHA-256, проверяет уже существующий объект, обновляет ключ в БД только после успешной проверки и не удаляет локальный оригинал. Запускать её нужно в окружении, где доступен исходный каталог/volume. Если прежняя serverless-функция уже потеряла временные файлы, нужен внешний backup или исходники от пользователя.
+
+## Проверка
+
+1. Убедись, что bucket имеет тип Private, а Application Key ограничен выбранным bucket.
+2. Проверь, что Django стартует только при полном наборе параметров для `PROJECT_MEDIA_STORAGE=s3`.
+3. Загрузи тестовый PDF/PNG/JPEG.
+4. Проверь объект в приватном bucket и отсутствие публичного доступа к нему.
+5. Скачай через защищённый endpoint участником проекта; проверь отказ для постороннего/исключённого пользователя.
+6. Удали материал и проверь удаление объекта.
+7. Повтори скачивание после redeploy и с нового экземпляра backend.
+8. Выполни тестовое восстановление БД и объектов в отдельной среде.
+
+## Резервные копии
+
+Object storage не заменяет backup. В рамках #16 нужно резервировать PostgreSQL и объекты в согласованном временном окне, хранить копию отдельно с ограниченным доступом и фактически проверить восстановление в изолированную среду. Не удаляй исходную копию до проверки новой.
