@@ -1,5 +1,6 @@
 package com.example.sipi_ai.ui.assistant
 
+import android.graphics.Bitmap
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.ViewGroup
@@ -11,12 +12,26 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.sipi_ai.R
 import com.example.sipi_ai.databinding.ItemMessageBinding
 
+enum class AssistantMode(val apiValue: String) { CHAT("chat"), TASKS("tasks"), LOGO("logo") }
+
+data class AssistantTaskDraft(
+    val title: String,
+    val description: String,
+    val tag: String,
+    val assigneeId: String = "",
+    val deadlineAt: String = "",
+)
+
 data class ChatMessage(
     val id: Long,
     val fromUser: Boolean,
     val text: String,
-    val drafts: List<String> = emptyList(),
+    val turnId: String? = null,
+    val drafts: List<AssistantTaskDraft> = emptyList(),
     val draftsAdded: Boolean = false,
+    val image: Bitmap? = null,
+    val imageLoading: Boolean = false,
+    val pending: Boolean = false,
 )
 
 class MessageAdapter(
@@ -35,6 +50,8 @@ class MessageAdapter(
             val gravity = if (message.fromUser) Gravity.END else Gravity.START
 
             binding.tvMessageText.text = message.text
+            binding.ivGeneratedImage.isVisible = message.image != null
+            binding.ivGeneratedImage.setImageBitmap(message.image)
             binding.tvMessageText.setBackgroundResource(
                 if (message.fromUser) R.drawable.bg_message_user else R.drawable.bg_message_assistant,
             )
@@ -46,8 +63,8 @@ class MessageAdapter(
 
             val hasDrafts = !message.fromUser && message.drafts.isNotEmpty()
             binding.btnAddDrafts.isVisible = hasDrafts
+            binding.btnAddDrafts.isEnabled = hasDrafts && !message.draftsAdded
             if (hasDrafts) {
-                binding.btnAddDrafts.isEnabled = !message.draftsAdded
                 binding.btnAddDrafts.text = if (message.draftsAdded) {
                     context.getString(R.string.assistant_drafts_added)
                 } else {
@@ -55,6 +72,7 @@ class MessageAdapter(
                 }
                 binding.btnAddDrafts.setOnClickListener { onAddDrafts(message) }
             }
+            binding.pbImageLoading.isVisible = message.imageLoading
         }
     }
 

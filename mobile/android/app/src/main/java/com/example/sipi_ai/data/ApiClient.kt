@@ -1,8 +1,11 @@
 package com.example.sipi_ai.data
 
 import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import com.example.sipi_ai.BuildConfig
 import com.example.sipi_ai.util.projectKey
 import org.json.JSONArray
@@ -11,6 +14,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.time.Instant
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import com.example.sipi_ai.ui.register.LoginActivity
 
 /** Session and CSRF aware client for the Django API shared with the website. */
 object ApiClient {
@@ -18,6 +23,7 @@ object ApiClient {
     private const val PREFS = "sipi_api_session"
     private val io = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
+    private val sessionRedirectStarted = AtomicBoolean(false)
     private lateinit var app: Context
     private var csrf: String? = null
 
@@ -26,7 +32,7 @@ object ApiClient {
         csrf = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("csrf", null)
     }
 
-    fun warmUp(done: (Result<Unit>) -> Unit) = request("GET", "bootstrap/", null) { done(it.map { Unit }) }
+    fun warmUp(done: (Result<Unit>) -> Unit) = request("GET", "bootstrap/", null, done = { done(it.map { Unit }) })
 
     fun login(username: String, password: String, done: (Result<String>) -> Unit) = post(
         "auth/login/", JSONObject().put("username", username).put("password", password), done
@@ -39,7 +45,7 @@ object ApiClient {
 
     fun verify(code: String, done: (Result<Unit>) -> Unit) = post(
         "auth/verify/", JSONObject().put("code", code), done
-    ) { Unit }
+    ) { markSessionAuthenticated(); Unit }
 
     fun logout(done: (Result<JSONObject>) -> Unit) = post("auth/logout/", JSONObject(), done) { it }
 
@@ -52,7 +58,95 @@ object ApiClient {
         csrf = null
     }
 
-    fun loadSnapshot(done: (Result<JSONObject>) -> Unit) = request("GET", "bootstrap/", null, done)
+    fun clearLocalAccountState() {
+        clearSession()
+        UserStore(app).clear()
+        ProjectRepository.replaceFromServer(emptyList(), emptyList())
+        TaskRepository.replaceFromServer(emptyList())
+    }
+
+    private fun markSessionAuthenticated() {
+        sessionRedirectStarted.set(false)
+    }
+
+    fun hasAuthenticatedSession(snapshot: JSONObject): Boolean {
+        val sessionValue = snapshot.opt("sessionId")
+        if (sessionValue == null || sessionValue === JSONObject.NULL) return false
+        val sessionId = sessionValue.toString().toLongOrNull() ?: return false
+        val users = snapshot.optJSONArray("users") ?: return false
+        return (0 until users.length()).any { index ->
+            users.optJSONObject(index)?.optString("id")?.toLongOrNull() == sessionId
+        }
+    }
+
+    private fun handleUnauthorized() {
+        if (!sessionRedirectStarted.compareAndSet(false, true)) return
+        clearLocalAccountState()
+        main.post {
+            app.startActivity(Intent(app, LoginActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            })
+        }
+    }
+
+    class SessionExpiredException(message: String) : IllegalStateException(message)
+
+    fun loadSnapshot(done: (Result<JSONObject>) -> Unit) = request(
+        "GET", "bootstrap/", null, done = { result ->
+            result.onSuccess { if (hasAuthenticatedSession(it)) markSessionAuthenticated() }
+            done(result)
+        }
+    )
+
+    fun assistantHistory(projectId: Long?, done: (Result<JSONObject>) -> Unit) = request(
+        "GET", "assistant" + (projectId?.let { "?projectId=$it" } ?: ""), null, done
+    )
+
+    fun askAssistant(message: String, mode: String, projectId: Long?, requestId: String, done: (Result<JSONObject>) -> Unit) = request(
+        "POST", "assistant", JSONObject().put("message", message).put("mode", mode)
+            .put("projectId", projectId?.toString()).put("requestId", requestId), done, 300_000
+    )
+
+    fun assistantTurn(turnId: String, done: (Result<JSONObject>) -> Unit) = request(
+        "GET", "assistant/turns/$turnId", null, done
+    )
+
+    fun clearAssistantHistory(projectId: Long?, done: (Result<JSONObject>) -> Unit) = request(
+        "DELETE", "assistant" + (projectId?.let { "?projectId=$it" } ?: ""), null, done
+    )
+
+    fun confirmAssistantTasks(turnId: String, tasks: JSONArray, done: (Result<JSONObject>) -> Unit) = post(
+        "assistant/turns/$turnId/confirm/", JSONObject().put("tasks", tasks), done
+    ) { it }
+
+    fun loadAssistantImage(turnId: String, done: (Result<Bitmap>) -> Unit) {
+        io.execute {
+            val result = runCatching {
+                val apiRoot = BuildConfig.API_BASE_URL.trimEnd('/')
+                val url = URL("$apiRoot/assistant/turns/$turnId/image")
+                val connection = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 20000
+                    readTimeout = 60000
+                    setRequestProperty("Accept", "image/png")
+                    app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("cookies", null)
+                        ?.takeIf { it.isNotBlank() }?.let { setRequestProperty("Cookie", it) }
+                }
+                val code = connection.responseCode
+                if (code == 401) handleUnauthorized()
+                if (code !in 200..299) {
+                    val error = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                    val message = runCatching { JSONObject(error).optJSONObject("error")?.optString("message") }.getOrNull()
+                    val description = message?.takeIf { it.isNotBlank() } ?: "Не удалось загрузить изображение"
+                    if (code == 401) throw SessionExpiredException(description)
+                    throw IllegalStateException(description)
+                }
+                connection.inputStream.use { BitmapFactory.decodeStream(it) }
+                    ?: error("Сервер вернул пустое изображение")
+            }
+            main.post { done(result) }
+        }
+    }
 
     fun applyMutation(response: JSONObject, userStore: UserStore) {
         applySnapshot(response.optJSONObject("snapshot") ?: response, userStore)
@@ -127,9 +221,15 @@ object ApiClient {
     private fun delete(path: String, done: (Result<JSONObject>) -> Unit) = request("DELETE", path, null, done)
 
     private fun <T> post(path: String, body: JSONObject, done: (Result<T>) -> Unit, method: String = "POST", map: (JSONObject) -> T) =
-        request(method, path, body) { done(it.mapCatching(map)) }
+        request(method, path, body, done = { done(it.mapCatching(map)) })
 
-    private fun request(method: String, path: String, body: JSONObject?, done: (Result<JSONObject>) -> Unit) {
+    private fun request(
+        method: String,
+        path: String,
+        body: JSONObject?,
+        done: (Result<JSONObject>) -> Unit,
+        readTimeoutMillis: Int = 25000,
+    ) {
         io.execute {
             val result = runCatching {
                 // The web host canonicalizes URLs without a trailing slash (308).
@@ -140,7 +240,7 @@ object ApiClient {
                 val connection = (url.openConnection() as HttpURLConnection).apply {
                     requestMethod = method
                     connectTimeout = 20000
-                    readTimeout = 25000
+                    readTimeout = readTimeoutMillis
                     setRequestProperty("Accept", "application/json")
                     setRequestProperty("Origin", "${url.protocol}://${url.host}")
                     app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("cookies", null)
@@ -175,9 +275,15 @@ object ApiClient {
                 val stream = if (code in 200..299) connection.inputStream else connection.errorStream
                 val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
                 val json = if (text.isBlank()) JSONObject() else JSONObject(text)
+                if (code == 401) {
+                    handleUnauthorized()
+                    throw SessionExpiredException(
+                        json.optJSONObject("error")?.optString("message")?.takeIf { it.isNotBlank() }
+                            ?: "Войдите в аккаунт."
+                    )
+                }
                 if (code !in 200..299) throw IllegalStateException(
-                    json.optJSONObject("error")?.optString("message")?.takeIf { it.isNotBlank() }
-                        ?: "Ошибка сервера ($code)"
+                    json.optJSONObject("error")?.optString("message")?.takeIf { it.isNotBlank() } ?: "Ошибка сервера ($code)"
                 )
                 json
             }

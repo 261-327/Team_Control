@@ -68,17 +68,34 @@
                 android:textColor="@color/text_primary"
                 android:textColorHint="@color/text_hint" />
 
-            <EditText
-                android:id="@+id/etLoginPassword"
+            <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="18dp"
-                android:background="@drawable/bg_edittext"
-                android:hint="Пароль"
-                android:inputType="textPassword"
-                android:padding="14dp"
-                android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_hint" />
+                android:layout_marginBottom="18dp">
+
+                <EditText
+                    android:id="@+id/etLoginPassword"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_edittext"
+                    android:hint="Пароль"
+                    android:inputType="textPassword"
+                    android:padding="14dp"
+                    android:paddingEnd="56dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint" />
+
+                <ImageButton
+                    android:id="@+id/btnTogglePassword"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="end|center_vertical"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/password_show"
+                    android:padding="12dp"
+                    android:src="@drawable/ic_visibility_off"
+                    android:tint="@color/text_secondary" />
+            </FrameLayout>
 
             <Button
                 android:id="@+id/btnLogin"

@@ -70,9 +70,9 @@ class ProjectActivity : AppCompatActivity() {
         binding.ivProjectIcon.imageTintList =
             ColorStateList.valueOf(getColor(projectColorRes(project.colorIndex)))
 
-        val team = getString(R.string.project_team_count, project.memberIds.size)
-        binding.tvProjectMeta.text =
-            if (project.ownerId == Members.ME_ID) "$team  ·  ${getString(R.string.project_you_lead)}" else team
+        binding.tvProjectMeta.setText(
+            if (project.ownerId == Members.ME_ID) R.string.project_you_lead else R.string.project_role_member,
+        )
 
         val tasksCount = TaskRepository.forProject(projectId).size
         binding.tabProject.getTabAt(0)?.text = "${getString(R.string.project_tab_tasks)} $tasksCount"

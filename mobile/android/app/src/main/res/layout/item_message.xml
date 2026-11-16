@@ -16,6 +16,25 @@
         android:textSize="14sp"
         tools:text="Привет! Чем помочь?" />
 
+    <ProgressBar
+        android:id="@+id/pbImageLoading"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="8dp"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/ivGeneratedImage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:adjustViewBounds="true"
+        android:contentDescription="@string/assistant_logo_image_description"
+        android:maxHeight="360dp"
+        android:scaleType="fitCenter"
+        android:visibility="gone" />
+
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/btnAddDrafts"
         style="@style/SipiPrimaryButton"

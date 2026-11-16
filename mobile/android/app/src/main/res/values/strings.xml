@@ -1,5 +1,10 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="ru">
     <string name="app_name">SIPI_AI</string>
+    <string name="startup_loading">Загружаем твои проекты и задачи…</string>
+    <string name="startup_error">Не удалось подключиться к серверу: %1$s</string>
+    <string name="startup_network_error">проверь подключение к интернету</string>
+    <string name="startup_retry">Повторить</string>
+    <string name="startup_open_login">Перейти ко входу</string>
 
     <string name="navigation_drawer_open">Открыть меню</string>
     <string name="navigation_drawer_close">Закрыть меню</string>
@@ -310,7 +315,7 @@
     <string name="assistant_title">Сипи AI</string>
     <string name="assistant_subtitle">Помощник по твоим проектам</string>
     <string name="assistant_context_label">Контекст</string>
-    <string name="assistant_ready">Помощник готов</string>
+    <string name="assistant_ready">ИИ-помощник готов</string>
     <string name="assistant_project_data">Данные проекта</string>
     <string name="assistant_welcome_title">С чего начнём?</string>
     <string name="assistant_welcome_text">Могу создать проект, добавить задачи на доску или разобраться в том, что уже есть.</string>
@@ -318,13 +323,23 @@
     <string name="assistant_suggest_create">Создай проект «Название» — здесь опиши идею. Добавь 5 задач для начала работы.</string>
     <string name="assistant_mode_assistant">Помощник</string>
     <string name="assistant_mode_drafts">Черновик задач</string>
+    <string name="assistant_mode_logo">Логотип</string>
     <string name="assistant_input_hint_assistant">Создай проект «Название» — здесь опиши идею.\nДобавь 5 задач для начала работы.</string>
     <string name="assistant_input_hint_drafts">Опиши работу — каждая строка станет задачей</string>
+    <string name="assistant_input_hint_logo">Опиши, какой логотип нарисовать</string>
     <string name="assistant_counter">%1$d/4000</string>
     <string name="assistant_footer">По просьбе «создай» помощник сразу добавит проект или задачи.</string>
     <string name="assistant_add_drafts">Добавить %1$d на доску</string>
     <string name="assistant_drafts_added">Задачи добавлены на доску</string>
     <string name="assistant_clear_title">Очистить чат?</string>
+    <string name="assistant_logo_image_description">Сгенерированный концепт логотипа</string>
+    <string name="assistant_connecting">Подключение к помощнику…</string>
+    <string name="assistant_unavailable">ИИ-помощник сейчас недоступен</string>
+    <string name="assistant_logo_unavailable">Генерация логотипов сейчас недоступна</string>
+    <string name="assistant_pending">Готовлю ответ…</string>
+    <string name="assistant_cancelled">Запрос отменён.</string>
+    <string name="assistant_select_project">Сначала выбери проект в поле «Контекст».</string>
+    <string name="assistant_clear_message">Переписка, черновики и изображения будут удалены. Созданные задачи останутся на доске.</string>
 
     <string name="register_role_label">Ваша роль</string>
     <string name="register_group_label">Номер группы</string>
@@ -346,6 +361,8 @@
     <string name="login_email_label">Почта</string>
     <string name="login_email_hint">Логин или почта</string>
     <string name="login_submit">Войти</string>
+    <string name="password_show">Показать пароль</string>
+    <string name="password_hide">Скрыть пароль</string>
     <string name="login_go_to_register">Нет аккаунта? Зарегистрироваться</string>
     <string name="login_error_empty_email">Введите почту</string>
 </resources>

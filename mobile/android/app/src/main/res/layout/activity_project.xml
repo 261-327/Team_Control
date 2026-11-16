@@ -88,7 +88,7 @@
             android:layout_marginTop="10dp"
             android:textColor="@color/text_hint"
             android:textSize="13sp"
-            tools:text="1 в команде  ·  Ты руководишь этим проектом" />
+            tools:text="Ты руководишь этим проектом" />
 
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btnNewTask"

@@ -64,7 +64,8 @@ class MainActivity : AppCompatActivity(), TaskFragment.StatsHost {
         super.onResume()
         ApiClient.loadSnapshot { result ->
             result.onSuccess { snapshot ->
-                if (snapshot.optString("sessionId").isBlank()) {
+                if (!ApiClient.hasAuthenticatedSession(snapshot)) {
+                    ApiClient.clearLocalAccountState()
                     startActivity(Intent(this, com.example.sipi_ai.ui.register.LoginActivity::class.java).apply {
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     })
@@ -76,7 +77,9 @@ class MainActivity : AppCompatActivity(), TaskFragment.StatsHost {
                 refreshStats()
                 supportFragmentManager.fragments.filterIsInstance<TaskFragment>().forEach { it.refreshTasks() }
             }.onFailure {
-                android.widget.Toast.makeText(this, it.message ?: "Не удалось загрузить данные с сервера", android.widget.Toast.LENGTH_LONG).show()
+                if (it !is ApiClient.SessionExpiredException) {
+                    android.widget.Toast.makeText(this, it.message ?: "Не удалось загрузить данные с сервера", android.widget.Toast.LENGTH_LONG).show()
+                }
             }
         }
     }

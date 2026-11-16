@@ -115,10 +115,8 @@ class ProfileActivity : AppCompatActivity() {
             .setPositiveButton(R.string.profile_logout) { _, _ ->
                 ApiClient.logout { result ->
                     result.onSuccess {
-                        ApiClient.clearSession()
-                        UserStore(this).clear()
+                        ApiClient.clearLocalAccountState()
                         startActivity(Intent(this, LoginActivity::class.java)
-                            .putExtra(LoginActivity.EXTRA_SKIP_SESSION_RESTORE, true)
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
                     }.onFailure { Toast.makeText(this, it.message ?: "Не удалось выйти", Toast.LENGTH_LONG).show() }
                 }

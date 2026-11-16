@@ -2,16 +2,18 @@ package com.example.sipi_ai.ui.register
 
 import android.content.Intent
 import android.os.Bundle
+import android.graphics.Rect
+import android.text.InputType
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.example.sipi_ai.R
 import com.example.sipi_ai.data.ApiClient
 import com.example.sipi_ai.databinding.ActivityLoginBinding
-import com.example.sipi_ai.ui.main.MainActivity
 
 class LoginActivity : AppCompatActivity() {
     private lateinit var binding: ActivityLoginBinding
-    private var userChoseAuthFlow = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -19,16 +21,48 @@ class LoginActivity : AppCompatActivity() {
         setContentView(binding.root)
         ApiClient.initialize(this)
 
-        val skipRestore = intent.getBooleanExtra(EXTRA_SKIP_SESSION_RESTORE, false)
-        if (!skipRestore) ApiClient.loadSnapshot { result ->
-            if (!userChoseAuthFlow && !isFinishing && result.getOrNull()?.optString("sessionId").orEmpty().isNotBlank()) openMain()
+        // Android 15+ keeps edge-to-edge layouts behind the IME even when
+        // adjustResize is requested. Apply the IME inset to the scroll view
+        // and bring the focused field into the visible area explicitly.
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            val navigationBottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+            view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, maxOf(imeBottom, navigationBottom))
+            if (insets.isVisible(WindowInsetsCompat.Type.ime())) {
+                view.post {
+                    currentFocus?.let { focused ->
+                        focused.post {
+                            focused.requestRectangleOnScreen(Rect(0, 0, focused.width, focused.height), true)
+                        }
+                    }
+                }
+            }
+            insets
         }
+        ViewCompat.requestApplyInsets(binding.root)
+
+        var passwordVisible = false
+        binding.btnTogglePassword.setOnClickListener {
+            val cursor = binding.etLoginPassword.selectionStart
+            passwordVisible = !passwordVisible
+            binding.etLoginPassword.inputType = if (passwordVisible) {
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+            } else {
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            }
+            if (cursor >= 0) binding.etLoginPassword.setSelection(cursor.coerceAtMost(binding.etLoginPassword.length()))
+            binding.btnTogglePassword.setImageResource(
+                if (passwordVisible) R.drawable.ic_visibility else R.drawable.ic_visibility_off,
+            )
+            binding.btnTogglePassword.setContentDescription(
+                getString(if (passwordVisible) R.string.password_hide else R.string.password_show),
+            )
+        }
+
         binding.tvGoToRegister.setOnClickListener {
-            userChoseAuthFlow = true
             startActivity(Intent(this, RegisterActivity::class.java))
         }
         binding.btnLogin.setOnClickListener {
-            userChoseAuthFlow = true
             val username = binding.etLoginEmail.text.toString().trim()
             val password = binding.etLoginPassword.text.toString()
             if (username.isBlank() || password.isBlank()) {
@@ -52,18 +86,7 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    private fun openMain() {
-        startActivity(Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        })
-        finish()
-    }
-
     private fun showError(error: Throwable) {
         Toast.makeText(this, error.message ?: getString(R.string.login_error_empty_email), Toast.LENGTH_LONG).show()
-    }
-
-    companion object {
-        const val EXTRA_SKIP_SESSION_RESTORE = "skip_session_restore"
     }
 }

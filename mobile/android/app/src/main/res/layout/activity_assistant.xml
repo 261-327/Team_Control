@@ -42,6 +42,16 @@
             android:background="@drawable/bg_edittext" />
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/tvAssistantStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="18dp"
+        android:paddingBottom="6dp"
+        android:text="@string/assistant_connecting"
+        android:textColor="@color/text_hint"
+        android:textSize="12sp" />
+
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -117,9 +127,9 @@
 
     <com.google.android.material.button.MaterialButtonToggleGroup
         android:id="@+id/toggleAssistantMode"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
+        android:layout_marginHorizontal="12dp"
         android:layout_marginTop="8dp"
         app:checkedButton="@+id/btnModeAssistant"
         app:selectionRequired="true"
@@ -128,17 +138,28 @@
         <Button
             android:id="@+id/btnModeAssistant"
             style="?attr/materialButtonOutlinedStyle"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:text="@string/assistant_mode_assistant"
             android:textAllCaps="false" />
 
         <Button
             android:id="@+id/btnModeDrafts"
             style="?attr/materialButtonOutlinedStyle"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:text="@string/assistant_mode_drafts"
+            android:textAllCaps="false" />
+
+        <Button
+            android:id="@+id/btnModeLogo"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/assistant_mode_logo"
             android:textAllCaps="false" />
     </com.google.android.material.button.MaterialButtonToggleGroup>
 
