@@ -92,7 +92,13 @@ export function ProfileView() {
             </div>
             <label className="profile-theme-control" htmlFor="profile-theme">
               <span>Тема приложения</span>
-              <select id="profile-theme" value={theme} onChange={(event) => setTheme(event.target.value as "light" | "dark" | "system")}>
+              <select
+                id="profile-theme"
+                value={theme}
+                onChange={(event) =>
+                  setTheme(event.target.value as "light" | "dark" | "system")
+                }
+              >
                 <option value="light">Светлая</option>
                 <option value="dark">Тёмная</option>
                 <option value="system">Как на устройстве</option>
