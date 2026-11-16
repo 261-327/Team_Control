@@ -5,9 +5,9 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
 } from "react";
 
 export type ThemePreference = "light" | "dark" | "system";
@@ -25,7 +25,30 @@ const ThemeContext = createContext<ThemeContextValue>({
 });
 
 const STORAGE_KEY = "sipi-theme";
+const THEME_EVENT = "sipi-theme-change";
 const mediaQuery = "(prefers-color-scheme: dark)";
+
+function isThemePreference(value: string | null): value is ThemePreference {
+  return value === "light" || value === "dark" || value === "system";
+}
+
+function getStoredTheme(): ThemePreference {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return isThemePreference(stored) ? stored : "system";
+  } catch {
+    return "system";
+  }
+}
+
+function subscribeToTheme(callback: () => void) {
+  window.addEventListener(THEME_EVENT, callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener(THEME_EVENT, callback);
+    window.removeEventListener("storage", callback);
+  };
+}
 
 function getResolvedTheme(theme: ThemePreference): "light" | "dark" {
   if (theme !== "system") return theme;
@@ -33,34 +56,24 @@ function getResolvedTheme(theme: ThemePreference): "light" | "dark" {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<ThemePreference>("system");
+  const theme = useSyncExternalStore(
+    subscribeToTheme,
+    getStoredTheme,
+    () => "system",
+  );
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
 
-  useLayoutEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === "light" || stored === "dark" || stored === "system") {
-        setThemeState(stored);
-        setResolvedTheme(getResolvedTheme(stored));
-      } else {
-        setResolvedTheme(getResolvedTheme("system"));
-      }
-    } catch {
-      setResolvedTheme(getResolvedTheme("system"));
-    }
-  }, []);
-
   const setTheme = useCallback((nextTheme: ThemePreference) => {
-    setThemeState(nextTheme);
     try {
       localStorage.setItem(STORAGE_KEY, nextTheme);
     } catch {
       // The theme still applies for this session when storage is unavailable.
     }
-    const resolved = nextTheme === "system" ? getResolvedTheme("system") : nextTheme;
+    const resolved = getResolvedTheme(nextTheme);
     setResolvedTheme(resolved);
     document.documentElement.dataset.theme = resolved;
     document.documentElement.style.colorScheme = resolved;
+    window.dispatchEvent(new Event(THEME_EVENT));
   }, []);
 
   useEffect(() => {
@@ -74,17 +87,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
     };
     media.addEventListener("change", syncSystemTheme);
-    const syncStorage = (event: StorageEvent) => {
-      if (
-        event.key === STORAGE_KEY &&
-        (event.newValue === "light" || event.newValue === "dark" || event.newValue === "system")
-      ) {
-        setThemeState(event.newValue);
-        const resolved = getResolvedTheme(event.newValue);
-        setResolvedTheme(resolved);
-        document.documentElement.dataset.theme = resolved;
-        document.documentElement.style.colorScheme = resolved;
-      }
+
+    const syncStorage = () => {
+      const storedTheme = getStoredTheme();
+      const resolved = getResolvedTheme(storedTheme);
+      setResolvedTheme(resolved);
+      document.documentElement.dataset.theme = resolved;
+      document.documentElement.style.colorScheme = resolved;
     };
     window.addEventListener("storage", syncStorage);
     return () => {
