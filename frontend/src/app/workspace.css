@@ -2297,13 +2297,25 @@ select:focus {
   border-color: #80534a;
   color: #ffc0ae;
 }
-:root[data-theme="dark"] .status-todo { color: #c2c9c4; }
-:root[data-theme="dark"] .status-in_progress { color: #9cc7df; }
-:root[data-theme="dark"] .status-in_review { color: #d0b2e8; }
-:root[data-theme="dark"] .status-done { color: #a9c5a9; }
-:root[data-theme="dark"] .deadline-overdue { color: #ff9d89; }
+:root[data-theme="dark"] .status-todo {
+  color: #c2c9c4;
+}
+:root[data-theme="dark"] .status-in_progress {
+  color: #9cc7df;
+}
+:root[data-theme="dark"] .status-in_review {
+  color: #d0b2e8;
+}
+:root[data-theme="dark"] .status-done {
+  color: #a9c5a9;
+}
+:root[data-theme="dark"] .deadline-overdue {
+  color: #ff9d89;
+}
 :root[data-theme="dark"] .deadline-soon,
-:root[data-theme="dark"] .deadline-today { color: #f1d17a; }
+:root[data-theme="dark"] .deadline-today {
+  color: #f1d17a;
+}
 
 .profile-theme-settings {
   display: grid;
@@ -2325,4 +2337,58 @@ select:focus {
   color: var(--text);
   font-size: 13px;
   font-weight: 600;
+}
+
+:root[data-theme="dark"] .profile-summary,
+:root[data-theme="dark"] .profile-colleagues,
+:root[data-theme="dark"] .profile-form,
+:root[data-theme="dark"] .calendar-task-panel,
+:root[data-theme="dark"] .calendar-grid,
+:root[data-theme="dark"] .calendar-toolbar,
+:root[data-theme="dark"] .calendar-cell,
+:root[data-theme="dark"] .task-result,
+:root[data-theme="dark"] .discussion-panel,
+:root[data-theme="dark"] .material-card,
+:root[data-theme="dark"] .settings-panel,
+:root[data-theme="dark"] .column-settings-row,
+:root[data-theme="dark"] .search-results,
+:root[data-theme="dark"] .profile-project-roles,
+:root[data-theme="dark"] .notification-panel {
+  background-color: var(--surface);
+  color: var(--text);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .profile-summary h2,
+:root[data-theme="dark"] .profile-form h2,
+:root[data-theme="dark"] .profile-form h3,
+:root[data-theme="dark"] .calendar-task-panel h2,
+:root[data-theme="dark"] .material-card h3,
+:root[data-theme="dark"] .task-result h2,
+:root[data-theme="dark"] .discussion-panel h2,
+:root[data-theme="dark"] .settings-panel h2,
+:root[data-theme="dark"] .column-settings-row strong {
+  color: var(--text);
+}
+:root[data-theme="dark"] .calendar-weekdays,
+:root[data-theme="dark"] .calendar-cell,
+:root[data-theme="dark"] .calendar-task-panel,
+:root[data-theme="dark"] .search-results > a,
+:root[data-theme="dark"] .profile-role-row,
+:root[data-theme="dark"] .comment,
+:root[data-theme="dark"] .history-list > li {
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .assistant-composer textarea,
+:root[data-theme="dark"] .assistant-toolbar > select,
+:root[data-theme="dark"] .comment-form textarea {
+  background: var(--surface-soft);
+  color: var(--text);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .sheet > .modal-header,
+:root[data-theme="dark"] .notification-notice,
+:root[data-theme="dark"] .deadline-summary {
+  background: #30352f;
+  color: var(--text);
+  border-color: var(--line);
 }
