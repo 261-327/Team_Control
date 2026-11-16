@@ -693,14 +693,20 @@ export function MembersView() {
   );
 }
 function InviteDialog({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const [mode, setMode] = useState<"colleague" | "email">("colleague");
   const [email, setEmail] = useState("");
   const [link, setLink] = useState("");
   const [copied, setCopied] = useState(false);
   const action = useAction();
+
   return (
     <Modal
       title={link ? "Приглашение готово" : "Пригласить участника"}
-      description="Создай ссылку для участника. Принять её можно с указанной почтой."
+      description={
+        link
+          ? "Отправь ссылку участнику. Принять её можно с указанной почтой."
+          : "Выбери подтверждённого коллегу из списка или создай приглашение по почте."
+      }
       onClose={onClose}
       busy={action.busy}
     >
@@ -735,40 +741,265 @@ function InviteDialog({ projectId, onClose }: { projectId: string; onClose: () =
           </p>
         </div>
       ) : (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void action.run(
-              () => client.invite(projectId, email),
-              (invitation) => setLink(`${window.location.origin}/invitations/${invitation.id}`),
-            );
-          }}
-        >
-          <InviteColleague projectId={projectId} />
-          <Field label="Почта участника" hint="Почта, с которой участник войдёт в Сипи" required>
-            <input
-              autoFocus
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </Field>
-          <FormError error={action.error} />
-          <div className="form-actions">
-            <Button type="button" variant="secondary" onClick={onClose} disabled={action.busy}>
-              Отмена
-            </Button>
-            <Button loading={action.busy}>
+        <>
+          <div className="view-switch" role="tablist" aria-label="Способ приглашения" style={{ marginBottom: "16px" }}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "colleague"}
+              className={mode === "colleague" ? "active" : ""}
+              onClick={() => setMode("colleague")}
+            >
+              <Icon name="users" size={16} />
+              Из коллег
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "email"}
+              className={mode === "email" ? "active" : ""}
+              onClick={() => setMode("email")}
+            >
               <Icon name="mail" size={16} />
-              Создать приглашение
-            </Button>
+              По почте
+            </button>
           </div>
-        </form>
+
+          {mode === "colleague" ? (
+            <InviteColleague projectId={projectId} onClose={onClose} />
+          ) : (
+            <form
+              autoComplete="off"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void action.run(
+                  () => client.invite(projectId, email),
+                  (invitation) => setLink(`${window.location.origin}/invitations/${invitation.id}`),
+                );
+              }}
+            >
+              <Field label="Почта участника" hint="Почта, с которой участник войдёт в Сипи" required>
+                <input
+                  type="email"
+                  name="invite-participant-email"
+                  autoComplete="off"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </Field>
+              <FormError error={action.error} />
+              <div className="form-actions">
+                <Button type="button" variant="secondary" onClick={onClose} disabled={action.busy}>
+                  Отмена
+                </Button>
+                <Button loading={action.busy}>
+                  <Icon name="mail" size={16} />
+                  Создать приглашение
+                </Button>
+              </div>
+            </form>
+          )}
+        </>
       )}
     </Modal>
   );
 }
+
+function InviteColleague({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const data = useReadyData();
+  const [colleagues, setColleagues] = useState<
+    {
+      id: number;
+      userId: number;
+      name: string;
+      username: string;
+      state: string;
+      projectIds?: number[];
+      pendingProjectIds: number[];
+    }[]
+  >([]);
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [sent, setSent] = useState<string[]>([]);
+  const action = useAction();
+  const ui = useUi();
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/colleagues", { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok)
+          throw new Error("Не удалось загрузить коллег. Можно пригласить по почте.");
+        return response.json();
+      })
+      .then((result) => {
+        setColleagues(
+          (result.colleagues || []).filter((row: { state: string }) => row.state === "accepted"),
+        );
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setLoadError(error.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
+
+  const filtered = colleagues.filter((row) =>
+    `${row.name} ${row.username}`.toLowerCase().includes(query.trim().toLowerCase()),
+  );
+
+  return (
+    <div className="invite-colleagues">
+      {!loading && !loadError && colleagues.length > 0 && (
+        <Field label="Поиск коллеги">
+          <div className="search-field">
+            <Icon name="search" size={16} />
+            <input
+              type="search"
+              name="colleague-search-query"
+              autoComplete="off"
+              spellCheck={false}
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setSelected("");
+              }}
+              placeholder="Имя или никнейм…"
+            />
+          </div>
+        </Field>
+      )}
+
+      {loading ? (
+        <p className="muted" style={{ padding: "12px 0" }}>
+          Загрузка списка коллег…
+        </p>
+      ) : loadError ? null : colleagues.length === 0 ? (
+        <EmptyState
+          icon="users"
+          title="Пока нет подтверждённых коллег"
+          description="Добавь коллег в своём профиле или переключись на вкладку «По почте»."
+        />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon="search"
+          title="Коллеги не найдены"
+          description="Попробуй изменить запрос или пригласи участника по почте."
+        />
+      ) : (
+        <div
+          role="listbox"
+          aria-label="Подтверждённые коллеги"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
+            maxHeight: "240px",
+            overflowY: "auto",
+            marginBottom: "14px",
+            paddingRight: "2px",
+          }}
+        >
+          {filtered.map((row) => {
+            const colleagueUser = data.users.find((u) => u.id === String(row.userId));
+            const member =
+              data.memberships.some(
+                (m) => m.projectId === projectId && m.userId === String(row.userId),
+              ) || (row.projectIds?.includes(Number(projectId)) ?? false);
+            const hasActiveInvite =
+              !!colleagueUser?.email &&
+              data.invitations.some(
+                (inv) =>
+                  inv.projectId === projectId &&
+                  inv.status === "pending" &&
+                  inv.email.toLowerCase() === colleagueUser.email.toLowerCase(),
+              );
+            const pending =
+              sent.includes(String(row.id)) ||
+              row.pendingProjectIds.includes(Number(projectId)) ||
+              hasActiveInvite;
+            const disabled = member || pending || action.busy;
+            const isSelected = selected === String(row.id);
+
+            return (
+              <button
+                key={row.id}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                disabled={disabled}
+                onClick={() => setSelected(String(row.id))}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  border: isSelected
+                    ? "2px solid var(--accent, #2563eb)"
+                    : "1px solid var(--border, #e2e8f0)",
+                  background: disabled
+                    ? "var(--surface-muted, #f8fafc)"
+                    : isSelected
+                      ? "var(--accent-soft, #eff6ff)"
+                      : "var(--surface, #ffffff)",
+                  opacity: disabled ? 0.65 : 1,
+                  cursor: disabled ? "not-allowed" : "pointer",
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {row.name}
+                  </div>
+                  <div className="muted" style={{ fontSize: "13px" }}>
+                    @{row.username}
+                  </div>
+                </div>
+                <span className="count-pill" style={{ flexShrink: 0 }}>
+                  {member ? "В проекте" : pending ? "Приглашён" : isSelected ? "Выбран" : "Выбрать"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <FormError error={loadError || action.error} />
+
+            <div className="form-actions">
+        {colleagues.length > 0 && (
+          <Button
+            type="button"
+            disabled={!selected}
+            loading={action.busy}
+            onClick={() =>
+              void action.run(
+                () => client.inviteColleague(projectId, selected),
+                () => {
+                  setSent((values) => [...values, selected]);
+                  setSelected("");
+                  ui.notify("Приглашение отправлено. Коллега увидит его в уведомлениях.");
+                },
+              )
+            }
+          >
+            Пригласить коллегу
+          </Button>
+        )}
+           </div>
+    </div>
+  );
+}
+
 export function ProjectSettingsView() {
   const { projectId } = useParams<{ projectId: string }>();
   const data = useReadyData();
@@ -999,114 +1230,6 @@ export function ProjectSettingsView() {
           </div>
         </ConfirmDialog>
       )}
-    </div>
-  );
-}
-
-function InviteColleague({ projectId }: { projectId: string }) {
-  const data = useReadyData();
-  const [colleagues, setColleagues] = useState<
-    {
-      id: number;
-      userId: number;
-      name: string;
-      username: string;
-      state: string;
-      pendingProjectIds: number[];
-    }[]
-  >([]);
-  const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
-  const [sent, setSent] = useState<string[]>([]);
-  const action = useAction();
-  const ui = useUi();
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch("/api/colleagues", { signal: controller.signal, cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok)
-          throw new Error("Не удалось загрузить коллег. Можно пригласить по почте.");
-        return response.json();
-      })
-      .then((result) => {
-        setColleagues(
-          result.colleagues.filter((row: { state: string }) => row.state === "accepted"),
-        );
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted) setLoadError(error.message);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
-  }, []);
-  return (
-    <div className="invite-colleagues">
-      <h3>Пригласить коллегу</h3>
-      <Field label="Поиск коллеги">
-        <input
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setSelected("");
-          }}
-          placeholder="Имя или никнейм"
-        />
-      </Field>
-      <Field label="Коллега">
-        <select
-          value={selected}
-          onChange={(event) => setSelected(event.target.value)}
-          disabled={loading}
-        >
-          <option value="">{loading ? "Загрузка…" : "Выбери коллегу"}</option>
-          {colleagues
-            .filter((row) =>
-              `${row.name} ${row.username}`.toLowerCase().includes(query.toLowerCase()),
-            )
-            .map((row) => {
-              const member = data.memberships.some(
-                (m) => m.projectId === projectId && m.userId === String(row.userId),
-              );
-              const pending =
-                sent.includes(String(row.id)) || row.pendingProjectIds.includes(Number(projectId));
-              return (
-                <option key={row.id} value={row.id} disabled={member || pending}>
-                  {row.name} (@{row.username})
-                  {member ? " · В команде" : pending ? " · Приглашён" : ""}
-                </option>
-              );
-            })}
-        </select>
-      </Field>
-      {!loading && !colleagues.length && (
-        <p className="field-hint">
-          Добавь коллег в профиле или используй приглашение по почте ниже.
-        </p>
-      )}
-      <Button
-        type="button"
-        variant="secondary"
-        disabled={!selected}
-        loading={action.busy}
-        onClick={() =>
-          void action.run(
-            () => client.inviteColleague(projectId, selected),
-            () => {
-              setSent((values) => [...values, selected]);
-              setSelected("");
-              ui.notify("Приглашение отправлено. Коллега увидит его в уведомлениях.");
-            },
-          )
-        }
-      >
-        Пригласить коллегу
-      </Button>
-      <FormError error={loadError || action.error} />
-      <p className="form-note">Или создай приглашение по почте</p>
     </div>
   );
 }
