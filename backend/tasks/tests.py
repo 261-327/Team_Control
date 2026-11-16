@@ -215,7 +215,7 @@ class MembershipRoleFormTests(TestCase):
 
     def test_developer_direction_and_custom_role_validation(self):
         self.assertFalse(self.form('developer').is_valid())
-        self.assertFalse(self.form('developer',developer_specialization='invalid').is_valid())
+        self.assertTrue(self.form('developer',developer_specialization='Game development').is_valid())
         for value in ['backend','frontend','ios','android']:
             form=self.form('developer',developer_specialization=value,custom_role='ignored')
             self.assertTrue(form.is_valid(),form.errors)

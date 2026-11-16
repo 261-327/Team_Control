@@ -623,7 +623,7 @@ export function MembersView() {
                         ? "iOS"
                         : m.specialization === "android"
                           ? "Android"
-                          : "Проектная команда"}
+                          : m.specialization || "Проектная команда"}
                 </span>
               </div>
               <span className={`role-badge role-${m.role}`}>
