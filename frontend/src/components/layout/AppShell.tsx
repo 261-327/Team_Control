@@ -36,6 +36,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [toast, setToast] = useState("");
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sidebarRef = useRef<HTMLElement>(null);
+    const [loggingOut, setLoggingOut] = useState(false);
+
+  useEffect(() => {
+    const onFocus = () => {
+      void client.refresh();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      closeNav();
+      await client.logout();
+      router.replace("/login");
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+  
   useEffect(() => {
     if (data && !data.sessionId && !data.connectionError)
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
@@ -256,20 +278,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </span>
               <Icon name="upRight" size={14} />
             </button>
-            <Link href="/profile" className="sidebar-profile" onClick={closeNav}>
-              <Avatar user={user} />
-              <div>
-                <strong>{user.name}</strong>
-                <span>
-                  {user.kind === "teacher"
-                    ? "Преподаватель"
-                    : user.kind === "staff"
-                      ? "Координатор"
-                      : "Студент"}
-                </span>
-              </div>
-              <Icon name="down" size={15} />
-            </Link>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <Link
+                href="/profile"
+                className="sidebar-profile"
+                onClick={closeNav}
+                style={{ flex: 1, minWidth: 0 }}
+              >
+                <Avatar user={user} />
+                <div>
+                  <strong>{user.name}</strong>
+                  <span>
+                    {user.kind === "teacher"
+                      ? "Преподаватель"
+                      : user.kind === "staff"
+                        ? "Координатор"
+                        : "Студент"}
+                  </span>
+                </div>
+              </Link>
+              <IconButton
+                icon="logout"
+                label="Выйти из аккаунта"
+                disabled={loggingOut}
+                onClick={() => void handleLogout()}
+              />
+            </div>
           </div>
         </aside>
         <div className="workspace-main" inert={mobile}>
@@ -306,10 +340,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <span>Поиск по пространству</span>
                 <kbd>⌘ K</kbd>
               </button>
-              <NotificationsBell key={data.sessionId} attention={attention} />
+                            <NotificationsBell key={data.sessionId} attention={attention} />
               <Link className="topbar-avatar" href="/profile" aria-label="Открыть профиль">
                 <Avatar user={user} />
               </Link>
+              <button
+                type="button"
+                className="nav-item"
+                disabled={loggingOut}
+                onClick={() => void handleLogout()}
+                aria-label="Выйти из аккаунта"
+                style={{ padding: "0.35rem 0.65rem", width: "auto" }}
+              >
+                <Icon name="logout" size={16} />
+                <span>{loggingOut ? "Выход…" : "Выйти"}</span>
+              </button>
             </div>
           </header>
           {data.connectionError && (

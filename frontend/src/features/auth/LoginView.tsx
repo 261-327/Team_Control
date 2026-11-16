@@ -31,6 +31,7 @@ function LoginForm({ register, data }: { register: boolean; data: Snapshot }) {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [challenge, setChallenge] = useState<AuthChallenge | null>(data.authChallenge || null);
   const [tick, setTick] = useState(() => Date.now());
   useEffect(() => {
@@ -136,9 +137,9 @@ function LoginForm({ register, data }: { register: boolean; data: Snapshot }) {
               event.preventDefault();
               if (challenge)
                 void action.run(
-                  () => client.verifyCode(code),
+                  () => client.verifyCode(code, rememberMe),
                   () => router.push(next),
-                );
+              );
               else
                 void action.run(
                   () =>
@@ -240,11 +241,50 @@ function LoginForm({ register, data }: { register: boolean; data: Snapshot }) {
                     required
                   />
                 </Field>
-                {!register && (
-                  <p className="auth-switch" style={{ textAlign: "right" }}>
-                    <Link href="/forgot-password">Забыли пароль?</Link>
-                  </p>
+                                 {!register && (
+                  <>
+                    <p className="auth-switch" style={{ textAlign: "right" }}>
+                      <Link href="/forgot-password">Забыли пароль?</Link>
+                    </p>
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: "0.6rem",
+                        marginTop: "0.75rem",
+                        cursor: "pointer",
+                        font: "inherit",
+                        color: "inherit",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        style={{
+                          width: "16px",
+                          height: "16px",
+                          marginTop: "0.2rem",
+                          accentColor: "var(--accent, #eab308)",
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span style={{ fontSize: "0.9rem", lineHeight: 1.4 }}>
+                        <span style={{ fontWeight: 600, display: "block" }}>
+                          Запомнить меня на 30 дней
+                        </span>
+                        <span className="field-hint" style={{ display: "block", marginTop: "0.15rem" }}>
+                          Без галочки вход сохраняется до закрытия браузера. Выйти можно в любой момент.
+                        </span>
+                      </span>
+                    </label>
+                    <p className="field-hint" style={{ marginTop: "0.6rem" }}>
+                      Вкладки одного браузера используют общую сессию. Для входа в другой аккаунт
+                      одновременно откройте приватное окно (Инкогнито) или другой профиль браузера.
+                    </p>
+                  </>
                 )}
+
                 {register && (
                   <Field label="Повтори пароль" required>
                     <input

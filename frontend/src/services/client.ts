@@ -176,10 +176,10 @@ class HttpClient implements DataClient {
     password: string;
     passwordConfirm: string;
   }) => this.request<AuthChallenge>("auth/register", "POST", input);
-  verifyCode = async (code: string) => {
+  verifyCode = async (code: string, rememberMe = false) => {
     this.revision++;
     this.authRevision++;
-    const data = await this.request<Database>("auth/verify", "POST", { code });
+    const data = await this.request<Database>("auth/verify", "POST", { code, rememberMe });
     this.revision++;
     this.publish(data);
   };

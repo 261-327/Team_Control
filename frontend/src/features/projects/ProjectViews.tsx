@@ -766,7 +766,7 @@ function InviteDialog({ projectId, onClose }: { projectId: string; onClose: () =
           </div>
 
           {mode === "colleague" ? (
-            <InviteColleague projectId={projectId} onClose={onClose} />
+            <InviteColleague projectId={projectId} />
           ) : (
             <form
               autoComplete="off"
@@ -807,7 +807,7 @@ function InviteDialog({ projectId, onClose }: { projectId: string; onClose: () =
   );
 }
 
-function InviteColleague({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+function InviteColleague({ projectId }: { projectId: string }) {
   const data = useReadyData();
   const [colleagues, setColleagues] = useState<
     {
@@ -975,7 +975,7 @@ function InviteColleague({ projectId, onClose }: { projectId: string; onClose: (
 
       <FormError error={loadError || action.error} />
 
-            <div className="form-actions">
+      <div className="form-actions">
         {colleagues.length > 0 && (
           <Button
             type="button"
@@ -995,241 +995,7 @@ function InviteColleague({ projectId, onClose }: { projectId: string; onClose: (
             Пригласить коллегу
           </Button>
         )}
-           </div>
-    </div>
-  );
-}
-
-export function ProjectSettingsView() {
-  const { projectId } = useParams<{ projectId: string }>();
-  const data = useReadyData();
-  const ui = useUi();
-  const router = useRouter();
-  const project = data.projects.find((p) => p.id === projectId)!;
-  const manage = canManage(data, projectId);
-  const [column, setColumn] = useState<Status | "new" | null>(null);
-  const [confirm, setConfirm] = useState("");
-  const [showAssignmentConfirm, setShowAssignmentConfirm] = useState(false);
-  const [confirmCoordinatorDemotion, setConfirmCoordinatorDemotion] = useState(false);
-  const currentLeaderId =
-    data.memberships.find((m) => m.projectId === projectId && m.role === "leader")?.userId ?? "";
-  const currentTeacherId =
-    data.memberships.find((m) => m.projectId === projectId && m.role === "teacher")?.userId ?? "";
-  const [leaderId, setLeaderId] = useState<string | null>(null);
-  const [teacherId, setTeacherId] = useState<string | null>(null);
-  const selectedLeaderId = leaderId ?? currentLeaderId;
-  const selectedTeacherId = teacherId ?? currentTeacherId;
-  const currentLeaderName = data.users.find((u) => u.id === currentLeaderId)?.name ?? "Не выбран";
-  const selectedLeaderName = data.users.find((u) => u.id === selectedLeaderId)?.name ?? "Не выбран";
-  const currentTeacherName =
-    data.users.find((u) => u.id === currentTeacherId)?.name ?? "Не назначен";
-  const selectedTeacherName = selectedTeacherId
-    ? (data.users.find((u) => u.id === selectedTeacherId)?.name ?? "Не выбран")
-    : "Не назначен";
-  const leaderChanged = selectedLeaderId !== currentLeaderId;
-  const teacherChanged = selectedTeacherId !== currentTeacherId;
-  const selectedLeaderIsCoordinator =
-    data.users.find((u) => u.id === selectedLeaderId)?.scopeProjectIds?.includes(projectId) ??
-    false;
-  return (
-    <div className="settings-page">
-      <section className="panel settings-panel">
-        <h2>Доступ по приглашению</h2>
-        <p className="muted">
-          Проект виден его участникам. Новых участников приглашает руководитель через раздел
-          «Команда».
-        </p>
-      </section>
-      <section className="panel settings-panel">
-        <h2>Этапы работы</h2>
-        <p className="muted">Настрой названия этапов и допустимое количество задач в колонках.</p>
-        {manage && (
-          <Button variant="secondary" onClick={() => setColumn("new")}>
-            <Icon name="plus" size={16} />
-            Добавить этап
-          </Button>
-        )}
-        {project.columns.map((c) => (
-          <div className="column-settings-row" key={c.id}>
-            <span className={`column-marker status-${c.id}`}>
-              <Icon name={statusIcon(c.id)} size={18} />
-            </span>
-            <strong>{c.name}</strong>
-            <span>
-              {data.tasks.filter((t) => t.projectId === projectId && t.status === c.id).length} /{" "}
-              {plural(c.limit)}
-            </span>
-            {manage && (
-              <IconButton
-                icon="edit"
-                label={`Изменить колонку «${c.name}»`}
-                onClick={() => setColumn(c.id)}
-              />
-            )}
-          </div>
-        ))}
-      </section>
-      {manage && (
-        <section className="panel settings-panel">
-          <h2>Назначения проекта</h2>
-          <p className="muted" style={{ marginBottom: "6px" }}>
-            Измени руководителя или преподавателя проекта.
-          </p>
-          <Field label="Руководитель" required>
-            <select value={selectedLeaderId} onChange={(e) => setLeaderId(e.target.value)} required>
-              <option value="">Выбери руководителя</option>
-              {data.users
-                .filter((u) => u.kind === "student")
-                .map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-            </select>
-          </Field>
-
-          <Field label="Преподаватель">
-            <select value={selectedTeacherId} onChange={(e) => setTeacherId(e.target.value)}>
-              <option value="">Пока не назначен</option>
-              {data.users
-                .filter((u) => u.kind === "teacher")
-                .map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-            </select>
-          </Field>
-          <Button
-            onClick={() => {
-              if (selectedLeaderId === selectedTeacherId && selectedTeacherId !== "") {
-                ui.notify(
-                  "Один человек не может быть одновременно руководителем и преподавателем.",
-                );
-                return;
-              }
-
-              setConfirmCoordinatorDemotion(
-                selectedLeaderIsCoordinator && selectedLeaderId !== currentLeaderId,
-              );
-              if (!leaderChanged && !teacherChanged) {
-                ui.notify("Изменений нет");
-                return;
-              }
-              setShowAssignmentConfirm(true);
-            }}
-          >
-            Изменить назначения
-          </Button>
-        </section>
-      )}
-      <section className="panel settings-panel danger-zone">
-        <h2>{manage ? "Удаление проекта" : "Участие в проекте"}</h2>
-        <p>
-          {manage
-            ? "Проект, задачи и обсуждения будут удалены. Это действие нельзя отменить."
-            : "После выхода проект исчезнет из твоего пространства. История твоих комментариев сохранится."}
-        </p>
-        <Button variant="danger" onClick={() => setConfirm(manage ? "delete" : "leave")}>
-          <Icon name={manage ? "trash" : "logout"} size={17} />
-          {manage ? "Удалить проект" : "Покинуть проект"}
-        </Button>
-      </section>
-      {column && (
-        <ColumnEditor
-          projectId={projectId}
-          columnId={column === "new" ? undefined : column}
-          onClose={() => setColumn(null)}
-        />
-      )}{" "}
-      {confirm && (
-        <ConfirmDialog
-          title={confirm === "delete" ? `Удалить «${project.name}»?` : "Покинуть команду?"}
-          description={
-            confirm === "delete"
-              ? "Все задачи, материалы и обсуждения проекта будут удалены."
-              : "Твои задачи останутся в проекте без исполнителя. Сообщи команде, если их нужно передать."
-          }
-          challenge={confirm === "delete" ? "УДАЛИТЬ" : undefined}
-          confirmLabel={confirm === "delete" ? "Удалить проект" : "Покинуть"}
-          onClose={() => setConfirm("")}
-          onConfirm={async () => {
-            if (confirm === "delete") await client.deleteProject(projectId);
-            else await client.leaveProject(projectId);
-            ui.notify(confirm === "delete" ? "Проект удалён" : "Ты покинул проект");
-            router.push("/projects");
-          }}
-        />
-      )}
-      {showAssignmentConfirm && (
-        <ConfirmDialog
-          title="Подтвердить изменения назначений?"
-          hideIcon
-          description="Проверь изменения перед сохранением."
-          confirmLabel="Подтвердить изменения"
-          onClose={() => setShowAssignmentConfirm(false)}
-          onConfirm={async () => {
-            await client.updateProjectAssignments(
-              projectId,
-              selectedLeaderId,
-              selectedTeacherId,
-              confirmCoordinatorDemotion,
-            );
-
-            ui.notify("Назначения проекта обновлены");
-            setShowAssignmentConfirm(false);
-            router.refresh();
-          }}
-        >
-          <div className="assignment-confirm-details">
-            <div className="assignment-confirm-card">
-              <strong>Руководитель проекта</strong>
-              <div className="assignment-confirm-comparison">
-                <div>
-                  <span>Сейчас</span>
-                  <p>{currentLeaderName}</p>
-                </div>
-                <span aria-hidden="true">→</span>
-                <div>
-                  <span>После изменения</span>
-                  <p>{selectedLeaderName}</p>
-                </div>
-              </div>
-              <p className="muted">
-                {leaderChanged ? "Назначение изменится" : "Останется без изменений"}
-              </p>
-            </div>
-
-            <div className="assignment-confirm-card">
-              <strong>Преподаватель</strong>
-              <div className="assignment-confirm-comparison">
-                <div>
-                  <span>Сейчас</span>
-                  <p>{currentTeacherName}</p>
-                </div>
-                <span aria-hidden="true">→</span>
-                <div>
-                  <span>После изменения</span>
-                  <p>{selectedTeacherName}</p>
-                </div>
-              </div>
-              <p className="muted">
-                {teacherChanged ? "Назначение изменится" : "Останется без изменений"}
-              </p>
-            </div>
-
-            <p className="muted">
-              Прежние руководитель и преподаватель останутся участниками проекта.
-            </p>
-
-            {confirmCoordinatorDemotion && (
-              <p>
-                Внимание: роль координатора нового руководителя изменится только в этом проекте.
-              </p>
-            )}
-          </div>
-        </ConfirmDialog>
-      )}
+      </div>
     </div>
   );
 }

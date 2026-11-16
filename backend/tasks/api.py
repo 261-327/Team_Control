@@ -521,8 +521,12 @@ def auth_verify(request):
         )
         for key in ("api_otp_user_id", "api_otp_hash", "api_otp_mode"):
             request.session.pop(key, None)
+        remember_me = bool(request.data.get("rememberMe", False))
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        # Обычная сессия завершается при закрытии браузера; сохраняемая действует 30 дней.
+        request.session.set_expiry(60 * 60 * 24 * 30 if remember_me else 0)
     return snapshot(request)
+
 
 
 @endpoint(("POST",), public=True)

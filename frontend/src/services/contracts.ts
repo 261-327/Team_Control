@@ -31,7 +31,7 @@ export interface DataClient {
     password: string;
     passwordConfirm: string;
   }): Promise<{ message: string }>;
-  verifyCode(code: string): Promise<void>;
+  verifyCode(code: string, rememberMe?: boolean): Promise<void>;
   register(input: {
     name: string;
     username: string;
