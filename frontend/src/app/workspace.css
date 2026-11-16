@@ -2146,3 +2146,183 @@ select:focus {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
+
+
+/* Theme preference: colors are switched at the document root so every route shares it. */
+:root {
+  color-scheme: light;
+  --bg: #f8f8f8;
+  --surface: #ffffff;
+  --surface-soft: #f1f1f1;
+  --text: #2c2c2c;
+  --muted: #686868;
+  --line: #e1e1e1;
+  --panel: #ffffff;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #171918;
+  --surface: #222624;
+  --surface-soft: #2a302d;
+  --text: #e8ece9;
+  --muted: #aab4ad;
+  --line: #39423d;
+  --panel: #222624;
+  --brand-ink: #111513;
+  --focus: #e8c65d;
+}
+:root[data-theme="dark"] body,
+:root[data-theme="dark"] .workspace-main {
+  background: var(--bg);
+  color: var(--text);
+}
+:root[data-theme="dark"] .topbar,
+:root[data-theme="dark"] .panel,
+:root[data-theme="dark"] .modal,
+:root[data-theme="dark"] .sheet,
+:root[data-theme="dark"] .toast,
+:root[data-theme="dark"] .task-card,
+:root[data-theme="dark"] .project-list-card,
+:root[data-theme="dark"] .project-mini-card,
+:root[data-theme="dark"] .stat-card,
+:root[data-theme="dark"] .assistant-prompts > button,
+:root[data-theme="dark"] .task-status-options,
+:root[data-theme="dark"] .profile-colleague-menu-panel {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .topbar,
+:root[data-theme="dark"] .panel-heading,
+:root[data-theme="dark"] .task-row,
+:root[data-theme="dark"] .task-card > footer,
+:root[data-theme="dark"] .profile-colleague-row,
+:root[data-theme="dark"] .modal-header,
+:root[data-theme="dark"] .assistant-composer {
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .breadcrumbs,
+:root[data-theme="dark"] .breadcrumbs > span:last-child,
+:root[data-theme="dark"] .panel-heading h2,
+:root[data-theme="dark"] .section-heading h2,
+:root[data-theme="dark"] .empty-state h3,
+:root[data-theme="dark"] .task-row-title > strong,
+:root[data-theme="dark"] .project-mini-card h3,
+:root[data-theme="dark"] .task-card h3,
+:root[data-theme="dark"] .modal-header h2,
+:root[data-theme="dark"] .assistant-welcome h3,
+:root[data-theme="dark"] .profile-colleague-person strong,
+:root[data-theme="dark"] .stat-card strong {
+  color: var(--text);
+}
+:root[data-theme="dark"] .muted,
+:root[data-theme="dark"] .field-label,
+:root[data-theme="dark"] .field-hint,
+:root[data-theme="dark"] .task-description,
+:root[data-theme="dark"] .profile-bio,
+:root[data-theme="dark"] .material-description,
+:root[data-theme="dark"] .task-row-title > span,
+:root[data-theme="dark"] .task-code,
+:root[data-theme="dark"] .deadline,
+:root[data-theme="dark"] .breadcrumbs > a,
+:root[data-theme="dark"] .assistant-welcome > p,
+:root[data-theme="dark"] .assistant-prompts > button,
+:root[data-theme="dark"] .modal-header p {
+  color: var(--muted);
+}
+:root[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+:root[data-theme="dark"] textarea,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] .search-field,
+:root[data-theme="dark"] .search-trigger,
+:root[data-theme="dark"] .form-note,
+:root[data-theme="dark"] .view-switch,
+:root[data-theme="dark"] .task-column {
+  color: var(--text);
+  background: var(--surface-soft);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder {
+  color: #929e96;
+}
+:root[data-theme="dark"] .task-column {
+  --surface: #252c28;
+}
+:root[data-theme="dark"] .task-row:hover,
+:root[data-theme="dark"] .stat-card:hover,
+:root[data-theme="dark"] .project-mini-card:hover,
+:root[data-theme="dark"] .assistant-prompts > button:hover,
+:root[data-theme="dark"] .task-status-options > button:hover:not(:disabled),
+:root[data-theme="dark"] .profile-colleague-menu-panel > button:hover {
+  background: #303934;
+}
+:root[data-theme="dark"] .projects-workspace-summary,
+:root[data-theme="dark"] .projects-workspace-summary > div,
+:root[data-theme="dark"] .assistant-mode-note,
+:root[data-theme="dark"] .assistant-messages,
+:root[data-theme="dark"] .assistant-setup-note,
+:root[data-theme="dark"] .assistant-plan,
+:root[data-theme="dark"] .profile-theme-settings {
+  background: var(--surface-soft);
+  border-color: var(--line);
+  color: var(--text);
+}
+:root[data-theme="dark"] .calendar-day-button,
+:root[data-theme="dark"] .calendar-toolbar h2,
+:root[data-theme="dark"] .week-month,
+:root[data-theme="dark"] .task-status-options > button,
+:root[data-theme="dark"] .profile-colleague-menu-panel > button {
+  color: var(--text);
+}
+:root[data-theme="dark"] .calendar-day-button[aria-selected="true"],
+:root[data-theme="dark"] .calendar-day-button:hover {
+  background: #3a463e;
+  color: #f4d56d;
+}
+:root[data-theme="dark"] .notification-request,
+:root[data-theme="dark"] .notification-request-actions,
+:root[data-theme="dark"] .profile-project-roles,
+:root[data-theme="dark"] .profile-role-row {
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .assistant-modes > button[aria-pressed="true"] {
+  background: #514522;
+  border-color: #8d7738;
+  color: #f4dfa0;
+}
+:root[data-theme="dark"] .assistant-turn-error,
+:root[data-theme="dark"] .form-error {
+  background: #432a27;
+  border-color: #80534a;
+  color: #ffc0ae;
+}
+:root[data-theme="dark"] .status-todo { color: #c2c9c4; }
+:root[data-theme="dark"] .status-in_progress { color: #9cc7df; }
+:root[data-theme="dark"] .status-in_review { color: #d0b2e8; }
+:root[data-theme="dark"] .status-done { color: #a9c5a9; }
+:root[data-theme="dark"] .deadline-overdue { color: #ff9d89; }
+:root[data-theme="dark"] .deadline-soon,
+:root[data-theme="dark"] .deadline-today { color: #f1d17a; }
+
+.profile-theme-settings {
+  display: grid;
+  gap: 16px;
+  margin: 22px 0 26px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+.profile-theme-settings h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+.profile-theme-control {
+  display: grid;
+  gap: 7px;
+  max-width: 360px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
