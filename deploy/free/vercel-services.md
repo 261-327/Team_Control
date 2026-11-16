@@ -77,26 +77,27 @@ IP берётся из [платформенного заголовка Vercel](
 
 ## 3.1. Постоянное приватное хранилище файлов материалов
 
-Vercel Functions имеют read-only filesystem; `/tmp` — временное пространство и не подходит для постоянных пользовательских файлов. Поэтому в Services-профиле загрузка и скачивание файлов материалов остаются отключёнными, пока не включено внешнее object storage. Локальная разработка и обычный Docker Compose продолжают использовать FileSystemStorage / volume.
+Vercel Functions имеют read-only filesystem; `/tmp` — временное пространство и не подходит для постоянных пользовательских файлов. Поэтому в Services-профиле загрузка и скачивание файлов материалов остаются отключёнными, пока не включено внешнее object storage. Локальная разработка и Docker Compose продолжают использовать FileSystemStorage / volume.
 
-Для этого проекта предусмотрен S3-совместимый backend Django через `django-storages`. Рекомендуемый кандидат — **Cloudflare R2 Standard**: он совместим с S3 API, не требует публичного bucket и не взимает плату за исходящий трафик. По опубликованной таблице Cloudflare на 3 ноября 2026 года бесплатный ежемесячный объём Standard включает 10 GB-month хранения, 1 млн Class A и 10 млн Class B операций; сверх лимита действуют тарифы. Создание R2 требует включения R2 в аккаунте и прохождения checkout; «есть бесплатная квота» не означает, что ресурс уже создан или что аккаунт не попросит платёжные данные. Проверь текущие условия в [официальной таблице тарифов](https://developers.cloudflare.com/r2/pricing/) перед включением.
+Для файлов используется S3-совместимый backend Django через `django-storages`. Для этого проекта выбран Backblaze B2 с приватным bucket и S3 API.
 
-### Создание bucket и ключей
+### Настройка Backblaze B2
 
-1. В Cloudflare Dashboard открой **Storage & databases → R2** и включи R2 только после согласования владельцем аккаунта.
-2. Создай отдельный bucket для материалов, например `sipi-project-materials`, класс **Standard**. Не включай публичный доступ, `r2.dev` и custom domain.
-3. Создай отдельные S3 API credentials с минимальными правами только на этот bucket: чтение объектов, запись/перезапись и удаление. Не используй глобальный API token Cloudflare и не используй ключ Workers AI.
-4. Сохрани Account ID, S3 endpoint, bucket, Access Key ID и Secret Access Key. Secret показывается при создании; храни его только в менеджере секретов.
-5. В Vercel → Project → Settings → Environment Variables добавь для **Production only**:
+1. В Backblaze Console открой **Buckets** и проверь, что bucket `team-control-private-media` имеет тип доступа **Private**.
+2. Открой сведения bucket и скопируй S3 endpoint. Для текущей конфигурации ожидаются `https://s3.eu-central-003.backblazeb2.com` и region `eu-central-003`; если панель показывает другое, используй значения из панели.
+3. Создай Application Key, ограниченный этим bucket. Выдай только необходимые приложению права на чтение, запись, удаление и перечисление файлов. Не включай доступ ко всем bucket names без необходимости.
+4. В настройках окружения **backend-сервиса** добавь:
    - `PROJECT_MEDIA_STORAGE=s3`
-   - `OBJECT_STORAGE_ENDPOINT_URL=https://<ACCOUNT_ID>.r2.cloudflarestorage.com`
-   - `OBJECT_STORAGE_BUCKET=<имя приватного bucket>`
-   - `OBJECT_STORAGE_ACCESS_KEY_ID=<bucket-scoped access key>`
-   - `OBJECT_STORAGE_SECRET_ACCESS_KEY=<bucket-scoped secret>`
-   - `OBJECT_STORAGE_REGION=auto`
-6. Не добавляй эти значения в Preview, frontend, `NEXT_PUBLIC_*`, Git, issue, PR или логи. После сохранения переменных сделай Production Redeploy.
+   - `OBJECT_STORAGE_ENDPOINT_URL=https://s3.eu-central-003.backblazeb2.com`
+   - `OBJECT_STORAGE_BUCKET=team-control-private-media`
+   - `OBJECT_STORAGE_ACCESS_KEY_ID=<Application Key ID>`
+   - `OBJECT_STORAGE_SECRET_ACCESS_KEY=<Application Key>`
+   - `OBJECT_STORAGE_REGION=eu-central-003`
+5. Добавляй эти значения только в Production backend environment. Не добавляй ключи в Preview, frontend, `NEXT_PUBLIC_*`, Git, issue, PR или логи. После изменения окружения перезапусти/переразверни backend.
 
-Django использует endpoint R2 напрямую через S3 API. Bucket остаётся закрытым; публичные URL не формируются. Скачивание идёт через Django endpoint после проверки членства, а не через публичный URL bucket. Не включай публичный доступ ради обхода авторизации.
+Эта инструкция применима только если Django backend действительно размещён в Vercel Services. Если backend работает в другом месте, переменные нужно задавать в панели именно этого backend-провайдера. Сам по себе адрес frontend на `workers.dev` не подтверждает, где запущен Django.
+
+Bucket остаётся закрытым; публичные URL не формируются. Скачивание идёт через Django endpoint после проверки членства, а не через публичный URL bucket. Не включай публичный доступ ради обхода авторизации.
 
 ### Поведение при отсутствии конфигурации
 
@@ -112,9 +113,9 @@ python manage.py migrate_material_files_to_object_storage --dry-run
 python manage.py migrate_material_files_to_object_storage
 ```
 
-Команда сверяет размер и SHA-256, пропускает уже совпадающие объекты и обновляет имя объекта в БД только после проверки загрузки. Исходные файлы не удаляет. Если прежние файлы находились только на ephemeral filesystem Vercel и экземпляр уже был пересоздан, восстановить их из этой среды невозможно — нужен архив/volume backup или повторная загрузка исходников.
+Команда сверяет размер и SHA-256, пропускает уже совпадающие объекты и обновляет имя объекта в БД только после проверки загрузки. Исходные файлы не удаляет. Если прежние файлы находились только на ephemeral filesystem и экземпляр уже был пересоздан, восстановить их из этой среды невозможно — нужен архив/volume backup или повторная загрузка исходников.
 
-На тестовом bucket проверь загрузку, скачивание авторизованным участником, отказ постороннему пользователю, удаление, повторный деплой и доступ с нового экземпляра. Не используй реальные пользовательские документы до успешного восстановления вместе с БД; процедуру резервирования см. в [infra/media-backup.md](../../infra/media-backup.md).
+На тестовом bucket проверь загрузку, скачивание авторизованным участником, отказ постороннему пользователю, удаление, повторный деплой и доступ с нового экземпляра. Не используй реальные пользовательские документы до успешного восстановления вместе с БД.
 
 ## 4. Проверить живой стенд
 
