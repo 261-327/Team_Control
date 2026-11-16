@@ -95,7 +95,7 @@ Vercel Functions имеют read-only filesystem; `/tmp` — временное 
    - `OBJECT_STORAGE_REGION=eu-central-003`
 5. Добавляй эти значения только в Production backend environment. Не добавляй ключи в Preview, frontend, `NEXT_PUBLIC_*`, Git, issue, PR или логи. После изменения окружения перезапусти/переразверни backend.
 
-Эта инструкция применима только если Django backend действительно размещён в Vercel Services. Если backend работает в другом месте, переменные нужно задавать в панели именно этого backend-провайдера. Сам по себе адрес frontend на `workers.dev` не подтверждает, где запущен Django.
+В текущей архитектуре `sipi.prettiqs.workers.dev` — дополнительный Cloudflare Worker reverse proxy к `sipi-pilot.vercel.app`, а не место размещения приложения. Next.js и Django развернуты в Vercel Services; переменные B2 задаются в Vercel Project → Settings → Environment Variables для Production. Не помещай ключи в Cloudflare Worker. Если архитектура размещения будет изменена, переменные нужно перенести в окружение нового Django backend.
 
 Bucket остаётся закрытым; публичные URL не формируются. Скачивание идёт через Django endpoint после проверки членства, а не через публичный URL bucket. Не включай публичный доступ ради обхода авторизации.
 
