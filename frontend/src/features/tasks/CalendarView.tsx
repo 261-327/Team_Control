@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useReadyData } from "@/providers/DataProvider";
 import { useUi } from "@/providers/UiContext";
 import { Button, EmptyState, IconButton } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
-import { dayKey, dateLabel, plural } from "@/lib/format";
+import { dayKey, dateLabel, plural, statusLabels } from "@/lib/format";
+import type { Status } from "@/types/domain";
 import { createCalendar } from "@/lib/calendar";
 import { calendarPeriod, shiftCalendar, type CalendarMode } from "@/lib/calendar-navigation";
 import { TaskList } from "./TaskViews";
@@ -27,12 +28,22 @@ export function CalendarView() {
   const [mode, setMode] = useState<CalendarMode>("week");
   const [selectedDay, setSelectedDay] = useState(validDay ? requested : "");
   const [projectId, setProjectId] = useState("");
-  const { start, end, month, cells } = calendarPeriod(anchor, mode);
+  const [status, setStatus] = useState<Status | "">("");
+  const [deadlineFilter, setDeadlineFilter] = useState<"" | "overdue" | "today" | "upcoming">("");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const { start, end, month, cells: periodCells } = calendarPeriod(anchor, mode);
+  const cells = mode === "week" && deadlineFilter === "upcoming" ? 14 : periodCells;
   const firstKey = start.toISOString().slice(0, 10);
-  const lastKey = end.toISOString().slice(0, 10);
+  const gridEnd = new Date(start);
+  gridEnd.setUTCDate(gridEnd.getUTCDate() + cells - 1);
+  const lastKey = gridEnd.toISOString().slice(0, 10);
+  const upcomingEnd = new Date(`${today}T12:00:00Z`);
+  upcomingEnd.setUTCDate(upcomingEnd.getUTCDate() + 6);
+  const upcomingLastKey = upcomingEnd.toISOString().slice(0, 10);
   const navigate = (direction: number) => {
     setAnchor((value) => shiftCalendar(value, mode, direction));
     setSelectedDay("");
+    if (deadlineFilter === "upcoming") setDeadlineFilter("");
   };
   const periodLabel =
     mode === "week"
@@ -47,10 +58,39 @@ export function CalendarView() {
           year: "numeric",
           timeZone: "UTC",
         }).format(month);
-  const mine = data.tasks.filter((t) => t.assigneeId === data.sessionId && t.status !== "done");
-  const visible = mine.filter((t) => !projectId || t.projectId === projectId);
+  const mine = data.tasks.filter((t) => t.assigneeId === data.sessionId && t.deadlineAt);
+  const projectTasks = mine.filter((t) => !projectId || t.projectId === projectId);
+  const statuses = useMemo(() => {
+    const projects = data.projects.filter((p) => !projectId || p.id === projectId);
+    return projects
+      .flatMap((project) =>
+        project.columns.map((column) => ({
+          id: column.id,
+          name: column.name || statusLabels[column.id] || column.id,
+        })),
+      )
+      .filter(
+        (item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index,
+      );
+  }, [data.projects, projectId]);
+  const visible = projectTasks.filter((task) => {
+    if (status && task.status !== status) return false;
+    if (deadlineFilter === "overdue")
+      return task.status !== "done" && Date.parse(task.deadlineAt) < Date.parse(data.now);
+    if (deadlineFilter === "today") return dayKey(task.deadlineAt) === today;
+    if (deadlineFilter === "upcoming") {
+      const key = dayKey(task.deadlineAt);
+      return (
+        Date.parse(task.deadlineAt) >= Date.parse(data.now) &&
+        key >= today &&
+        key <= upcomingLastKey
+      );
+    }
+    return true;
+  });
   const week = mine.filter(
     (t) =>
+      t.status !== "done" &&
       Date.parse(t.deadlineAt) >= Date.parse(data.now) &&
       Date.parse(t.deadlineAt) < Date.parse(data.now) + 7 * 86400000,
   );
@@ -58,11 +98,21 @@ export function CalendarView() {
     .filter((t) => {
       const key = dayKey(t.deadlineAt);
       if (selectedDay) return key === selectedDay;
+      if (deadlineFilter === "upcoming") return true;
       return mode === "week"
         ? key >= firstKey && key <= lastKey
         : key.startsWith(anchor.slice(0, 7));
     })
-    .sort((a, b) => Date.parse(a.deadlineAt) - Date.parse(b.deadlineAt));
+    .sort(
+      (a, b) =>
+        (Date.parse(a.deadlineAt) - Date.parse(b.deadlineAt)) * (sortDirection === "asc" ? 1 : -1),
+    );
+  const resetFilters = () => {
+    setProjectId("");
+    setStatus("");
+    setDeadlineFilter("");
+    setSortDirection("asc");
+  };
   const exportCalendar = () => {
     if (!week.length) {
       ui.notify("На ближайшие 7 дней нет личных дедлайнов");
@@ -97,7 +147,14 @@ export function CalendarView() {
         <div className="calendar-toolbar">
           <div>
             <h2 aria-live="polite" aria-atomic="true">
-              {periodLabel}
+              {mode === "week" && deadlineFilter === "upcoming"
+                ? new Intl.DateTimeFormat("ru-RU", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                    timeZone: "UTC",
+                  }).formatRange(start, gridEnd)
+                : periodLabel}
             </h2>
             <span>МСК · UTC+3</span>
           </div>
@@ -130,6 +187,52 @@ export function CalendarView() {
                 {p.name}
               </option>
             ))}
+          </select>
+          <label className="sr-only" htmlFor="calendar-deadline">
+            Срок
+          </label>
+          <select
+            id="calendar-deadline"
+            value={deadlineFilter}
+            onChange={(e) => {
+              const value = e.target.value as typeof deadlineFilter;
+              setDeadlineFilter(value);
+              if (value === "upcoming") {
+                setAnchor(today);
+                setSelectedDay("");
+              }
+            }}
+          >
+            <option value="">Все сроки</option>
+            <option value="overdue">Просроченные</option>
+            <option value="today">Сегодня</option>
+            <option value="upcoming">Ближайшие 7 дней</option>
+          </select>
+          <label className="sr-only" htmlFor="calendar-status">
+            Статус
+          </label>
+          <select
+            id="calendar-status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value as Status | "")}
+          >
+            <option value="">Все статусы</option>
+            {statuses.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+          <label className="sr-only" htmlFor="calendar-sort">
+            Сортировка по сроку
+          </label>
+          <select
+            id="calendar-sort"
+            value={sortDirection}
+            onChange={(e) => setSortDirection(e.target.value as typeof sortDirection)}
+          >
+            <option value="asc">Сначала ближайшие</option>
+            <option value="desc">Сначала дальние</option>
           </select>
           <div className="button-wrap">
             <Button
@@ -175,10 +278,16 @@ export function CalendarView() {
               const date = new Date(Date.parse(start.toISOString()) + i * 86400000);
               const iso = date.toISOString();
               const key = dayKey(iso);
-              const tasks = visible.filter((t) => dayKey(t.deadlineAt) === key);
+              const tasks = visible
+                .filter((t) => dayKey(t.deadlineAt) === key)
+                .sort(
+                  (a, b) =>
+                    (Date.parse(a.deadlineAt) - Date.parse(b.deadlineAt)) *
+                    (sortDirection === "asc" ? 1 : -1),
+                );
               return (
                 <div
-                  className={`calendar-cell ${mode === "month" && date.getUTCMonth() !== month.getUTCMonth() ? "outside" : ""} ${key === dayKey(data.now) ? "today" : ""} ${selectedDay === key ? "selected" : ""}`}
+                  className={`calendar-cell ${mode === "month" && date.getUTCMonth() !== month.getUTCMonth() ? "outside" : ""} ${deadlineFilter === "upcoming" && (key < today || key > upcomingLastKey) ? "outside" : ""} ${key === dayKey(data.now) ? "today" : ""} ${selectedDay === key ? "selected" : ""}`}
                   key={key}
                 >
                   <button
@@ -220,13 +329,20 @@ export function CalendarView() {
           <h2>
             {selectedDay
               ? `Задачи на ${dateLabel(`${selectedDay}T12:00:00+03:00`)}`
-              : mode === "week"
-                ? "Задачи на эту неделю"
-                : "Задачи на этот месяц"}
+              : deadlineFilter === "upcoming"
+                ? "Задачи на ближайшие 7 дней"
+                : mode === "week"
+                  ? "Задачи на эту неделю"
+                  : "Задачи на этот месяц"}
           </h2>
           {selectedDay && (
             <Button variant="ghost" onClick={() => setSelectedDay("")}>
               {mode === "week" ? "Вся неделя" : "Весь месяц"}
+            </Button>
+          )}
+          {(projectId || status || deadlineFilter) && (
+            <Button variant="ghost" onClick={resetFilters}>
+              Сбросить фильтры
             </Button>
           )}
         </div>
