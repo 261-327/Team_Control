@@ -739,6 +739,16 @@ def projects(request):
 
 
 
+@endpoint(("PATCH",))
+def update_project_description(request, project_id):
+    with transaction.atomic():
+        project = project_for(request.user, project_id, manage=True)
+        description = text(request.data, "description", 10000)
+        project.description = description
+        project.save(update_fields=["description"])
+    return {"project": project_json(project), "snapshot": snapshot(request)}
+
+
 @endpoint(("GET", "PATCH", "DELETE"))
 def project_detail(request, project_id):
     if request.method == "GET":
