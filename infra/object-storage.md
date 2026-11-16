@@ -29,7 +29,7 @@ Production использует S3-совместимое объектное х�
 
 Для Application Key ограничь доступ выбранным bucket и используй только необходимые права чтения, записи, удаления и перечисления файлов. Не включай доступ ко всем bucket names, если он не требуется приложению. Секретный ключ показывается при создании: сохрани его в менеджере секретов и не отправляй в чат.
 
-Добавляй переменные только в защищённые настройки окружения **backend-сервиса**, который действительно выполняет Django-запросы. Не добавляй секреты в Git, issue, PR, frontend, `NEXT_PUBLIC_*` или логи. Конкретная панель зависит от места размещения backend; не считай адрес сайта доказательством того, где запущен Django.
+В текущей архитектуре публичный `sipi.prettiqs.workers.dev` — это Cloudflare Worker reverse proxy к `sipi-pilot.vercel.app`; он не размещает Django. Django работает как backend service в Vercel Services. Поэтому переменные добавляются в Vercel Project → Settings → Environment Variables для **Production** (backend service). Не добавляй секреты в настройки Worker, Git, issue, PR, frontend, `NEXT_PUBLIC_*` или логи.
 
 ## Перенос локальных файлов
 
