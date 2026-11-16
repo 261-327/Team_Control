@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useReadyData } from "@/providers/DataProvider";
+import { useTheme } from "@/providers/ThemeProvider";
 import { useUi } from "@/providers/UiContext";
 import { client } from "@/services/client";
 import { Avatar, Button, Field, FormError, useAction } from "@/components/ui";
@@ -25,6 +26,7 @@ export function ProfileView() {
   const logoutAction = useAction();
   const ui = useUi();
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
   return (
     <>
       <div className="page-heading">
@@ -83,6 +85,20 @@ export function ProfileView() {
         </div>
         <section className="panel profile-form">
           <h2>Личная информация</h2>
+          <section className="profile-theme-settings" aria-labelledby="profile-theme-heading">
+            <div>
+              <h3 id="profile-theme-heading">Оформление</h3>
+              <p className="muted">Выбери удобную тему интерфейса.</p>
+            </div>
+            <label className="profile-theme-control" htmlFor="profile-theme">
+              <span>Тема приложения</span>
+              <select id="profile-theme" value={theme} onChange={(event) => setTheme(event.target.value as "light" | "dark" | "system")}>
+                <option value="light">Светлая</option>
+                <option value="dark">Тёмная</option>
+                <option value="system">Как на устройстве</option>
+              </select>
+            </label>
+          </section>
           <p className="muted">Так тебя видят участники твоих проектов.</p>
           <form
             onSubmit={(e) => {
