@@ -5,6 +5,7 @@ export type User = {
   name: string;
   email: string;
   username: string;
+  avatar?: string;
   bio: string;
   color: string;
   kind: "student" | "teacher" | "staff";

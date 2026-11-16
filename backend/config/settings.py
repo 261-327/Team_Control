@@ -282,3 +282,7 @@ ASSISTANT_IMAGE_MODEL = os.environ.get("ASSISTANT_IMAGE_MODEL", "stabilityai/sdx
 PROJECT_SELF_JOIN_ENABLED = os.environ.get(
     "PROJECT_SELF_JOIN_ENABLED", "true" if DEBUG else "false"
 ).lower() == "true"
+
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"

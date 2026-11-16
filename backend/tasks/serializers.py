@@ -208,6 +208,7 @@ def snapshot(request):
         result["users"].append(
             {
                 "id": str(person.pk),
+                "avatar": f"http://127.0.0.1:8000{person.avatar.url}" if person.avatar else "", 
                 "name": person.get_full_name().strip() or person.username,
                 "username": person.username if person.pk in visible_users else "",
                 "email": person.email

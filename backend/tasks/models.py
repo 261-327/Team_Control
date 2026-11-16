@@ -22,6 +22,7 @@ class WorkspaceUser(AbstractUser):
         default="student",
     )
     bio = models.TextField(max_length=500, blank=True, verbose_name="О себе")
+    avatar = models.ImageField(upload_to="avatars/%Y/%m/", blank=True, null=True, verbose_name="Аватар")
 
     # Поля для одноразового кода
     otp_attempts = models.PositiveSmallIntegerField(default=0)

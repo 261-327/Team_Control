@@ -18,6 +18,7 @@ urlpatterns = [
     path("auth/password-reset/", api.auth_password_reset_request),
     path("auth/password-reset/confirm/", api.auth_password_reset_confirm),
     path("profile/", api.profile),
+    path("profile/avatar/", api.upload_avatar),
     path("directory/", api.directory),
     path("projects/", api.projects),
     path(

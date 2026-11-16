@@ -651,6 +651,21 @@ def auth_password_reset_confirm(request):
     return {"message": "Пароль изменён. Войдите с новым паролем и подтвердите вход кодом из письма."}
 
 
+
+@endpoint(("POST",), multipart=True)
+def upload_avatar(request):
+    file = request.FILES.get("avatar")
+    if not file:
+        raise APIError("Выберите файл", "validation", 400)
+    if file.size > 3 * 1024 * 1024:
+        raise APIError("Файл должен быть до 3 МБ", "validation", 400)
+    
+    user = request.user
+    user.avatar = file
+    user.save(update_fields=["avatar"])
+    return {"snapshot": snapshot(request)}
+
+
 @endpoint(("PATCH",))
 def profile(request):
     name = text(request.data, "name", 100, True).split(" ", 1)
