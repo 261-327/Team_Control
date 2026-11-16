@@ -5,7 +5,8 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt \
     && useradd --create-home --uid 10001 sipi
 COPY --chown=sipi:sipi . .
-RUN mkdir -p /app/staticfiles && chown sipi:sipi /app /app/staticfiles
+RUN mkdir -p /app/staticfiles /app/media \
+    && chown -R sipi:sipi /app /app/staticfiles /app/media
 USER sipi
 EXPOSE 8000
 CMD ["sh", "entrypoint.sh"]

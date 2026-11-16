@@ -418,14 +418,6 @@ class AssistantWorker(models.Model):
     heartbeat = models.DateTimeField(default=timezone.now)
 
 
-class RateLimitCounter(models.Model):
-    """Shared, expiring abuse counters; the key contains no raw IP or address."""
-
-    key = models.CharField(primary_key=True, max_length=64)
-    count = models.PositiveIntegerField(default=0)
-    expires_at = models.DateTimeField(db_index=True)
-
-
 class ProjectEvent(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="events")
     user = models.ForeignKey(WorkspaceUser, on_delete=models.SET_NULL, null=True)
@@ -473,3 +465,19 @@ def delete_private_file(instance):
         storage.delete(name)
     else:
         transaction.on_commit(lambda: storage.delete(name))
+
+class RateLimitCounter(models.Model):
+    """Shared, expiring abuse counters."""
+
+    key = models.CharField(
+        primary_key=True,
+        max_length=64
+    )
+
+    count = models.PositiveIntegerField(
+        default=0
+    )
+
+    expires_at = models.DateTimeField(
+        db_index=True
+    )
