@@ -48,12 +48,28 @@ export function IconButton({
   );
 }
 export function Avatar({ user, size = "sm" }: { user?: User; size?: "xs" | "sm" | "md" | "lg" }) {
+  // Если аватар есть, принудительно ставим порт 8000
+  const avatarUrl = user?.avatar 
+    ? user.avatar.replace("http://localhost:3000", "http://localhost:8000").replace("http://127.0.0.1:3000", "http://127.0.0.1:8000") 
+    : "";
+
   return (
     <span
       className={`avatar avatar-${size} ${user?.color || "neutral"}`}
       title={user?.name || "Не назначен"}
+      style={{ overflow: 'hidden', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
     >
-      {user ? initials(user.name) : <Icon name="user" size={14} />}
+      {avatarUrl ? (
+        <img 
+          src={avatarUrl} 
+          alt={user?.name} 
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+        />
+      ) : user ? (
+        initials(user.name)
+      ) : (
+        <Icon name="user" size={14} />
+      )}
     </span>
   );
 }

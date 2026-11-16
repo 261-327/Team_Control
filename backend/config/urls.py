@@ -2,6 +2,9 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from django.contrib.auth.views import LogoutView
 from tasks.views import colleague_profile_view, colleague_invite_view, project_invitation_view, colleague_request_view, colleague_response_view, projects_list_view, profile_view, column_edit_view, column_delete_view, project_delete_view, task_delete_view, project_leave_view, project_remove_member_view, project_search_view, project_join_view, column_limit_view, column_create_view, task_move_view, task_edit_view, task_create_view, project_create_view, project_detail_view, register_verify_view, register_view, home_view, login_request_view, login_verify_view
+from django.conf import settings
+from django.conf.urls.static import static
+
 
 legacy_patterns = [
     path('profile/colleagues/<int:user_id>/', colleague_profile_view, name='colleague_profile'),
@@ -40,5 +43,8 @@ urlpatterns = [
     path('api/', include('tasks.api_urls')),
     path('admin/', admin.site.urls),
     path('legacy/', include(legacy_patterns)),
-    re_path(r'^(?P<path>(?!api/).*)$', frontend_redirect, name='frontend'),
+    re_path(r'^(?P<path>(?!api/|media/).*)$', frontend_redirect, name='frontend'),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

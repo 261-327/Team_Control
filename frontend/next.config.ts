@@ -1,4 +1,4 @@
-import type { NextConfig } from "next";
+  import type { NextConfig } from "next";
 import { execFileSync } from "node:child_process";
 import { version } from "./package.json";
 

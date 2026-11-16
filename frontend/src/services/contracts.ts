@@ -48,6 +48,7 @@ export interface DataClient {
     role?: RoleInput,
   ): Promise<{ notifications: NotificationItem[] }>;
   updateProfile(name: string, bio: string): Promise<void>;
+  uploadAvatar: (file: File) => Promise<void>;
   updateMyRole(projectId: string, role: RoleInput): Promise<void>;
   updateMemberRole(projectId: string, userId: string, role: RoleInput): Promise<void>;
   inviteColleague(projectId: string, connectionId: string): Promise<void>;

@@ -25,6 +25,7 @@ export function ProfileView() {
   const logoutAction = useAction();
   const ui = useUi();
   const router = useRouter();
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   return (
     <>
       <div className="page-heading">
@@ -44,6 +45,30 @@ export function ProfileView() {
               <i />
             </div>
             <Avatar user={user} size="lg" />
+                        <div style={{ marginTop: '10px', textAlign: 'center' }}>
+              <input 
+                type="file" 
+                accept="image/*" 
+                id="avatar-upload" 
+                style={{ display: 'none' }}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setUploadingAvatar(true);
+                  try {
+                    await client.uploadAvatar(file);
+                    ui.notify("Аватар обновлен");
+                  } catch (err: any) {
+                    ui.notify(err.message);
+                  } finally {
+                    setUploadingAvatar(false);
+                  }
+                }}
+              />
+              <Button variant="secondary" onClick={() => document.getElementById('avatar-upload')?.click()} loading={uploadingAvatar}>
+                <Icon name="image" size={16} /> Изменить аватар
+              </Button>
+            </div>
             <h2>{user.name}</h2>
             <p className="profile-username">@{user.username}</p>
             <p>{user.email}</p>

@@ -205,6 +205,26 @@ class HttpClient implements DataClient {
   updateProfile = async (name: string, bio: string) => {
     await this.mutate("profile", "PATCH", { name, bio });
   };
+    uploadAvatar = async (file: File) => {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    
+    const csrf = document.cookie.split("; ").find((item) => item.startsWith("csrftoken="))?.split("=").slice(1).join("=");
+    
+    const response = await fetch("/api/profile/avatar/", {
+      method: "POST",
+      body: formData,
+      headers: {
+        ...(csrf ? { "X-CSRFToken": decodeURIComponent(csrf) } : {}),
+      },
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => null);
+      throw new Error(err?.error?.message || "Не удалось загрузить аватар");
+    }
+    const data = await response.json();
+    this.publish(data.snapshot);
+  };
   createTask = async (input: TaskInput) =>
     (await this.mutate<{ task: Task }>("tasks", "POST", input)).task;
   updateTask = async (id: string, input: TaskInput) => {
