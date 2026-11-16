@@ -1,0 +1,31 @@
+{
+  "id": "1",
+  "name": "Учебный проект",
+  "description": "Вымышленный пример",
+  "color": "sage",
+  "symbol": "projects",
+  "createdAt": "2026-11-17T09:00:00+03:00",
+  "joinPolicy": "invitation",
+  "columns": [
+    {
+      "id": "todo",
+      "name": "К выполнению",
+      "limit": 15
+    },
+    {
+      "id": "in_progress",
+      "name": "В работе",
+      "limit": 15
+    },
+    {
+      "id": "in_review",
+      "name": "На проверке",
+      "limit": 15
+    },
+    {
+      "id": "done",
+      "name": "Готово",
+      "limit": 15
+    }
+  ]
+}
