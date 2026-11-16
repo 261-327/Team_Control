@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 
 export type ThemePreference = "light" | "dark" | "system";
 
@@ -67,7 +75,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     };
     media.addEventListener("change", syncSystemTheme);
     const syncStorage = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY && (event.newValue === "light" || event.newValue === "dark" || event.newValue === "system")) {
+      if (
+        event.key === STORAGE_KEY &&
+        (event.newValue === "light" || event.newValue === "dark" || event.newValue === "system")
+      ) {
         setThemeState(event.newValue);
         const resolved = getResolvedTheme(event.newValue);
         setResolvedTheme(resolved);
@@ -82,7 +93,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     };
   }, [theme]);
 
-  const value = useMemo(() => ({ theme, setTheme, resolvedTheme }), [theme, setTheme, resolvedTheme]);
+  const value = useMemo(
+    () => ({ theme, setTheme, resolvedTheme }),
+    [theme, setTheme, resolvedTheme],
+  );
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
