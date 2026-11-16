@@ -1,7 +1,9 @@
 from django.urls import path
-from . import api, assistant_api, colleagues_api, notifications_api
+from . import api, email_change_api, assistant_api, colleagues_api, notifications_api
 
 urlpatterns = [
+    path("profile/email-change/", email_change_api.request_change),
+    path("profile/email-change/confirm/", email_change_api.confirm_change),
     path("notifications/", notifications_api.notifications),
     path("notifications/<str:kind>/<str:notification_id>/respond/", notifications_api.respond_notification),
     path("colleagues/<int:connection_id>/invite/", colleagues_api.invite_colleague),

@@ -13,6 +13,7 @@ import { Icon } from "@/components/ui/Icon";
 import { RoleEditor } from "@/features/projects/RoleFields";
 import { professions, pluralWord } from "@/lib/format";
 
+import { EmailChangeForm } from "./EmailChangeForm";
 import { ColleaguesView } from "./ColleaguesView";
 
 export function ProfileView() {
@@ -95,9 +96,7 @@ export function ProfileView() {
               <select
                 id="profile-theme"
                 value={theme}
-                onChange={(event) =>
-                  setTheme(event.target.value as "light" | "dark" | "system")
-                }
+                onChange={(event) => setTheme(event.target.value as "light" | "dark" | "system")}
               >
                 <option value="light">Светлая</option>
                 <option value="dark">Тёмная</option>
@@ -105,6 +104,7 @@ export function ProfileView() {
               </select>
             </label>
           </section>
+          <EmailChangeForm />
           <p className="muted">Так тебя видят участники твоих проектов.</p>
           <form
             onSubmit={(e) => {
@@ -126,7 +126,10 @@ export function ProfileView() {
             <Field label="Никнейм" hint="По этому нику тебя можно найти и добавить в коллеги.">
               <input value={user.username} readOnly autoComplete="username" />
             </Field>
-            <Field label="Электронная почта" hint="Чтобы изменить почту, обратись к администратору">
+            <Field
+              label="Электронная почта"
+              hint="Новый адрес станет действующим после подтверждения"
+            >
               <input type="email" value={user.email} readOnly />
             </Field>
             <Field label="О себе" hint={`${bio.length}/500 символов`}>

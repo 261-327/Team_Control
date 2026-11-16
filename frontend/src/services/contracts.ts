@@ -47,6 +47,11 @@ export interface DataClient {
     action: "accept" | "decline",
     role?: RoleInput,
   ): Promise<{ notifications: NotificationItem[] }>;
+  requestEmailChange(
+    email: string,
+    password: string,
+  ): Promise<{ expiresAt: string; resendAt: string }>;
+  confirmEmailChange(code: string): Promise<void>;
   updateProfile(name: string, bio: string): Promise<void>;
   updateMyRole(projectId: string, role: RoleInput): Promise<void>;
   updateMemberRole(projectId: string, userId: string, role: RoleInput): Promise<void>;
