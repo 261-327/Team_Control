@@ -255,6 +255,10 @@ class HttpClient implements DataClient {
   directory = async (query: string) =>
     (await this.request<{ projects: Project[] }>(`directory?q=${encodeURIComponent(query)}`))
       .projects;
+    updateProjectDescription = async (id: string, description: string) =>
+    await this.mutate<{ project: Project; snapshot: Snapshot }>(`projects/${id}/description/`, "PATCH", {
+      description,
+    });
   readComments = async (taskId: string, lastCommentId: string) => {
     await this.mutate(`tasks/${taskId}/comments/read`, "POST", { lastCommentId });
     window.dispatchEvent(new Event("comments-changed"));

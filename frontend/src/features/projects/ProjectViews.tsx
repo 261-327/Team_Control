@@ -7,6 +7,7 @@ import { useReadyData } from "@/providers/DataProvider";
 import { useUi } from "@/providers/UiContext";
 import { client } from "@/services/client";
 import { canManage } from "@/lib/permissions";
+import { ProjectPassport } from "./ProjectPassport";
 import {
   Avatar,
   Button,
@@ -38,6 +39,7 @@ export function ProjectsView() {
   const data = useReadyData();
   const ui = useUi();
   const [query, setQuery] = useState("");
+  const [passportProjectId, setPassportProjectId] = useState<string | null>(null);
   const projects = data.projects.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()));
   return (
     <>
@@ -89,7 +91,14 @@ export function ProjectsView() {
           <div className="project-list-card" key={p.id}>
             <ProjectMiniCard id={p.id} />
             <div className="project-list-description">
-              <p>{p.description}</p>
+              <button 
+                type="button" 
+                className="icon-button" 
+                title="Открыть паспорт проекта"
+                onClick={() => setPassportProjectId(p.id)}
+                >
+                <Icon name="info" size={18} />
+              </button>
               <span>
                 <Icon name={canManage(data, p.id) ? "flag" : "user"} size={14} />
                 {canManage(data, p.id)
@@ -128,12 +137,19 @@ export function ProjectsView() {
           description="Попробуй другое название или найди новую команду через поиск проектов."
         />
       )}
+      {passportProjectId && (
+      <ProjectPassport 
+        projectId={passportProjectId} 
+        onClose={() => setPassportProjectId(null)} 
+        />
+    )}
     </>
   );
 }
 export function ProjectLayout({ children }: { children: React.ReactNode }) {
   const { projectId } = useParams<{ projectId: string }>();
   const data = useReadyData();
+  const [passportOpen, setPassportOpen] = useState(false);
   const pathname = usePathname();
   const ui = useUi();
   const project = data.projects.find((p) => p.id === projectId);
@@ -173,8 +189,17 @@ export function ProjectLayout({ children }: { children: React.ReactNode }) {
           <div className="project-title-row">
             <h1>{project.name}</h1>
             <span className="project-semester">Осень 2026</span>
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              title="Паспорт проекта"
+              onClick={() => setPassportOpen(true)}
+              style={{ marginLeft: '12px', padding: '4px 12px', fontSize: '14px', height: '32px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Icon name="info" size={16} />
+              Паспорт проекта
+            </button>
           </div>
-          <p>{project.description}</p>
         </div>
       </div>
       <div className="project-underheading">
@@ -229,6 +254,7 @@ export function ProjectLayout({ children }: { children: React.ReactNode }) {
         ))}
       </nav>
       {children}
+      {passportOpen && <ProjectPassport projectId={projectId} onClose={() => setPassportOpen(false)} />}
     </div>
   );
 }
