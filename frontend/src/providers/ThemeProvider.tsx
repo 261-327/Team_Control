@@ -56,7 +56,7 @@ function getResolvedTheme(theme: ThemePreference): "light" | "dark" {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const theme = useSyncExternalStore(
+  const theme = useSyncExternalStore<ThemePreference>(
     subscribeToTheme,
     getStoredTheme,
     () => "system",
