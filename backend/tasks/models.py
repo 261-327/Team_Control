@@ -481,3 +481,15 @@ class RateLimitCounter(models.Model):
     expires_at = models.DateTimeField(
         db_index=True
     )
+
+
+class EmailChangeChallenge(models.Model):
+    user = models.OneToOneField(WorkspaceUser, on_delete=models.CASCADE)
+    request_id = models.UUIDField(default=uuid.uuid4)
+    email = models.EmailField()
+    previous_email = models.EmailField()
+    code_hash = models.CharField(max_length=128)
+    auth_hash = models.CharField(max_length=128)
+    expires_at = models.DateTimeField()
+    resend_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)

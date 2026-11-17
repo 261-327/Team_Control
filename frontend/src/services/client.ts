@@ -202,6 +202,20 @@ class HttpClient implements DataClient {
       "POST",
       { action, role },
     );
+  requestEmailChange = (email: string, password: string) =>
+    this.request<{ expiresAt: string; resendAt: string }>("profile/email-change", "POST", {
+      email,
+      password,
+    });
+  confirmEmailChange = async (code: string) => {
+    const result = await this.request<{ snapshot: Database }>(
+      "profile/email-change/confirm",
+      "POST",
+      { code },
+    );
+    this.revision++;
+    this.publish(result.snapshot);
+  };
   updateProfile = async (name: string, bio: string) => {
     await this.mutate("profile", "PATCH", { name, bio });
   };
@@ -255,10 +269,14 @@ class HttpClient implements DataClient {
   directory = async (query: string) =>
     (await this.request<{ projects: Project[] }>(`directory?q=${encodeURIComponent(query)}`))
       .projects;
-    updateProjectDescription = async (id: string, description: string) =>
-    await this.mutate<{ project: Project; snapshot: Snapshot }>(`projects/${id}/description/`, "PATCH", {
-      description,
-    });
+  updateProjectDescription = async (id: string, description: string) =>
+    await this.mutate<{ project: Project; snapshot: Snapshot }>(
+      `projects/${id}/description/`,
+      "PATCH",
+      {
+        description,
+      },
+    );
   readComments = async (taskId: string, lastCommentId: string) => {
     await this.mutate(`tasks/${taskId}/comments/read`, "POST", { lastCommentId });
     window.dispatchEvent(new Event("comments-changed"));
