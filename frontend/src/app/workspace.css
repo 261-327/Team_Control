@@ -2392,3 +2392,339 @@ select:focus {
   color: var(--text);
   border-color: var(--line);
 }
+
+
+/* Accessible dark theme: complete surface, typography and authentication coverage. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #101512;
+  --surface: #1b231e;
+  --surface-soft: #26312a;
+  --panel: #1b231e;
+  --text: #f2f6f3;
+  --muted: #c0cbc3;
+  --line: #536157;
+  --brand-ink: #0c110e;
+  --focus: #ffe08a;
+  --primary: #f4d46f;
+  --primary-hover: #ffdf7d;
+}
+
+:root[data-theme="dark"] body,
+:root[data-theme="dark"] .workspace-main,
+:root[data-theme="dark"] .auth-page {
+  background: var(--bg) !important;
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .auth-story {
+  background: #111914;
+  color: var(--text);
+  border-right: 1px solid var(--line);
+}
+:root[data-theme="dark"] .auth-story-copy h1,
+:root[data-theme="dark"] .auth-story-copy h1 em {
+  color: #f7f9f7;
+}
+:root[data-theme="dark"] .auth-story-copy h1 em {
+  color: #ffdf7d;
+}
+:root[data-theme="dark"] .auth-story-copy > p,
+:root[data-theme="dark"] .auth-story-footer {
+  color: #c8d2cb;
+}
+:root[data-theme="dark"] .auth-main {
+  background: #171f1a !important;
+  color: var(--text);
+}
+:root[data-theme="dark"] .auth-main h1,
+:root[data-theme="dark"] .auth-main h2,
+:root[data-theme="dark"] .auth-form h2,
+:root[data-theme="dark"] .auth-form strong {
+  color: #f5f8f5;
+}
+:root[data-theme="dark"] .auth-main p,
+:root[data-theme="dark"] .auth-form > p,
+:root[data-theme="dark"] .auth-subtitle,
+:root[data-theme="dark"] .auth-footnote,
+:root[data-theme="dark"] .auth-switch,
+:root[data-theme="dark"] .auth-footer,
+:root[data-theme="dark"] .auth-site-version {
+  color: #c0cbc3;
+}
+:root[data-theme="dark"] .auth-form {
+  color: var(--text);
+}
+:root[data-theme="dark"] .auth-form .field-label,
+:root[data-theme="dark"] .auth-form label,
+:root[data-theme="dark"] .auth-form legend {
+  color: #edf3ee;
+}
+:root[data-theme="dark"] .auth-form .field-hint,
+:root[data-theme="dark"] .auth-form small,
+:root[data-theme="dark"] .auth-form .form-note {
+  color: #c0cbc3;
+}
+:root[data-theme="dark"] .auth-form .form-note {
+  background: #26352c;
+  border: 1px solid #536b59;
+}
+:root[data-theme="dark"] .auth-form a,
+:root[data-theme="dark"] .auth-code-actions button {
+  color: #ffdf7d;
+}
+:root[data-theme="dark"] .auth-form a:hover,
+:root[data-theme="dark"] .auth-code-actions button:hover:not(:disabled) {
+  color: #fff0b8;
+}
+:root[data-theme="dark"] .auth-form .auth-submit {
+  color: #211d10;
+}
+:root[data-theme="dark"] .auth-code-actions button:disabled {
+  color: #89958c;
+}
+:root[data-theme="dark"] .auth-mobile-logo {
+  color: var(--text);
+}
+:root[data-theme="dark"] .auth-product-preview,
+:root[data-theme="dark"] .auth-preview-board,
+:root[data-theme="dark"] .auth-preview-board article {
+  background: #202a23;
+  color: #f2f6f3;
+  border-color: #536157;
+}
+:root[data-theme="dark"] .auth-preview-tabs,
+:root[data-theme="dark"] .auth-preview-board small {
+  color: #c0cbc3;
+}
+
+/* Give every common workspace surface a distinct, visible layer. */
+:root[data-theme="dark"] .topbar,
+:root[data-theme="dark"] .panel,
+:root[data-theme="dark"] .modal,
+:root[data-theme="dark"] .sheet,
+:root[data-theme="dark"] .toast,
+:root[data-theme="dark"] .task-card,
+:root[data-theme="dark"] .project-list-card,
+:root[data-theme="dark"] .project-mini-card,
+:root[data-theme="dark"] .stat-card,
+:root[data-theme="dark"] .assistant-prompts > button,
+:root[data-theme="dark"] .task-status-options,
+:root[data-theme="dark"] .profile-colleague-menu-panel,
+:root[data-theme="dark"] .material-card,
+:root[data-theme="dark"] .settings-panel,
+:root[data-theme="dark"] .notification-panel,
+:root[data-theme="dark"] .discussion-panel,
+:root[data-theme="dark"] .task-result,
+:root[data-theme="dark"] .search-results,
+:root[data-theme="dark"] .calendar-grid,
+:root[data-theme="dark"] .calendar-task-panel {
+  background-color: var(--surface);
+  color: var(--text);
+  border-color: var(--line);
+}
+
+:root[data-theme="dark"] .modal-header,
+:root[data-theme="dark"] .sheet > .modal-header,
+:root[data-theme="dark"] .panel-heading,
+:root[data-theme="dark"] .task-card > footer,
+:root[data-theme="dark"] .task-row,
+:root[data-theme="dark"] .profile-colleague-row,
+:root[data-theme="dark"] .profile-role-row,
+:root[data-theme="dark"] .comment,
+:root[data-theme="dark"] .history-list > li {
+  background-color: #202a23;
+  color: var(--text);
+  border-color: var(--line);
+}
+
+:root[data-theme="dark"] .modal-header h2,
+:root[data-theme="dark"] .modal-header p,
+:root[data-theme="dark"] .modal-body,
+:root[data-theme="dark"] .panel h1,
+:root[data-theme="dark"] .panel h2,
+:root[data-theme="dark"] .panel h3,
+:root[data-theme="dark"] .panel h4,
+:root[data-theme="dark"] .task-card h3,
+:root[data-theme="dark"] .task-row-title > strong,
+:root[data-theme="dark"] .project-mini-card h3,
+:root[data-theme="dark"] .stat-card strong,
+:root[data-theme="dark"] .profile-summary h2,
+:root[data-theme="dark"] .profile-form h2,
+:root[data-theme="dark"] .profile-form h3,
+:root[data-theme="dark"] .material-card h3,
+:root[data-theme="dark"] .settings-panel h2,
+:root[data-theme="dark"] .discussion-panel h2,
+:root[data-theme="dark"] .task-result h2,
+:root[data-theme="dark"] .empty-state h3 {
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .muted,
+:root[data-theme="dark"] .field-label,
+:root[data-theme="dark"] .field-hint,
+:root[data-theme="dark"] .form-note,
+:root[data-theme="dark"] .task-description,
+:root[data-theme="dark"] .profile-bio,
+:root[data-theme="dark"] .material-description,
+:root[data-theme="dark"] .task-row-title > span,
+:root[data-theme="dark"] .task-code,
+:root[data-theme="dark"] .deadline,
+:root[data-theme="dark"] .breadcrumbs,
+:root[data-theme="dark"] .breadcrumbs > a,
+:root[data-theme="dark"] .modal-header p,
+:root[data-theme="dark"] .profile-role-row > a > span,
+:root[data-theme="dark"] .attachment-list a span,
+:root[data-theme="dark"] .assistant-attached-files a span {
+  color: var(--muted);
+}
+
+/* Forms, selects and editable controls: readable text and clear boundaries. */
+:root[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+:root[data-theme="dark"] textarea,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] .search-field,
+:root[data-theme="dark"] .search-trigger,
+:root[data-theme="dark"] .view-switch,
+:root[data-theme="dark"] .task-column,
+:root[data-theme="dark"] .assistant-composer textarea,
+:root[data-theme="dark"] .assistant-toolbar > select,
+:root[data-theme="dark"] .comment-form textarea {
+  color: #f2f6f3 !important;
+  background: #202a23 !important;
+  border: 1px solid #647368 !important;
+  caret-color: #ffdf7d;
+}
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder {
+  color: #b0bdb4 !important;
+  opacity: 1;
+}
+:root[data-theme="dark"] input:disabled,
+:root[data-theme="dark"] textarea:disabled,
+:root[data-theme="dark"] select:disabled {
+  color: #aeb9b1 !important;
+  background: #1b231e !important;
+  opacity: 1;
+}
+:root[data-theme="dark"] option {
+  color: #f2f6f3;
+  background: #202a23;
+}
+:root[data-theme="dark"] input[type="checkbox"],
+:root[data-theme="dark"] input[type="radio"] {
+  accent-color: #f4d46f;
+}
+:root[data-theme="dark"] :where(button, a, input, select, textarea, summary):focus-visible {
+  outline-color: #ffe08a;
+  outline-offset: 3px;
+}
+
+/* Buttons and links retain contrast in every state. */
+:root[data-theme="dark"] .btn-secondary,
+:root[data-theme="dark"] .icon-button,
+:root[data-theme="dark"] .task-status-options > button,
+:root[data-theme="dark"] .profile-colleague-menu-panel > button {
+  color: var(--text);
+  background: #29342d;
+  border-color: #647368;
+}
+:root[data-theme="dark"] .btn-secondary:hover:not(:disabled),
+:root[data-theme="dark"] .icon-button:hover,
+:root[data-theme="dark"] .task-status-options > button:hover:not(:disabled),
+:root[data-theme="dark"] .profile-colleague-menu-panel > button:hover {
+  color: #fff;
+  background: #36453b;
+  border-color: #829487;
+}
+:root[data-theme="dark"] .btn-ghost {
+  color: var(--text);
+}
+:root[data-theme="dark"] .btn-ghost:hover {
+  color: #fff;
+  background: #303d34;
+}
+:root[data-theme="dark"] .text-link,
+:root[data-theme="dark"] .breadcrumbs > a,
+:root[data-theme="dark"] .search-results > a {
+  color: #ffdf7d;
+}
+:root[data-theme="dark"] .text-link:hover,
+:root[data-theme="dark"] .search-results > a:hover {
+  color: #fff0b8;
+}
+
+/* Calendars, boards, tables, attachments and nested blocks. */
+:root[data-theme="dark"] .calendar-cell,
+:root[data-theme="dark"] .calendar-toolbar,
+:root[data-theme="dark"] .calendar-weekdays,
+:root[data-theme="dark"] .calendar-mode,
+:root[data-theme="dark"] .projects-workspace-summary,
+:root[data-theme="dark"] .projects-workspace-summary > div,
+:root[data-theme="dark"] .assistant-mode-note,
+:root[data-theme="dark"] .assistant-messages,
+:root[data-theme="dark"] .assistant-setup-note,
+:root[data-theme="dark"] .assistant-plan,
+:root[data-theme="dark"] .profile-theme-settings,
+:root[data-theme="dark"] .deadline-summary,
+:root[data-theme="dark"] .notification-notice,
+:root[data-theme="dark"] .site-release,
+:root[data-theme="dark"] .attachment-list li,
+:root[data-theme="dark"] .assistant-attached-files li {
+  background: #202a23;
+  color: var(--text);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .calendar-day-button,
+:root[data-theme="dark"] .calendar-toolbar h2,
+:root[data-theme="dark"] .week-month,
+:root[data-theme="dark"] .calendar-mode button {
+  color: var(--text);
+}
+:root[data-theme="dark"] .calendar-day-button[aria-selected="true"],
+:root[data-theme="dark"] .calendar-day-button:hover,
+:root[data-theme="dark"] .calendar-mode button[aria-pressed="true"] {
+  background: #514522;
+  color: #fff0b8;
+}
+:root[data-theme="dark"] table,
+:root[data-theme="dark"] th,
+:root[data-theme="dark"] td {
+  color: var(--text);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] tr:nth-child(even) {
+  background: #202a23;
+}
+:root[data-theme="dark"] .task-row:hover,
+:root[data-theme="dark"] .stat-card:hover,
+:root[data-theme="dark"] .project-mini-card:hover,
+:root[data-theme="dark"] .assistant-prompts > button:hover {
+  background: #303d34;
+}
+:root[data-theme="dark"] .status-todo { color: #d4ddd6; }
+:root[data-theme="dark"] .status-in_progress { color: #a9dcf4; }
+:root[data-theme="dark"] .status-in_review { color: #dfc0ff; }
+:root[data-theme="dark"] .status-done { color: #b9e4bc; }
+:root[data-theme="dark"] .deadline-overdue { color: #ffad9b; }
+:root[data-theme="dark"] .deadline-soon,
+:root[data-theme="dark"] .deadline-today { color: #ffe08a; }
+:root[data-theme="dark"] .form-error,
+:root[data-theme="dark"] .assistant-turn-error {
+  color: #ffd1c7;
+  background: #492c29;
+  border-color: #a66b60;
+}
+:root[data-theme="dark"] .unread-comments {
+  color: #ffe08a;
+}
+:root[data-theme="dark"] .progress-track {
+  background: #3b473f;
+}
+:root[data-theme="dark"] .progress-track > span {
+  background: #f4d46f;
+}
+:root[data-theme="dark"] ::selection {
+  color: #171b18;
+  background: #f4d46f;
+}

@@ -55,6 +55,10 @@ class WorkspaceUserCreationForm(UserCreationForm):
 
 
 class MembershipRoleForm(forms.ModelForm):
+    developer_specialization = forms.ChoiceField(
+        choices=[("", "Выберите направление")] + Membership.DEVELOPER_SPECIALIZATION_CHOICES,
+        required=False,
+    )
     class Meta:
         model = Membership
         fields = ("role", "developer_specialization", "custom_role")
