@@ -21,6 +21,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
 import { dateLabel } from "@/lib/format";
+import { FILE_ACCEPT, fileError, formatFileSize } from "@/lib/attachments";
 import { TaskAttachments } from "./TaskAttachments";
 import { Deadline, StatusBadge } from "./TaskViews";
 
@@ -30,6 +31,9 @@ export function TaskDetailView() {
   const ui = useUi();
   const router = useRouter();
   const [tab, setTab] = useState("comments");
+  const [commentFile, setCommentFile] = useState<File | null>(null);
+  const [commentFileError, setCommentFileError] = useState("");
+  const commentRequestId = useRef("");
   const [comment, setComment] = useState("");
   const [submittedComments, setSubmittedComments] = useState(0);
   const [result, setResult] = useState<string | null>(null);
@@ -253,6 +257,12 @@ export function TaskDetailView() {
                               <time>{dateLabel(c.createdAt, true)} МСК</time>
                             </header>
                             <p className="pre-wrap">{c.text}</p>
+                            {c.attachments?.map((file) => (
+                              <a key={file.id} href={file.downloadUrl}>
+                                <Icon name="paperclip" size={16} /> {file.fileName} ·{" "}
+                                {formatFileSize(file.fileSize)}
+                              </a>
+                            ))}
                           </div>
                         </article>
                       );
@@ -273,9 +283,22 @@ export function TaskDetailView() {
                   onSubmit={(e) => {
                     e.preventDefault();
                     void commentsAction.run(
-                      () => client.addComment(task.id, comment),
+                      () => {
+                        if (!commentRequestId.current)
+                          commentRequestId.current = crypto.randomUUID();
+                        return commentFile
+                          ? client.addCommentFile(
+                              task.id,
+                              comment,
+                              commentFile,
+                              commentRequestId.current,
+                            )
+                          : client.addComment(task.id, comment);
+                      },
                       () => {
                         setComment("");
+                        setCommentFile(null);
+                        commentRequestId.current = "";
                         setSubmittedComments((count) => count + 1);
                         ui.notify("Комментарий добавлен");
                       },
@@ -291,8 +314,77 @@ export function TaskDetailView() {
                     rows={3}
                     maxLength={2000}
                     value={comment}
-                    onChange={(e) => setComment(e.target.value)}
+                    onChange={(e) => {
+                      setComment(e.target.value);
+                      commentRequestId.current = "";
+                    }}
+                    disabled={commentsAction.busy}
                   />
+                  <label>
+                    Прикрепить файл к комментарию (до 3 МБ)
+                    <input
+                      type="file"
+                      accept={FILE_ACCEPT}
+                      disabled={commentsAction.busy}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        event.target.value = "";
+                        if (!file) return;
+                        const error = fileError(file);
+                        setCommentFileError(error);
+                        if (!error) {
+                          setCommentFile(file);
+                          commentRequestId.current = "";
+                        }
+                      }}
+                    />
+                  </label>
+                  {commentFileError && <p role="alert">{commentFileError}</p>}
+                  {commentFile && (
+                    <div>
+                      <span>
+                        {commentFile.name} · {formatFileSize(commentFile.size)}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          const url = URL.createObjectURL(
+                            new Blob([commentFile], {
+                              type:
+                                (
+                                  {
+                                    png: "image/png",
+                                    jpg: "image/jpeg",
+                                    jpeg: "image/jpeg",
+                                    pdf: "application/pdf",
+                                    txt: "text/plain",
+                                    md: "text/plain",
+                                    csv: "text/plain",
+                                  } as Record<string, string>
+                                )[commentFile.name.split(".").pop()?.toLowerCase() || ""] ||
+                                "application/octet-stream",
+                            }),
+                          );
+                          window.open(url, "_blank", "noopener,noreferrer");
+                          setTimeout(() => URL.revokeObjectURL(url), 60000);
+                        }}
+                      >
+                        Просмотреть вложение
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={commentsAction.busy}
+                        onClick={() => {
+                          setCommentFile(null);
+                          commentRequestId.current = "";
+                        }}
+                      >
+                        Убрать вложение
+                      </Button>
+                    </div>
+                  )}
                   <div>
                     <span>{comment.length}/2000 · МСК</span>
                     <Button loading={commentsAction.busy} disabled={!comment.trim()}>

@@ -52,6 +52,7 @@ from .memberships import accessible, remove_project_participant
 from .rate_limits import RateLimitUnavailable, clear as clear_rate, client_identity, consume
 from .serializers import (
     challenge_json,
+    comment_attachment_json,
     invitation_json,
     project_json,
     public_project,
@@ -1383,6 +1384,7 @@ def comments(request, task_id):
                     "taskId": str(comment.task_id),
                     "userId": str(comment.user_id or ""),
                     "text": comment.text,
+                    "attachments": comment_attachment_json(comment),
                     "createdAt": (
                         comment.created_at.isoformat()
                         if comment.created_at
@@ -1408,18 +1410,7 @@ def comments(request, task_id):
             ),
         )
 
-        participants = set(
-            project.memberships.filter(is_confirmed=True, user__is_active=True)
-            .values_list("user_id", flat=True)
-        )
-        participants.add(project.owner_id)
-        recipients = {project.owner_id, task.creator_id}
-        recipients.update(task.assignees.values_list("pk", flat=True))
-        recipients.update(task.comments.values_list("user_id", flat=True))
-        recipients = (recipients & participants) - {request.user.pk, None}
-        CommentNotification.objects.bulk_create(
-            [CommentNotification(comment=comment, user_id=user_id) for user_id in recipients]
-        )
+        notify_comment(project, task, comment, request.user)
 
     return {"snapshot": snapshot(request)}
 
@@ -1640,3 +1631,19 @@ def frontend_redirect(request, path=""):
         + ("?" + request.META["QUERY_STRING"] if request.META.get("QUERY_STRING") else "")
     )
 
+
+
+def notify_comment(project, task, comment, user):
+    from .models import CommentNotification
+    participants = set(
+        project.memberships.filter(is_confirmed=True, user__is_active=True)
+        .values_list("user_id", flat=True)
+    )
+    participants.add(project.owner_id)
+    recipients = {project.owner_id, task.creator_id}
+    recipients.update(task.assignees.values_list("pk", flat=True))
+    recipients.update(task.comments.values_list("user_id", flat=True))
+    recipients = (recipients & participants) - {user.pk, None}
+    CommentNotification.objects.bulk_create(
+        [CommentNotification(comment=comment, user_id=user_id) for user_id in recipients]
+    )

@@ -246,6 +246,7 @@ def snapshot(request):
                 "taskId": str(c.task_id),
                 "userId": str(c.user_id or ""),
                 "text": c.text,
+                "attachments": comment_attachment_json(c),
                 "createdAt": stamp(c.created_at),
             }
             for c in comments
@@ -299,3 +300,13 @@ def project_member_json(project, membership=None):
         "specialization": specialization,
         "customRole": custom_role,
     }
+
+
+def comment_attachment_json(comment):
+    from .models import CommentAttachment
+    attachment = CommentAttachment.objects.filter(comment=comment).first()
+    if not attachment:
+        return []
+    return [{"id": str(attachment.pk), "fileName": attachment.original_filename,
+             "fileSize": attachment.file_size, "contentType": attachment.content_type,
+             "downloadUrl": f"/api/comment-attachments/{attachment.pk}/download/"}]

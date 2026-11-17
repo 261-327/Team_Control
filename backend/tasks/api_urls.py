@@ -1,7 +1,9 @@
 from django.urls import path
-from . import api, email_change_api, assistant_api, colleagues_api, notifications_api
+from . import api, email_change_api, comment_files_api, assistant_api, colleagues_api, notifications_api
 
 urlpatterns = [
+    path("tasks/<int:task_id>/comments/files/", comment_files_api.send_comment),
+    path("comment-attachments/<int:attachment_id>/download/", comment_files_api.download),
     path("profile/email-change/", email_change_api.request_change),
     path("profile/email-change/confirm/", email_change_api.confirm_change),
     path("notifications/", notifications_api.notifications),
