@@ -1,0 +1,19 @@
+{
+  "id": "1",
+  "projectId": "1",
+  "title": "Подготовить макет",
+  "description": "Вымышленная задача",
+  "assigneeId": "1",
+  "assigneeIds": [
+    "1"
+  ],
+  "deadlineAt": "2026-11-19T18:00:00+03:00",
+  "status": "todo",
+  "tag": "дизайн",
+  "resultUrl": "",
+  "createdBy": "1",
+  "createdAt": "2026-11-17T09:00:00+03:00",
+  "submittedAt": "",
+  "acceptedAt": "",
+  "position": 0
+}
