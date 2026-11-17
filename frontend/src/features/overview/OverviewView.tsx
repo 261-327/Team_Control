@@ -5,6 +5,7 @@ import { useReadyData } from "@/providers/DataProvider";
 import { canManage, canOverview } from "@/lib/permissions";
 import { Avatar, EmptyState } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
+import { summarizeTasks, taskAssignees } from "@/lib/project-statistics";
 import { dateLabel, urgency } from "@/lib/format";
 
 export function OverviewView() {
@@ -36,7 +37,7 @@ export function OverviewView() {
   const review = tasks.filter((t) => t.status === "in_review");
   const overdue = active.filter((t) => urgency(t, data.now) === "overdue");
   const workload = data.users
-    .map((u) => ({ user: u, count: active.filter((t) => t.assigneeId === u.id).length }))
+    .map((u) => ({ user: u, count: active.filter((t) => taskAssignees(t).includes(u.id)).length }))
     .filter((u) => u.count)
     .sort((a, b) => b.count - a.count);
   return (
@@ -81,8 +82,9 @@ export function OverviewView() {
           </div>
           {projects.map((p) => {
             const all = tasks.filter((t) => t.projectId === p.id);
-            const complete = all.filter((t) => t.status === "done").length;
-            const late = all.filter((t) => urgency(t, data.now) === "overdue").length;
+            const summary = summarizeTasks(all, data.now);
+            const complete = summary.completed;
+            const late = summary.overdue;
             const next = all
               .filter((t) => t.status !== "done")
               .sort((a, b) => Date.parse(a.deadlineAt) - Date.parse(b.deadlineAt))[0];
