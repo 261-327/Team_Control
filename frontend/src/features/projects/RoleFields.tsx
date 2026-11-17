@@ -14,6 +14,10 @@ export function RoleFields({
   value: RoleInput;
   onChange: (value: RoleInput) => void;
 }) {
+  const standardDirections = ["frontend", "backend", "ios", "android"];
+  const [customDirection, setCustomDirection] = useState(
+    Boolean(value.specialization && !standardDirections.includes(value.specialization)),
+  );
   return (
     <>
       <Field label="Роль в команде" required>
@@ -24,6 +28,7 @@ export function RoleFields({
               : value.profession
           }
           onChange={(e) => {
+            setCustomDirection(false);
             const [profession, specialization] = e.target.value.split(":");
             onChange({
               profession: profession as Profession,
@@ -42,19 +47,38 @@ export function RoleFields({
         </select>
       </Field>
       {value.profession === "developer" && (
-        <Field label="Направление разработки" required>
-          <select
-            value={value.specialization}
-            onChange={(e) => onChange({ ...value, specialization: e.target.value })}
-            required
-          >
-            <option value="">Выбери направление</option>
-            <option value="frontend">Фронтенд</option>
-            <option value="backend">Бэкенд</option>
-            <option value="ios">Мобильная разработка · iOS</option>
-            <option value="android">Мобильная разработка · Android</option>
-          </select>
-        </Field>
+        <>
+          <Field label="Направление разработки" required>
+            <select
+              value={customDirection ? "__custom__" : value.specialization}
+              onChange={(e) => {
+                const custom = e.target.value === "__custom__";
+                setCustomDirection(custom);
+                onChange({ ...value, specialization: custom ? "" : e.target.value });
+              }}
+              required
+            >
+              <option value="">Выбери направление</option>
+              <option value="frontend">Фронтенд</option>
+              <option value="backend">Бэкенд</option>
+              <option value="ios">Мобильная разработка · iOS</option>
+              <option value="android">Мобильная разработка · Android</option>
+              <option value="__custom__">Своё направление</option>
+            </select>
+          </Field>
+          {customDirection && (
+            <Field label="Своё направление разработки" required>
+              <input
+                value={value.specialization}
+                onChange={(e) => onChange({ ...value, specialization: e.target.value })}
+                placeholder="Например, разработка игр"
+                maxLength={100}
+                pattern={".*\\S.*"}
+                required
+              />
+            </Field>
+          )}
+        </>
       )}
       {value.profession === "other" && (
         <Field label="Своя роль" required>

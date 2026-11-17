@@ -139,8 +139,7 @@ class Membership(models.Model):
         max_length=20, choices=ROLE_CHOICES, default="developer", verbose_name="Роль в команде"
     )
     developer_specialization = models.CharField(
-        max_length=20,
-        choices=DEVELOPER_SPECIALIZATION_CHOICES,
+        max_length=100,
         blank=True,
         verbose_name="Направление разработки",
     )
@@ -170,6 +169,7 @@ class Membership(models.Model):
 
     def clean(self):
         super().clean()
+        self.developer_specialization = self.developer_specialization.strip()
         if self.role == "developer":
             if not self.developer_specialization:
                 raise ValidationError(
@@ -189,7 +189,10 @@ class Membership(models.Model):
         if self.role == "other" and self.custom_role:
             return self.custom_role
         if self.role == "developer" and self.developer_specialization:
-            return f"{self.get_role_display()} — {self.get_developer_specialization_display()}"
+            direction = dict(self.DEVELOPER_SPECIALIZATION_CHOICES).get(
+                self.developer_specialization, self.developer_specialization
+            )
+            return f"{self.get_role_display()} — {direction}"
         return self.get_role_display()
 
     def __str__(self):
