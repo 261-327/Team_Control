@@ -233,6 +233,9 @@ class HttpClient implements DataClient {
   deleteTask = async (id: string) => {
     await this.mutate(`tasks/${id}`, "DELETE");
   };
+  addCommentFile = async (taskId: string, text: string, file: File, requestId: string) => {
+    await this.upload(`tasks/${taskId}/comments/files/`, { text, file, requestId }, () => {});
+  };
   addComment = async (taskId: string, text: string) => {
     await this.mutate(`tasks/${taskId}/comments`, "POST", { text });
   };
@@ -348,7 +351,7 @@ class HttpClient implements DataClient {
         const xhr = new XMLHttpRequest();
         const form = new FormData();
         for (const [name, value] of Object.entries(input)) form.append(name, value);
-        if (input.file instanceof File) {
+        if (input.file instanceof File && !input.requestId) {
           const requestId = this.fileRequests.get(input.file) || crypto.randomUUID();
           this.fileRequests.set(input.file, requestId);
           form.append("requestId", requestId);

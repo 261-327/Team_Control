@@ -52,6 +52,13 @@ export type TaskEvent = {
   createdAt: string;
 };
 export type Comment = {
+  attachments?: {
+    id: string;
+    fileName: string;
+    fileSize: number;
+    contentType: string;
+    downloadUrl: string;
+  }[];
   id: string;
   taskId: string;
   userId: string;

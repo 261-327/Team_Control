@@ -297,6 +297,8 @@ class TaskEvent(models.Model):
 
 
 class Comment(models.Model):
+    upload_request_id = models.UUIDField(null=True, blank=True, unique=True)
+    upload_fingerprint = models.CharField(max_length=64, blank=True)
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="comments")
     user = models.ForeignKey(WorkspaceUser, on_delete=models.SET_NULL, null=True)
     text = models.TextField(max_length=2000)
@@ -496,3 +498,16 @@ class EmailChangeChallenge(models.Model):
     expires_at = models.DateTimeField()
     resend_at = models.DateTimeField()
     attempts = models.PositiveSmallIntegerField(default=0)
+
+
+class CommentAttachment(models.Model):
+    comment = models.OneToOneField(Comment, on_delete=models.CASCADE, related_name="attachment")
+    file = models.FileField(upload_to="comment-attachments/%Y/%m/")
+    original_filename = models.CharField(max_length=255)
+    file_size = models.PositiveIntegerField()
+    content_type = models.CharField(max_length=100)
+
+
+@receiver(pre_delete, sender=CommentAttachment)
+def remove_comment_attachment_file(sender, instance, **kwargs):
+    delete_private_file(instance)
