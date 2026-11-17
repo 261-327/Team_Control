@@ -62,6 +62,8 @@ export interface DataClient {
   transitionTask(id: string, status: Status, resultUrl?: string, reason?: string): Promise<void>;
   moveTask(id: string, status: Status, beforeTaskId?: string, reason?: string): Promise<void>;
   deleteTask(id: string): Promise<void>;
+  deleteComment(taskId: string, commentId: string): Promise<void>;
+  deleteAssistantMessage(turnId: string): Promise<void>;
   addComment(taskId: string, text: string): Promise<void>;
   createProject(
     name: string,

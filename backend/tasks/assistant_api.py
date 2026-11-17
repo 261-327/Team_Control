@@ -423,3 +423,23 @@ def attachment_download(request, attachment_id):
         return download_file(attachment.file, attachment.original_filename)
     except (OSError, ValueError):
         raise Http404 from None
+
+
+@endpoint(("DELETE",))
+def delete_message(request, turn_id):
+    with transaction.atomic():
+        # Lock the thread in the same order as confirmation/cleanup operations.
+        from .models import AssistantThread
+        thread_id = AssistantTurn.objects.filter(pk=turn_id, thread__user=request.user).values_list("thread_id", flat=True).first()
+        if thread_id is None:
+            # Missing and foreign IDs are indistinguishable and retry-safe.
+            return {}
+        AssistantThread.objects.select_for_update().get(pk=thread_id, user=request.user)
+        turn = AssistantTurn.objects.select_for_update().select_related("thread").filter(pk=turn_id, thread__user=request.user).first()
+        if turn is None:
+            return {}
+        check_scope(request, turn)
+        if turn.status in ("queued", "running"):
+            raise APIError("Сначала отмените текущий запрос.", "conflict", 409)
+        turn.delete()
+    return {}
