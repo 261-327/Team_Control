@@ -35,6 +35,7 @@ export type Task = {
   title: string;
   description: string;
   assigneeId: string;
+  assigneeIds?: string[];
   deadlineAt: string;
   status: Status;
   tag: string;

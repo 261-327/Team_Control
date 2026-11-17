@@ -239,6 +239,7 @@ export function ProjectLayout({ children }: { children: React.ReactNode }) {
             icon: "folder",
             count: data.materials.filter((m) => m.projectId === projectId).length,
           },
+          { path: "/statistics", label: "Статистика", icon: "tasks", count: undefined },
           { path: "/settings", label: "Настройки", icon: "settings", count: undefined },
         ].map((tab) => (
           <Link
