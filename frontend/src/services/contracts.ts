@@ -71,6 +71,7 @@ export interface DataClient {
     teacherId?: string,
   ): Promise<Project>;
   deleteProject(id: string): Promise<void>;
+  updateProjectDescription(id: string, description: string): Promise<void>;
   updateProjectAssignments(
     id: string,
     leaderId: string,
