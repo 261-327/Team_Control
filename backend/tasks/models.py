@@ -297,6 +297,7 @@ class TaskEvent(models.Model):
 
 
 class Comment(models.Model):
+    edited_at = models.DateTimeField(null=True, blank=True)
     upload_request_id = models.UUIDField(null=True, blank=True, unique=True)
     upload_fingerprint = models.CharField(max_length=64, blank=True)
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="comments")

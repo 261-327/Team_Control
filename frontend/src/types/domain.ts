@@ -53,6 +53,7 @@ export type TaskEvent = {
   createdAt: string;
 };
 export type Comment = {
+  editedAt?: string;
   attachments?: {
     id: string;
     fileName: string;

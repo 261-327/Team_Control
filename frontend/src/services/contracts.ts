@@ -62,6 +62,10 @@ export interface DataClient {
   transitionTask(id: string, status: Status, resultUrl?: string, reason?: string): Promise<void>;
   moveTask(id: string, status: Status, beforeTaskId?: string, reason?: string): Promise<void>;
   deleteTask(id: string): Promise<void>;
+  editComment(taskId: string, commentId: string, text: string, originalText: string): Promise<void>;
+  deleteComment(taskId: string, commentId: string): Promise<void>;
+  deleteAssistantMessage(turnId: string): Promise<void>;
+
   addCommentFile(taskId: string, text: string, file: File, requestId: string): Promise<void>;
   addComment(taskId: string, text: string): Promise<void>;
   createProject(
@@ -72,7 +76,10 @@ export interface DataClient {
     teacherId?: string,
   ): Promise<Project>;
   deleteProject(id: string): Promise<void>;
-  updateProjectDescription(id: string, description: string): Promise<{ project: Project; snapshot: Snapshot }>;
+  updateProjectDescription(
+    id: string,
+    description: string,
+  ): Promise<{ project: Project; snapshot: Snapshot }>;
   updateProjectAssignments(
     id: string,
     leaderId: string,
