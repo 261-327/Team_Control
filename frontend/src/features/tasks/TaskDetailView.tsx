@@ -39,6 +39,11 @@ export function TaskDetailView() {
   const [result, setResult] = useState<string | null>(null);
   const [returnOpen, setReturnOpen] = useState(false);
   const [reason, setReason] = useState("");
+  const [editingComment, setEditingComment] = useState<{ id: string; original: string } | null>(
+    null,
+  );
+  const [editText, setEditText] = useState("");
+  const editAction = useAction();
   const [deletingComment, setDeletingComment] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const action = useAction();
@@ -258,6 +263,23 @@ export function TaskDetailView() {
                               <time>{dateLabel(c.createdAt, true)} МСК</time>
                             </header>
                             <p className="pre-wrap">{c.text}</p>
+                            {c.editedAt && (
+                              <small className="muted">
+                                Изменено · {dateLabel(c.editedAt, true)} МСК
+                              </small>
+                            )}
+                            {c.userId === data.sessionId && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => {
+                                  setEditingComment({ id: c.id, original: c.text });
+                                  setEditText(c.text);
+                                }}
+                              >
+                                Редактировать комментарий
+                              </Button>
+                            )}
                             {c.userId === data.sessionId && (
                               <Button
                                 type="button"
@@ -527,6 +549,54 @@ export function TaskDetailView() {
               </Button>
               <Button loading={action.busy} disabled={!reason.trim()}>
                 Вернуть в работу
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+      {editingComment && (
+        <Modal
+          title="Редактировать комментарий"
+          onClose={() => setEditingComment(null)}
+          busy={editAction.busy}
+        >
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void editAction.run(async () => {
+                await client.editComment(
+                  task.id,
+                  editingComment.id,
+                  editText,
+                  editingComment.original,
+                );
+                setEditingComment(null);
+                ui.notify("Комментарий изменён");
+              });
+            }}
+          >
+            <Field label="Текст комментария" required>
+              <textarea
+                value={editText}
+                onChange={(event) => setEditText(event.target.value)}
+                maxLength={2000}
+                required
+                disabled={editAction.busy}
+              />
+            </Field>
+            <p className="muted">Прикреплённый файл сохранится.</p>
+            <FormError error={editAction.error} />
+            <div className="form-actions">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={editAction.busy}
+                onClick={() => setEditingComment(null)}
+              >
+                Отмена
+              </Button>
+              <Button loading={editAction.busy} disabled={!editText.trim()}>
+                Сохранить комментарий
               </Button>
             </div>
           </form>

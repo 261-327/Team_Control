@@ -66,3 +66,28 @@ class DeleteMessageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(CommentAttachment.objects.filter(pk=attachment.pk).exists())
         self.assertFalse(storage.exists(name))
+    def test_edit_ownership_conflict_retry_and_attachment(self):
+        import json
+        from django.core.files.base import ContentFile
+        from .models import CommentAttachment
+        attachment = CommentAttachment(comment=self.comment, original_filename='demo.txt', file_size=4, content_type='text/plain')
+        attachment.file.save('edit-comment-demo.txt', ContentFile(b'demo'))
+        self.addCleanup(lambda: attachment.file.delete(save=False))
+        def edit(value, original='Own comment'):
+            return self.client.patch(self.comment_url(), json.dumps({'text': value, 'originalText': original}), content_type='application/json')
+        self.client.force_login(self.owner)
+        self.assertEqual(edit('Changed').status_code,403)
+        self.client.force_login(self.other)
+        self.assertEqual(edit(' ').status_code,400)
+        self.assertEqual(edit('x'*2001).status_code,400)
+        self.assertEqual(edit('Changed').status_code,200)
+        self.comment.refresh_from_db();stamp=self.comment.edited_at
+        self.assertIsNotNone(stamp)
+        self.assertEqual(edit('Changed').status_code,200)
+        self.comment.refresh_from_db();self.assertEqual(self.comment.edited_at,stamp)
+        self.assertEqual(edit('Concurrent change').status_code,409)
+        self.assertTrue(attachment.file.storage.exists(attachment.file.name))
+        self.assertTrue(CommentNotification.objects.filter(comment=self.comment).exists())
+        response=self.client.get(f'/api/tasks/{self.task.pk}/comments/').json()['comments'][0]
+        self.assertEqual(response['text'],'Changed');self.assertTrue(response['editedAt'])
+        self.member.delete();self.assertEqual(edit('Hidden','Changed').status_code,404)

@@ -246,6 +246,7 @@ def snapshot(request):
                 "taskId": str(c.task_id),
                 "userId": str(c.user_id or ""),
                 "text": c.text,
+                "editedAt": stamp(c.edited_at),
                 "attachments": comment_attachment_json(c),
                 "createdAt": stamp(c.created_at),
             }

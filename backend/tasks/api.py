@@ -1384,6 +1384,7 @@ def comments(request, task_id):
                     "taskId": str(comment.task_id),
                     "userId": str(comment.user_id or ""),
                     "text": comment.text,
+                    "editedAt": comment.edited_at.isoformat() if comment.edited_at else "",
                     "attachments": comment_attachment_json(comment),
                     "createdAt": (
                         comment.created_at.isoformat()
@@ -1633,7 +1634,7 @@ def frontend_redirect(request, path=""):
 
 
 
-@endpoint(("DELETE",))
+@endpoint(("PATCH", "DELETE"))
 def delete_comment(request, task_id, comment_id):
     with transaction.atomic():
         task = get_object_or_404(Task.objects.select_related("column__board"), pk=task_id)
@@ -1642,7 +1643,18 @@ def delete_comment(request, task_id, comment_id):
         if comment is not None:
             if comment.user_id != request.user.pk:
                 raise APIError("Удалять можно только свои комментарии.", "forbidden", 403)
-            comment.delete()
+            if request.method == "PATCH":
+                value = text(request.data, "text", 2000, True)
+                if comment.text != value:
+                    if request.data.get("originalText") != comment.text:
+                        raise APIError("Комментарий уже изменён. Обновите его перед сохранением.", "conflict", 409)
+                    comment.text = value
+                    comment.edited_at = timezone.now()
+                    comment.save(update_fields=["text", "edited_at"])
+            else:
+                comment.delete()
+        elif request.method == "PATCH":
+            raise Http404
     return {"snapshot": snapshot(request)}
 
 def notify_comment(project, task, comment, user):
