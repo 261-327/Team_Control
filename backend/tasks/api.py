@@ -1633,6 +1633,18 @@ def frontend_redirect(request, path=""):
 
 
 
+@endpoint(("DELETE",))
+def delete_comment(request, task_id, comment_id):
+    with transaction.atomic():
+        task = get_object_or_404(Task.objects.select_related("column__board"), pk=task_id)
+        project_for(request.user, task.column.board.project_id, lock=True)
+        comment = Comment.objects.select_for_update().filter(pk=comment_id, task=task).first()
+        if comment is not None:
+            if comment.user_id != request.user.pk:
+                raise APIError("Удалять можно только свои комментарии.", "forbidden", 403)
+            comment.delete()
+    return {"snapshot": snapshot(request)}
+
 def notify_comment(project, task, comment, user):
     from .models import CommentNotification
     participants = set(

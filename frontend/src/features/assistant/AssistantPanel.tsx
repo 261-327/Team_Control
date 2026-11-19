@@ -94,6 +94,7 @@ function AssistantChat({
   const [uploadError, setUploadError] = useState("");
   const [failedFile, setFailedFile] = useState<File | null>(null);
   const uploadController = useRef<AbortController | null>(null);
+  const [deletingMessage, setDeletingMessage] = useState<string | null>(null);
   const [clearOpen, setClearOpen] = useState(false);
   const [reload, setReload] = useState(0);
   const action = useAction();
@@ -384,6 +385,11 @@ function AssistantChat({
             <article className="chat-message chat-user">
               <p className="pre-wrap">{turn.message}</p>
               <AttachedFiles files={turn.attachments || []} />
+              {!inFlight(turn) && (
+                <Button type="button" variant="ghost" onClick={() => setDeletingMessage(turn.id)}>
+                  Удалить сообщение и ответ
+                </Button>
+              )}
             </article>
             {turn.status === "succeeded" && (
               <article className="chat-message chat-assistant">
@@ -694,6 +700,18 @@ function AssistantChat({
           </p>
         )}
       </div>
+      {deletingMessage && (
+        <ConfirmDialog
+          title="Удалить сообщение и ответ?"
+          description="Запрос, связанный ответ и сгенерированная картинка исчезнут из истории. Созданные задачи и загруженные файлы сохранятся. Уже переданный провайдеру контекст отозвать нельзя."
+          onClose={() => setDeletingMessage(null)}
+          onConfirm={async () => {
+            await client.deleteAssistantMessage(deletingMessage);
+            setTurns((current) => current.filter((turn) => turn.id !== deletingMessage));
+            setDeletingMessage(null);
+          }}
+        />
+      )}
       {clearOpen && (
         <ConfirmDialog
           title="Очистить переписку?"

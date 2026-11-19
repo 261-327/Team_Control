@@ -233,6 +233,16 @@ class HttpClient implements DataClient {
   deleteTask = async (id: string) => {
     await this.mutate(`tasks/${id}`, "DELETE");
   };
+  deleteComment = async (taskId: string, commentId: string) => {
+    const response = await this.request<{ snapshot: Database }>(
+      `tasks/${taskId}/comments/${commentId}`,
+      "DELETE",
+    );
+    this.publish(response.snapshot);
+  };
+  deleteAssistantMessage = async (turnId: string) => {
+    await this.request(`assistant/turns/${turnId}/message`, "DELETE");
+  };
   addCommentFile = async (taskId: string, text: string, file: File, requestId: string) => {
     await this.upload(`tasks/${taskId}/comments/files/`, { text, file, requestId }, () => {});
   };

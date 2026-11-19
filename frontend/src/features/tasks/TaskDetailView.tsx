@@ -39,6 +39,7 @@ export function TaskDetailView() {
   const [result, setResult] = useState<string | null>(null);
   const [returnOpen, setReturnOpen] = useState(false);
   const [reason, setReason] = useState("");
+  const [deletingComment, setDeletingComment] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const action = useAction();
   const commentsAction = useAction();
@@ -257,6 +258,16 @@ export function TaskDetailView() {
                               <time>{dateLabel(c.createdAt, true)} МСК</time>
                             </header>
                             <p className="pre-wrap">{c.text}</p>
+                            {c.userId === data.sessionId && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setDeletingComment(c.id)}
+                              >
+                                Удалить комментарий
+                              </Button>
+                            )}
+
                             {c.attachments?.map((file) => (
                               <a key={file.id} href={file.downloadUrl}>
                                 <Icon name="paperclip" size={16} /> {file.fileName} ·{" "}
@@ -520,6 +531,18 @@ export function TaskDetailView() {
             </div>
           </form>
         </Modal>
+      )}
+      {deletingComment && (
+        <ConfirmDialog
+          title="Удалить свой комментарий?"
+          description="Комментарий и связанные уведомления будут удалены. Восстановить его нельзя."
+          onClose={() => setDeletingComment(null)}
+          onConfirm={async () => {
+            await client.deleteComment(task.id, deletingComment);
+            setDeletingComment(null);
+            ui.notify("Комментарий удалён");
+          }}
+        />
       )}
       {deleting && (
         <ConfirmDialog
