@@ -120,6 +120,7 @@ export type AssistantMode = "chat" | "tasks" | "logo";
 export type AssistantDraft = Omit<TaskInput, "projectId">;
 export type AssistantReply = {
   text: string;
+  readOnly?: boolean;
   created?: {
     kind: "create_project" | "create_tasks";
     projectId: string;

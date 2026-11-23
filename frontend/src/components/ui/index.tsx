@@ -1,7 +1,7 @@
 "use client";
 
 import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from "react";
-import type { ButtonHTMLAttributes, ReactElement, ReactNode } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactElement, ReactNode } from "react";
 import type { User } from "@/types/domain";
 import { initials } from "@/lib/format";
 import { Icon } from "./Icon";
@@ -128,6 +128,22 @@ export function Modal({
       trigger?.focus({ preventScroll: true });
     };
   }, [focusSelector]);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const dialog = ref.current;
+    if (!viewport || !dialog) return;
+    const update = () => {
+      dialog.style.setProperty("--dialog-viewport-height", `${viewport.height}px`);
+      dialog.style.setProperty("--dialog-viewport-top", `${viewport.offsetTop}px`);
+    };
+    update();
+    viewport.addEventListener("resize", update);
+    viewport.addEventListener("scroll", update);
+    return () => {
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+    };
+  }, []);
   return (
     <dialog
       ref={ref}
@@ -182,7 +198,42 @@ export function Field({
       )
     : children;
   return (
-    <label className="field">
+    <label
+      className="field"
+      onInvalidCapture={(event) => {
+        const field = event.target;
+        if (!(
+          field instanceof HTMLInputElement ||
+          field instanceof HTMLSelectElement ||
+          field instanceof HTMLTextAreaElement
+        ))
+          return;
+        const validity = field.validity;
+        if (validity.valueMissing) field.setCustomValidity("Заполни это поле.");
+        else if (validity.typeMismatch)
+          field.setCustomValidity(
+            field instanceof HTMLInputElement && field.type === "email"
+              ? "Введи почту в формате name@example.com."
+              : "Введи полный адрес ссылки, начиная с https://.",
+          );
+        else if (validity.tooShort && "minLength" in field)
+          field.setCustomValidity(`Нужно не менее ${field.minLength} символов.`);
+        else if (validity.patternMismatch)
+          field.setCustomValidity(
+            "Проверь формат: значение должно соответствовать подсказке к полю.",
+          );
+        else if (validity.badInput) field.setCustomValidity("Проверь введённое значение.");
+      }}
+      onInputCapture={(event) => {
+        const field = event.target;
+        if (
+          field instanceof HTMLInputElement ||
+          field instanceof HTMLSelectElement ||
+          field instanceof HTMLTextAreaElement
+        )
+          field.setCustomValidity("");
+      }}
+    >
       <span className="field-label">
         <span id={labelId}>{label}</span>
         {required && (
@@ -201,6 +252,34 @@ export function Field({
     </label>
   );
 }
+export function PasswordInput(props: InputHTMLAttributes<HTMLInputElement>) {
+  const [visible, setVisible] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <span className="password-control">
+      <input {...props} ref={input} type={visible ? "text" : "password"} />
+      <button
+        type="button"
+        className="password-toggle"
+        aria-label={visible ? "Скрыть пароль" : "Показать пароль"}
+        aria-pressed={visible}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => {
+          const start = input.current?.selectionStart ?? null;
+          const end = input.current?.selectionEnd ?? null;
+          setVisible(!visible);
+          requestAnimationFrame(() => {
+            input.current?.focus();
+            if (start !== null && end !== null) input.current?.setSelectionRange(start, end);
+          });
+        }}
+      >
+        {visible ? "Скрыть" : "Показать"}
+      </button>
+    </span>
+  );
+}
+
 export function FormError({ error }: { error: string }) {
   return error ? (
     <div className="form-error" role="alert">

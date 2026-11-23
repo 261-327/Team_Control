@@ -1,4 +1,5 @@
 "use client";
+import { PasswordInput } from "@/components/ui";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Field, FormError, useAction } from "@/components/ui";
@@ -84,7 +85,7 @@ export function EmailChangeForm() {
               />
             </Field>
             <Field label="Текущий пароль" required>
-              <input
+              <PasswordInput
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

@@ -400,6 +400,9 @@ function AssistantChat({
                   <strong>Сипи AI</strong>
                 </div>
                 <p className="pre-wrap">{turn.reply.text}</p>
+                {turn.reply.readOnly && (
+                  <p className="assistant-action-summary">Данные проекта не изменены.</p>
+                )}
                 {turn.reply.created && (
                   <div
                     className="assistant-receipt"
@@ -689,16 +692,19 @@ function AssistantChat({
             используется ограниченный фрагмент текста.
           </p>
         )}
-        <p className="assistant-disclaimer">
-          <Icon name="sparkles" size={11} />
-          По просьбе «создай» помощник сразу добавит проект или задачи.
-        </p>
-        {capabilities && !capabilities.local && (
+        <details className="assistant-help">
+          <summary>Как работает помощник и обработка данных</summary>
           <p className="assistant-disclaimer">
-            <Icon name="lock" size={11} />
-            Для ответа Cloudflare получает сообщение и часть данных доступных тебе проектов.
+            <Icon name="sparkles" size={11} />
+            По просьбе «создай» помощник сразу добавит проект или задачи.
           </p>
-        )}
+          {capabilities && !capabilities.local && (
+            <p className="assistant-disclaimer">
+              <Icon name="lock" size={11} />
+              Для ответа Cloudflare получает сообщение и часть данных доступных тебе проектов.
+            </p>
+          )}
+        </details>
       </div>
       {deletingMessage && (
         <ConfirmDialog

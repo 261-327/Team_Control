@@ -21,7 +21,7 @@ export function canManage(db: Database, projectId: string) {
 export function allowedTransitions(db: Database, task: Task): Status[] {
   if (!canAccess(db, task.projectId)) return [];
   const own =
-    task.assigneeId === db.sessionId &&
+    isAssigned(task, db.sessionId) &&
     !db.memberships.some(
       (m) => m.projectId === task.projectId && m.userId === db.sessionId && m.role === "teacher",
     );
@@ -52,10 +52,17 @@ export function canReorderTask(db: Database, task: Task) {
   return (
     canAccess(db, task.projectId) &&
     (canManage(db, task.projectId) ||
-      (task.assigneeId === db.sessionId &&
+      (isAssigned(task, db.sessionId) &&
         db.memberships.some(
           (m) =>
             m.projectId === task.projectId && m.userId === db.sessionId && m.role !== "teacher",
         )))
+  );
+}
+
+/** Legacy snapshots have one assignee; current API also returns all assignees. */
+export function isAssigned(task: Task, userId: string | null) {
+  return (
+    !!userId && (task.assigneeIds ? task.assigneeIds.includes(userId) : task.assigneeId === userId)
   );
 }

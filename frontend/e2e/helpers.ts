@@ -109,11 +109,10 @@ export async function mailPasswordResetLink(email: string) {
       );
       for (const file of files.sort((a, b) => b.modified - a.modified)) {
         const contents = await readFile(path.join(mailPath, file.name), "utf8");
-        for (const message of contents.split("--------------------").reverse()) {
-          if (!message.includes("To: " + email) || !message.includes("Восстановление пароля"))
-            continue;
+        for (const message of contents.split(/\r?\n-{20,}\r?\n/).reverse()) {
+          if (!message.includes("To: " + email)) continue;
           const body = message.includes("Content-Transfer-Encoding: base64")
-            ? Buffer.from(message.split("\n\n").pop()!.trim(), "base64").toString("utf8")
+            ? Buffer.from(message.split(/\r?\n\r?\n/)[1].trim(), "base64").toString("utf8")
             : message;
           const line = body.split("\n").find((item) => item.includes("reset-password?uid="));
           if (line) {

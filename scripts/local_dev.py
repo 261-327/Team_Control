@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def control_path(root: Path) -> Path:
     digest = hashlib.sha256(os.fsencode(root.resolve())).hexdigest()[:16]
-    return Path("/tmp") / f"sipi-dev-{os.getuid()}-{digest}.sock"
+    return Path.home() / ".sipi-run" / f"{digest}.sock"
 
 
 def group_exists(pgid: int) -> bool:
@@ -167,6 +167,15 @@ class Session:
                 "Для остановки выполните ./stop.sh."
             ) from error
         check_ports()
+        # A private home directory prevents other local users from pre-creating
+        # this checkout's socket; keep the path short for macOS AF_UNIX limits.
+        directory = self.path.parent
+        directory.mkdir(mode=0o700, exist_ok=True)
+        info = directory.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+            raise RuntimeError("Каталог управления должен принадлежать текущему пользователю.")
+        if info.st_mode & 0o077:
+            raise RuntimeError("Каталог ~/.sipi-run должен иметь права 700.")
         if self.path.exists() or self.path.is_symlink():
             existing = self.path.lstat()
             if existing.st_uid != os.getuid() or not stat.S_ISSOCK(existing.st_mode):

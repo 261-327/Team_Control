@@ -18,13 +18,13 @@ test("password reset requires the emailed token and then regular OTP login", asy
   await page.goto(resetUrl.pathname + resetUrl.search);
   await expect(page.getByRole("heading", { name: "Новый пароль" })).toBeVisible();
   const newPassword = "Fresh-Browser-Password-942!";
-  await page.getByLabel("Новый пароль").fill(newPassword);
-  await page.getByLabel("Повтори новый пароль").fill(newPassword);
+  await page.locator('input[name="password"]').fill(newPassword);
+  await page.locator('input[name="passwordConfirm"]').fill(newPassword);
   await page.getByRole("button", { name: "Сменить пароль" }).click();
   await expect(page.getByRole("status")).toContainText("войдите с новым паролем");
   await page.getByRole("link", { name: "Перейти ко входу" }).click();
   await page.getByLabel("Логин или почта").fill(person.username);
-  await page.getByLabel("Пароль").fill(newPassword);
+  await page.getByLabel("Пароль", { exact: true }).fill(newPassword);
   await page.getByRole("button", { name: "Продолжить" }).click();
   await expect(page.getByLabel("Шестизначный код")).toBeVisible();
   await page.getByLabel("Шестизначный код").fill(await mailCode(person.email));

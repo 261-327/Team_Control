@@ -91,12 +91,12 @@ export function ProjectsView() {
           <div className="project-list-card" key={p.id}>
             <ProjectMiniCard id={p.id} />
             <div className="project-list-description">
-              <button 
-                type="button" 
-                className="icon-button" 
+              <button
+                type="button"
+                className="icon-button"
                 title="Открыть паспорт проекта"
                 onClick={() => setPassportProjectId(p.id)}
-                >
+              >
                 <Icon name="info" size={18} />
               </button>
               <span>
@@ -112,7 +112,7 @@ export function ProjectsView() {
             </div>
           </div>
         ))}
-        {!query && (
+        {!query && !projects.length && (
           <Link href="/projects/new" className="project-create-placeholder">
             <span>
               <Icon name="plus" size={28} />
@@ -138,11 +138,8 @@ export function ProjectsView() {
         />
       )}
       {passportProjectId && (
-      <ProjectPassport 
-        projectId={passportProjectId} 
-        onClose={() => setPassportProjectId(null)} 
-        />
-    )}
+        <ProjectPassport projectId={passportProjectId} onClose={() => setPassportProjectId(null)} />
+      )}
     </>
   );
 }
@@ -189,12 +186,20 @@ export function ProjectLayout({ children }: { children: React.ReactNode }) {
           <div className="project-title-row">
             <h1>{project.name}</h1>
             <span className="project-semester">Осень 2026</span>
-            <button 
-              type="button" 
-              className="btn btn-secondary" 
+            <button
+              type="button"
+              className="btn btn-secondary"
               title="Паспорт проекта"
               onClick={() => setPassportOpen(true)}
-              style={{ marginLeft: '12px', padding: '4px 12px', fontSize: '14px', height: '32px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{
+                marginLeft: "12px",
+                padding: "4px 12px",
+                fontSize: "14px",
+                height: "32px",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
             >
               <Icon name="info" size={16} />
               Паспорт проекта
@@ -209,9 +214,7 @@ export function ProjectLayout({ children }: { children: React.ReactNode }) {
               <Avatar user={data.users.find((u) => u.id === m.userId)} key={m.userId} size="xs" />
             ))}
           </div>
-          <Link href={`/projects/${projectId}/members`}>
-            {members.length} в команде <Icon name="chevron" size={13} />
-          </Link>
+          <span>{plural(members.length, ["участник", "участника", "участников"])}</span>
           <span className="vertical-divider" />
           <span className="muted">
             {manage ? "Ты руководишь этим проектом" : "Твоё пространство команды"}
@@ -250,12 +253,18 @@ export function ProjectLayout({ children }: { children: React.ReactNode }) {
           >
             <Icon name={tab.icon} size={17} />
             <span className="project-tab-label">{tab.label}</span>
-            {tab.count !== undefined && <span className="count-pill" aria-label={`${tab.count} элементов`}>{tab.count}</span>}
+            {tab.count !== undefined && (
+              <span className="count-pill" aria-label={`${tab.count} элементов`}>
+                {tab.count}
+              </span>
+            )}
           </Link>
         ))}
       </nav>
       {children}
-      {passportOpen && <ProjectPassport projectId={projectId} onClose={() => setPassportOpen(false)} />}
+      {passportOpen && (
+        <ProjectPassport projectId={projectId} onClose={() => setPassportOpen(false)} />
+      )}
     </div>
   );
 }

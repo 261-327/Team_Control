@@ -39,8 +39,14 @@ def port_free(port):
 
 class LifecycleTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="sipi-launcher-test-")
+        self.temp = tempfile.TemporaryDirectory(prefix="sipi-test-", dir="/tmp")
         self.root = Path(self.temp.name)
+        home = patch.object(local_dev.Path, "home", return_value=self.root)
+        home.start()
+        env_home = patch.dict(os.environ, {"HOME": str(self.root)})
+        env_home.start()
+        self.addCleanup(env_home.stop)
+        self.addCleanup(home.stop)
         self.supervisor = local_dev.Supervisor()
         self.runners = []
 
@@ -82,6 +88,42 @@ class LifecycleTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, f"Порт {port}"):
                 local_dev.check_ports((port,))
             self.assertFalse(port_free(port))
+
+    def test_socket_directory_is_private(self):
+        session = local_dev.Session(self.root)
+        with patch.object(local_dev, "check_ports"):
+            try:
+                session.open()
+                self.assertEqual(session.path.parent.stat().st_mode & 0o777, 0o700)
+                self.assertEqual(session.path.parent, self.root / ".sipi-run")
+            finally:
+                session.close()
+
+    def test_untrusted_control_directory_is_rejected(self):
+        directory = self.root / ".sipi-run"
+        directory.mkdir(mode=0o700)
+        directory.chmod(0o777)
+        session = local_dev.Session(self.root)
+        with patch.object(local_dev, "check_ports"):
+            try:
+                with self.assertRaisesRegex(RuntimeError, "700"):
+                    session.open()
+                self.assertFalse(session.path.exists())
+            finally:
+                session.close()
+
+    def test_control_directory_symlink_is_rejected(self):
+        target = self.root / "untrusted"
+        target.mkdir()
+        (self.root / ".sipi-run").symlink_to(target)
+        session = local_dev.Session(self.root)
+        with patch.object(local_dev, "check_ports"):
+            try:
+                with self.assertRaisesRegex(RuntimeError, "принадлежать"):
+                    session.open()
+                self.assertEqual(list(target.iterdir()), [])
+            finally:
+                session.close()
 
     def test_lock_prevents_second_start_and_keeps_active_socket(self):
         first = local_dev.Session(self.root)

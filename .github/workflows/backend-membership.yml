@@ -2,10 +2,10 @@ name: Backend and frontend checks
 
 on:
   pull_request:
-    paths: ['backend/**', 'frontend/**', '.github/workflows/backend-membership.yml']
+    paths: ['backend/**', 'frontend/**', 'scripts/**', 'tests/**', '.github/workflows/backend-membership.yml']
   push:
     branches: [main]
-    paths: ['backend/**', 'frontend/**', '.github/workflows/backend-membership.yml']
+    paths: ['backend/**', 'frontend/**', 'scripts/**', 'tests/**', '.github/workflows/backend-membership.yml']
 
 permissions:
   contents: read
@@ -41,6 +41,7 @@ jobs:
         with:
           python-version: '3.11'
       - run: python -m pip install -r requirements.txt
+      - run: python -m unittest discover -s ../tests -p test_local_dev.py
       - run: python manage.py check
       - run: python manage.py makemigrations --check --dry-run
       - run: python manage.py migrate --noinput
@@ -61,3 +62,14 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Browser regressions (isolated fixtures)
+        run: npx playwright test e2e/backlog-regressions.spec.ts e2e/calendar-navigation.spec.ts e2e/domain.spec.ts e2e/custom-direction.spec.ts e2e/proxy-headers.spec.ts
+        env:
+          SIPI_START_TEST_SERVER: '1'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failure-evidence
+          path: frontend/test-results/
+          retention-days: 7

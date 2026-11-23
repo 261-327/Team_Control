@@ -1,4 +1,5 @@
 "use client";
+import { isAssigned } from "@/lib/permissions";
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -6,7 +7,7 @@ import { useReadyData } from "@/providers/DataProvider";
 import { useUi } from "@/providers/UiContext";
 import { Button, EmptyState, IconButton } from "@/components/ui";
 import { Icon } from "@/components/ui/Icon";
-import { dayKey, dateLabel, plural, statusLabels } from "@/lib/format";
+import { dayKey, dateLabel, plural, statusLabels, urgency } from "@/lib/format";
 import type { Status } from "@/types/domain";
 import { createCalendar } from "@/lib/calendar";
 import { calendarPeriod, shiftCalendar, type CalendarMode } from "@/lib/calendar-navigation";
@@ -58,7 +59,7 @@ export function CalendarView() {
           year: "numeric",
           timeZone: "UTC",
         }).format(month);
-  const mine = data.tasks.filter((t) => t.assigneeId === data.sessionId && t.deadlineAt);
+  const mine = data.tasks.filter((t) => isAssigned(t, data.sessionId) && t.deadlineAt);
   const projectTasks = mine.filter((t) => !projectId || t.projectId === projectId);
   const statuses = useMemo(() => {
     const projects = data.projects.filter((p) => !projectId || p.id === projectId);
@@ -234,12 +235,31 @@ export function CalendarView() {
             <option value="asc">Сначала ближайшие</option>
             <option value="desc">Сначала дальние</option>
           </select>
+          <label className="calendar-date-picker">
+            Перейти к дате
+            <input
+              type="date"
+              value={anchor}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (
+                  !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
+                  !Number.isFinite(Date.parse(`${value}T12:00:00Z`))
+                )
+                  return;
+                setAnchor(value);
+                setSelectedDay(value);
+                setDeadlineFilter("");
+              }}
+            />
+          </label>
           <div className="button-wrap">
             <Button
               variant="ghost"
               onClick={() => {
                 setAnchor(today);
                 setSelectedDay(dayKey(data.now));
+                setDeadlineFilter("");
               }}
             >
               Сегодня
@@ -304,9 +324,18 @@ export function CalendarView() {
                       <Link
                         key={t.id}
                         href={`/projects/${t.projectId}/tasks/${t.id}`}
-                        className={data.projects.find((p) => p.id === t.projectId)?.color}
+                        className={`calendar-task status-${t.status} deadline-${urgency(t, data.now)}`}
+                        title={`${t.title} · ${data.projects.find((p) => p.id === t.projectId)?.columns.find((c) => c.id === t.status)?.name || statusLabels[t.status] || "Этап проекта"}${urgency(t, data.now) === "overdue" ? " · Просрочено" : ""}`}
                       >
-                        <span /> {t.title}
+                        <span aria-hidden="true" /> <strong>{t.title}</strong>
+                        <small>
+                          {data.projects
+                            .find((p) => p.id === t.projectId)
+                            ?.columns.find((c) => c.id === t.status)?.name ||
+                            statusLabels[t.status] ||
+                            "Этап проекта"}
+                          {urgency(t, data.now) === "overdue" ? " · Просрочено" : ""}
+                        </small>
                       </Link>
                     ))}
                     {tasks.length > 2 && (

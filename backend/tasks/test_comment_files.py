@@ -30,7 +30,8 @@ class CommentFileTests(TestCase):
  def test_download_revoked_and_cascade(self):
   self.send();attachment=CommentAttachment.objects.get();storage=attachment.file.storage;name=attachment.file.name
   url=f'/api/comment-attachments/{attachment.pk}/download/'
-  response=self.client.get(url);self.assertEqual(response.status_code,200);response.close()
+  response=self.client.get(url);self.assertEqual(response.status_code,200)
+  self.assertEqual(b"".join(response.streaming_content),b"example")
   self.member.delete();self.assertEqual(self.client.get(url).status_code,404)
   self.assertEqual(Client().get(url).status_code,401)
   with self.captureOnCommitCallbacks(execute=True):Comment.objects.all().delete()

@@ -1,6 +1,15 @@
 import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
+  webServer:
+    process.env.SIPI_START_TEST_SERVER === "1"
+      ? {
+          command: "npm run start -- --hostname 127.0.0.1",
+          url: "http://127.0.0.1:3000/login",
+          reuseExistingServer: !process.env.CI,
+          timeout: 120000,
+        }
+      : undefined,
   testDir: "./e2e",
   fullyParallel: false,
   workers: 1,

@@ -1,4 +1,5 @@
 "use client";
+import { PasswordInput } from "@/components/ui";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -230,7 +231,7 @@ function LoginForm({ register, data }: { register: boolean; data: Snapshot }) {
                   }
                   required
                 >
-                  <input
+                  <PasswordInput
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -247,7 +248,7 @@ function LoginForm({ register, data }: { register: boolean; data: Snapshot }) {
                 )}
                 {register && (
                   <Field label="Повтори пароль" required>
-                    <input
+                    <PasswordInput
                       type="password"
                       value={passwordConfirm}
                       onChange={(e) => setPasswordConfirm(e.target.value)}

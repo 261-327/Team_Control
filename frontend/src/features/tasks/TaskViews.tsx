@@ -1,4 +1,5 @@
 "use client";
+import { isAssigned } from "@/lib/permissions";
 
 import Link from "next/link";
 import { useRef, useState } from "react";
@@ -48,71 +49,87 @@ export function Deadline({ task }: { task: Task }) {
 }
 export function TaskList({ tasks, showProject = true }: { tasks: Task[]; showProject?: boolean }) {
   const data = useReadyData();
+  const [limit, setLimit] = useState(20);
   return (
-    <ul className="task-list">
-      {tasks.map((task) => {
-        const project = data.projects.find((p) => p.id === task.projectId);
-        const assignee = data.users.find((u) => u.id === task.assigneeId);
-        return (
-          <li key={task.id}>
-            <Link
-              className={`task-row ${task.status === "done" ? "task-completed" : ""}`}
-              href={`/projects/${task.projectId}/tasks/${task.id}`}
-              key={task.id}
-            >
-              <span
-                className={`task-check status-${task.status}`}
-                title={
-                  data.projects
-                    .find((p) => p.id === task.projectId)
-                    ?.columns.find((c) => c.id === task.status)?.name || statusLabels[task.status]
-                }
+    <>
+      <ul className="task-list">
+        {tasks.slice(0, limit).map((task) => {
+          const project = data.projects.find((p) => p.id === task.projectId);
+          const assignee = data.users.find((u) => u.id === task.assigneeId);
+          return (
+            <li key={task.id}>
+              <Link
+                className={`task-row ${task.status === "done" ? "task-completed" : ""}`}
+                href={`/projects/${task.projectId}/tasks/${task.id}`}
+                key={task.id}
               >
-                <span className="sr-only">
-                  {data.projects
-                    .find((p) => p.id === task.projectId)
-                    ?.columns.find((c) => c.id === task.status)?.name || statusLabels[task.status]}
-                </span>
-                <Icon
-                  name={
-                    task.status === "done"
-                      ? "checkCircle"
-                      : task.status === "in_progress"
-                        ? "progress"
-                        : task.status === "in_review"
-                          ? "review"
-                          : "circle"
+                <span
+                  className={`task-check status-${task.status}`}
+                  title={
+                    data.projects
+                      .find((p) => p.id === task.projectId)
+                      ?.columns.find((c) => c.id === task.status)?.name || statusLabels[task.status]
                   }
-                  size={19}
-                />
-              </span>
-              <div className="task-row-title">
-                <strong>{task.title}</strong>
-                <UnreadComments task={task} />
-                <span>
-                  {showProject && (
-                    <>
-                      <i className={`project-dot ${project?.color}`} />
-                      {project?.name.split(" — ")[0]}
-                      <span className="text-divider">/</span>
-                    </>
-                  )}
-                  <span className="task-code">SIP-{task.id.slice(0, 4).toUpperCase()}</span>
+                >
+                  <span className="sr-only">
+                    {data.projects
+                      .find((p) => p.id === task.projectId)
+                      ?.columns.find((c) => c.id === task.status)?.name ||
+                      statusLabels[task.status]}
+                  </span>
+                  <Icon
+                    name={
+                      task.status === "done"
+                        ? "checkCircle"
+                        : task.status === "in_progress"
+                          ? "progress"
+                          : task.status === "in_review"
+                            ? "review"
+                            : "circle"
+                    }
+                    size={19}
+                  />
                 </span>
-              </div>
-              <span className="task-row-status">
-                <StatusBadge status={task.status} projectId={task.projectId} />
-              </span>
-              <Deadline task={task} />
-              <span className="task-row-assignee">
-                <Avatar user={assignee} size="xs" />
-              </span>
-              <Icon name="chevron" size={15} className="row-chevron" />
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+                <div className="task-row-title">
+                  <strong>{task.title}</strong>
+                  <UnreadComments task={task} />
+                  <span>
+                    {showProject && (
+                      <>
+                        <i className={`project-dot ${project?.color}`} />
+                        {project?.name.split(" — ")[0]}
+                        <span className="text-divider">/</span>
+                      </>
+                    )}
+                    <span className="task-code">SIP-{task.id.slice(0, 4).toUpperCase()}</span>
+                  </span>
+                </div>
+                <span className="task-row-status">
+                  <StatusBadge status={task.status} projectId={task.projectId} />
+                </span>
+                <Deadline task={task} />
+                <span className="task-row-assignee">
+                  <Avatar user={assignee} size="xs" />
+                </span>
+                <Icon name="chevron" size={15} className="row-chevron" />
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      {tasks.length > 20 && (
+        <div className="task-list-pagination">
+          <span aria-live="polite">
+            Показано {Math.min(limit, tasks.length)} из {tasks.length}
+          </span>
+          {limit < tasks.length && (
+            <Button variant="secondary" onClick={() => setLimit((value) => value + 20)}>
+              Показать ещё
+            </Button>
+          )}
+        </div>
+      )}
+    </>
   );
 }
 export type Filters = {
@@ -135,8 +152,8 @@ export function filterTasks(tasks: Task[], filters: Filters, data: Snapshot) {
       (t) =>
         (!filters.query || t.title.toLowerCase().includes(filters.query.toLowerCase())) &&
         (!filters.status || t.status === filters.status) &&
-        (!filters.assignee || t.assigneeId === filters.assignee) &&
-        (!filters.mine || t.assigneeId === data.sessionId) &&
+        (!filters.assignee || isAssigned(t, filters.assignee)) &&
+        (!filters.mine || isAssigned(t, data.sessionId)) &&
         (!filters.period ||
           (t.status !== "done" &&
             (filters.period === "overdue"
@@ -326,7 +343,7 @@ export function MyTasksView() {
         : "smooth",
     });
   };
-  const allMine = data.tasks.filter((t) => t.assigneeId === user.id);
+  const allMine = data.tasks.filter((t) => isAssigned(t, user.id));
   const active = allMine.filter((t) => t.status !== "done");
   const overdue = active.filter((t) => urgency(t, data.now) === "overdue");
   const today = active.filter((t) => dayKey(t.deadlineAt) === dayKey(data.now));
@@ -336,7 +353,7 @@ export function MyTasksView() {
       tab === "done"
         ? t.status === "done"
         : tab === "all"
-          ? true
+          ? t.status !== "done"
           : t.status !== "done" &&
             !!t.deadlineAt &&
             Date.parse(t.deadlineAt) < Date.parse(data.now) + 7 * 86400000,
@@ -369,7 +386,13 @@ export function MyTasksView() {
             ),
           },
         ]
-      : [{ label: tab === "done" ? "Завершённые задачи" : "Все мои задачи", tone: "green", tasks }];
+      : [
+          {
+            label: tab === "done" ? "Завершённые задачи" : "Активные задачи",
+            tone: "green",
+            tasks,
+          },
+        ];
   const canCreate = data.projects.some((p) => canManage(data, p.id));
   return (
     <div className="dashboard">
@@ -531,7 +554,7 @@ export function MyTasksView() {
             <div className="tabs task-tabs">
               {[
                 { id: "attention", label: "Требуют внимания" },
-                { id: "all", label: "Все мои" },
+                { id: "all", label: "Активные" },
                 { id: "done", label: "Завершённые" },
               ].map((t) => (
                 <button
