@@ -1642,28 +1642,180 @@ select:focus {
     font-size: 13px;
   }
 }
-/* Tabs scroll within the project header instead of widening a small viewport. */
+/* Project tabs stay inside their container without an inner scroll bar. */
 .project-tabs {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: thin;
+  overflow: visible;
 }
 .project-tabs > a {
-  flex-shrink: 0;
-  white-space: nowrap;
+  flex-shrink: 1;
 }
-@media (max-width: 600px) {
+@media (max-width: 760px) {
   .project-tabs {
-    gap: 20px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 5px;
+    overflow: visible;
+    padding: 12px 0 18px;
+    border-bottom: 0;
   }
   .project-tabs > a {
-    font-size: 13px;
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+    padding: 0;
+    gap: 5px;
+    flex-direction: column;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: #737a73;
+    font-size: 0;
+    white-space: nowrap;
+  }
+  .project-tabs > a > .icon {
+    box-sizing: content-box;
+    width: 22px;
+    height: 22px;
+    padding: 13px;
+    border: 1px solid transparent;
+    border-radius: 18px;
+    background: #f2f4f1;
+    transform: scale(0.9);
+    transition:
+      width 180ms var(--ease-ui),
+      height 180ms var(--ease-ui),
+      padding 180ms var(--ease-ui),
+      border-radius 180ms var(--ease-ui),
+      transform 220ms var(--ease-ui),
+      background-color 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease;
   }
   .project-tabs .count-pill {
+    position: absolute;
+    top: 7px;
+    right: max(3px, calc((100% - 50px) / 2));
+    min-width: 18px;
+    height: 18px;
+    padding: 0 3px;
+    border: 1px solid #fff;
+    border-radius: 999px;
+    background: #fff;
+    color: #71766f;
+    font-size: 10px;
+    z-index: 1;
+    transition: transform 180ms var(--ease-ui), background-color 180ms ease;
+  }
+  .project-tabs > a.active .count-pill {
+    transform: translate(3px, -3px);
+    background: #fffdf4;
+  }
+  .project-tabs > a.active {
+    color: #34352f;
+    font-weight: 600;
+  }
+  .project-tabs > a.active > .icon {
+    width: 26px;
+    height: 26px;
+    padding: 15px;
+    border-color: #e7bc5b;
+    border-radius: 21px;
+    background: #f8d44f;
+    box-shadow: 0 2px 5px #76612b26;
+    transform: scale(1);
+  }
+  .project-tabs > a.active:after {
+    content: none;
+  }
+  .project-tabs > a:focus-visible {
+    outline: 3px solid #8b6a1a;
+    outline-offset: 2px;
+  }
+  .project-tabs > a.active .project-tab-label {
+    display: block;
+    width: max-content;
+    max-width: 110px;
+    margin: 0;
+    align-self: center;
+    white-space: normal;
+    text-align: center;
+    word-break: normal;
+    overflow-wrap: normal;
     font-size: 11px;
+    line-height: 1.05;
+    animation: project-tab-label-in 180ms var(--ease-ui) both;
+  }
+  @keyframes project-tab-label-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .project-tabs > a:not(.active) .project-tab-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .project-tabs > a > .icon,
+    .project-tabs .count-pill {
+      transition: none;
+    }
+  }
+}
+@media (min-width: 521px) and (max-width: 760px) {
+  .project-tabs > a:not(.active) {
+    font-size: 11px;
+    white-space: normal;
+  }
+  .project-tabs > a:not(.active) .project-tab-label {
+    position: static;
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    margin: 0 auto;
+    overflow: visible;
+    clip: auto;
+    text-align: center;
+    white-space: normal;
+    border: 0;
+    font-size: inherit;
+    line-height: 1.05;
+  }
+}
+@media (max-width: 360px) {
+  .project-tabs {
+    gap: 5px;
+  }
+  .project-tabs > a {
+    gap: 4px;
+  }
+  .project-tabs > a.active {
+    font-size: 0;
+  }
+  .project-tabs > a > .icon {
+    width: 20px;
+    height: 20px;
+    padding: 11px;
+  }
+  .project-tabs > a.active > .icon {
+    width: 24px;
+    height: 24px;
+    padding: 13px;
+  }
+  .project-tabs .count-pill {
+    top: 3px;
+    right: 3px;
   }
 }
 /* Keep the composer reachable with a phone keyboard or in landscape. */
