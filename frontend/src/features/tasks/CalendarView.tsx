@@ -132,7 +132,7 @@ export function CalendarView() {
   };
   return (
     <>
-      <div className="page-heading">
+      <div className="page-heading calendar-heading">
         <div>
           <h1>
             Календарь<span className="heading-dot">.</span>

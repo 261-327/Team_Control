@@ -48,10 +48,12 @@ export function ProjectsView() {
           <h1>Мои проекты</h1>
           <p>Проекты, в которых ты участвуешь.</p>
         </div>
-        <Link className="btn btn-primary" href="/projects/new">
-          <Icon name="plus" size={18} />
-          Создать проект
-        </Link>
+        {data.projects.length > 0 && (
+          <Link className="btn btn-primary" href="/projects/new">
+            <Icon name="plus" size={18} />
+            Создать проект
+          </Link>
+        )}
       </div>
       <div className="projects-workspace-summary">
         <div>

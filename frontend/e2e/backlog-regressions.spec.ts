@@ -180,8 +180,9 @@ test("required-field messages are Russian and clear after editing", async ({ pag
   expect(await password.evaluate((el: HTMLInputElement) => el.validationMessage)).toBe("");
 });
 
-
-test("calendar and list share status colors and completed tasks are never overdue", async ({ page }) => {
+test("calendar and list share status colors and completed tasks are never overdue", async ({
+  page,
+}) => {
   const db = await mockWorkspace(page);
   db.tasks = (["todo", "in_progress", "in_review", "done"] as const).map((status, i) => ({
     ...db.tasks[0],
@@ -197,8 +198,8 @@ test("calendar and list share status colors and completed tasks are never overdu
     const badge = page.locator(`.status-badge.status-${status}`);
     await expect(card).toBeVisible();
     await expect(badge).toBeVisible();
-    expect(await card.evaluate(el => getComputedStyle(el).color)).toBe(
-      await badge.evaluate(el => getComputedStyle(el).color),
+    expect(await card.evaluate((el) => getComputedStyle(el).color)).toBe(
+      await badge.evaluate((el) => getComputedStyle(el).color),
     );
   }
   await expect(page.locator(".calendar-task.status-done")).not.toHaveClass(/deadline-overdue/);
@@ -207,3 +208,27 @@ test("calendar and list share status colors and completed tasks are never overdu
   await expect(page.locator(".calendar-task.status-done")).toHaveCount(0);
   await expect(page.locator(".calendar-task")).toHaveCount(3);
 });
+
+for (const width of [375, 1440]) {
+  test(`home navigation and project creation have working unambiguous entry points at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const db = await mockWorkspace(page);
+    await page.goto("/projects");
+    const home = page.getByRole("link", { name: "На главную: мои задачи" });
+    await expect(home).toBeVisible();
+    await home.focus();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/my-tasks$/);
+    db.projects = [];
+    db.memberships = [];
+    db.tasks = [];
+    await page.goto("/projects");
+    await expect(page.locator(".page-heading a[href='/projects/new']")).toHaveCount(0);
+    const create = page.locator(".project-create-placeholder");
+    await expect(create).toBeVisible();
+    await create.click();
+    await expect(page).toHaveURL(/projects\/new$/);
+  });
+}

@@ -298,9 +298,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 className="mobile-menu"
                 onClick={() => setMobile(true)}
               />
-              <span className="breadcrumb-home">
+              <Link
+                href="/my-tasks"
+                className="breadcrumb-home"
+                aria-label="На главную: мои задачи"
+              >
                 <Icon name="home" size={16} />
-              </span>
+              </Link>
               <Icon name="chevron" size={13} />
               {project ? (
                 <>

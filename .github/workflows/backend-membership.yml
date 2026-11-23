@@ -60,16 +60,71 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm run format:check
       - run: npm run lint
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Browser regressions (isolated fixtures)
-        run: npx playwright test e2e/backlog-regressions.spec.ts e2e/calendar-navigation.spec.ts e2e/domain.spec.ts e2e/custom-direction.spec.ts e2e/proxy-headers.spec.ts
+        run: npx playwright test e2e/backlog-regressions.spec.ts e2e/accessibility-regressions.spec.ts e2e/calendar-navigation.spec.ts e2e/domain.spec.ts e2e/custom-direction.spec.ts e2e/proxy-headers.spec.ts
         env:
           SIPI_START_TEST_SERVER: '1'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r ../backend/requirements.txt
+      - name: Browser integration (isolated Django and file mail)
+        shell: bash
+        env:
+          DB_ENGINE: sqlite
+          DB_NAME: ${{ runner.temp }}/sipi-e2e.sqlite3
+          EMAIL_BACKEND: django.core.mail.backends.filebased.EmailBackend
+          EMAIL_FILE_PATH: ${{ runner.temp }}/sipi-e2e-mail
+          SIPI_TEST_MAIL_DIR: ${{ runner.temp }}/sipi-e2e-mail
+          DJANGO_DEBUG: 'true'
+          FRONTEND_URL: http://127.0.0.1:3000
+          DJANGO_API_URL: http://127.0.0.1:8000
+          SIPI_START_TEST_SERVER: '1'
+        run: |
+          mkdir -p "$EMAIL_FILE_PATH"
+          python ../backend/manage.py migrate --noinput
+          python ../backend/manage.py runserver 127.0.0.1:8000 --noreload > "$RUNNER_TEMP/sipi-django.log" 2>&1 &
+          django_pid=$!
+          trap 'kill "$django_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:8000/api/bootstrap/ > /dev/null; then break; fi
+            kill -0 "$django_pid"
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8000/api/bootstrap/ > /dev/null
+          npx playwright test e2e/core-flow.spec.ts e2e/task-lifecycle.spec.ts e2e/comment-files.spec.ts e2e/password-reset.spec.ts
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: browser-failure-evidence
           path: frontend/test-results/
           retention-days: 7
+
+  container-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start production images with disposable data
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build -t sipi-backend-check ./backend
+          docker build -t sipi-frontend-check ./frontend
+          docker network create sipi-check
+          trap 'docker rm -f sipi-fe-check sipi-be-check >/dev/null 2>&1 || true; docker network rm sipi-check >/dev/null 2>&1 || true' EXIT
+          docker run -d --name sipi-be-check --network sipi-check --network-alias backend \
+            -e DB_ENGINE=sqlite -e DB_NAME=/tmp/ci.sqlite3 -e DJANGO_DEBUG=false \
+            -e DJANGO_SECRET_KEY=ci-only-disposable-not-a-production-secret \
+            -e EMAIL_BACKEND=django.core.mail.backends.dummy.EmailBackend sipi-backend-check
+          docker run -d --name sipi-fe-check --network sipi-check -p 3000:3000 \
+            -e DJANGO_API_URL=http://backend:8000 sipi-frontend-check
+          for attempt in {1..60}; do
+            if curl -fsS http://127.0.0.1:3000/api/bootstrap > /dev/null; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:3000/login > /dev/null
+          curl -fsS http://127.0.0.1:3000/api/bootstrap | python -c 'import json,sys; data=json.load(sys.stdin); assert data["sessionId"] is None'
