@@ -1,0 +1,27 @@
+name: PostgreSQL backup script checks
+
+on:
+  pull_request:
+    paths:
+      - "infra/scripts/**"
+      - ".github/workflows/backup-scripts.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "infra/scripts/**"
+      - ".github/workflows/backup-scripts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  shell-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check Bash syntax
+        run: |
+          bash -n infra/scripts/backup.sh
+          bash -n infra/scripts/restore-test.sh

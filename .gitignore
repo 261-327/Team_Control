@@ -32,6 +32,11 @@ backend/.env
 backend/.env.*
 !backend/.env.example
 
+# PostgreSQL backup artifacts are never committed.
+*.dump
+*.dump.sha256
+*.dump.meta
+
 # User-uploaded project files and local backup archives.
 backend/media/
 media/
