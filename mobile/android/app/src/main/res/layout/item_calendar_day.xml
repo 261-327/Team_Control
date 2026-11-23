@@ -13,15 +13,4 @@
         android:textColor="@color/text_primary"
         android:textSize="15sp" />
 
-    <TextView
-        android:id="@+id/tvDot"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="-4dp"
-        android:includeFontPadding="false"
-        android:text="@string/calendar_task_dot"
-        android:textColor="@color/mustard"
-        android:textSize="12sp"
-        android:visibility="invisible" />
-
 </LinearLayout>

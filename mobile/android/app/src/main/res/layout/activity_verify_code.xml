@@ -61,5 +61,19 @@
             android:textSize="16sp"
             android:textStyle="bold"
             android:stateListAnimator="@null" />
+
+        <TextView
+            android:id="@+id/btnResendCode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="14dp"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="8dp"
+            android:text="@string/verify_resend_code"
+            android:textColor="@color/mustard_dark"
+            android:textSize="14sp" />
     </LinearLayout>
 </LinearLayout>

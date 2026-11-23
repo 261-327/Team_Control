@@ -20,6 +20,7 @@ import com.example.sipi_ai.data.TaskStatus
 import com.example.sipi_ai.data.UserStore
 import com.example.sipi_ai.databinding.ActivityTaskDetailBinding
 import com.example.sipi_ai.ui.common.MemberNames
+import com.example.sipi_ai.ui.common.confirmTaskSubmitForReview
 import com.example.sipi_ai.ui.taskedit.TaskEditActivity
 import com.example.sipi_ai.ui.tasks.style
 import com.example.sipi_ai.util.formatDeadline
@@ -172,23 +173,31 @@ class TaskDetailActivity : AppCompatActivity() {
             .setSingleChoiceItems(labels, statuses.indexOf(task.status)) { dialog, which ->
                 dialog.dismiss()
                 val next = statuses[which]
-                val wireStatus = when (next) {
-                    TaskStatus.TODO -> "todo"
-                    TaskStatus.IN_PROGRESS -> "in_progress"
-                    TaskStatus.REVIEW -> "in_review"
-                    TaskStatus.DONE -> "done"
+                if (next == TaskStatus.REVIEW && task.status != TaskStatus.REVIEW) {
+                    confirmTaskSubmitForReview(task) { changeTaskStatus(task, next) }
+                    return@setSingleChoiceItems
                 }
-                val reason = if (task.status == TaskStatus.REVIEW && next == TaskStatus.IN_PROGRESS)
-                    "Исправления отмечены в приложении" else null
-                ApiClient.moveTask(taskId, wireStatus, { result ->
-                    result.onSuccess {
-                        ApiClient.applyMutation(it, UserStore(this))
-                        render()
-                    }.onFailure { Toast.makeText(this, it.message ?: "Не удалось изменить статус", Toast.LENGTH_LONG).show() }
-                }, reason)
+                changeTaskStatus(task, next)
             }
             .setNegativeButton(R.string.action_cancel, null)
             .show()
+    }
+
+    private fun changeTaskStatus(task: com.example.sipi_ai.data.Task, next: TaskStatus) {
+        val wireStatus = when (next) {
+            TaskStatus.TODO -> "todo"
+            TaskStatus.IN_PROGRESS -> "in_progress"
+            TaskStatus.REVIEW -> "in_review"
+            TaskStatus.DONE -> "done"
+        }
+        val reason = if (task.status == TaskStatus.REVIEW && next == TaskStatus.IN_PROGRESS)
+            "Исправления отмечены в приложении" else null
+        ApiClient.moveTask(taskId, wireStatus, { result ->
+            result.onSuccess {
+                ApiClient.applyMutation(it, UserStore(this))
+                render()
+            }.onFailure { Toast.makeText(this, it.message ?: "Не удалось изменить статус", Toast.LENGTH_LONG).show() }
+        }, reason)
     }
 
     private fun confirmDelete() {

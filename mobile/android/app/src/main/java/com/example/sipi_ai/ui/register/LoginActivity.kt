@@ -51,9 +51,13 @@ class LoginActivity : AppCompatActivity() {
                 InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             }
             if (cursor >= 0) binding.etLoginPassword.setSelection(cursor.coerceAtMost(binding.etLoginPassword.length()))
-            binding.btnTogglePassword.setImageResource(
+            binding.btnTogglePassword.animate().cancel()
+            binding.btnTogglePassword.animate().alpha(0f).setDuration(90).withEndAction {
+                binding.btnTogglePassword.setImageResource(
                 if (passwordVisible) R.drawable.ic_visibility else R.drawable.ic_visibility_off,
-            )
+                )
+                binding.btnTogglePassword.animate().alpha(1f).setDuration(130).start()
+            }.start()
             binding.btnTogglePassword.setContentDescription(
                 getString(if (passwordVisible) R.string.password_hide else R.string.password_show),
             )
@@ -61,6 +65,9 @@ class LoginActivity : AppCompatActivity() {
 
         binding.tvGoToRegister.setOnClickListener {
             startActivity(Intent(this, RegisterActivity::class.java))
+        }
+        binding.tvForgotPassword.setOnClickListener {
+            startActivity(Intent(this, ForgotPasswordActivity::class.java))
         }
         binding.btnLogin.setOnClickListener {
             val username = binding.etLoginEmail.text.toString().trim()

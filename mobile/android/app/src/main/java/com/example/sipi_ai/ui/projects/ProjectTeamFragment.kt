@@ -23,7 +23,7 @@ class ProjectTeamFragment : Fragment(R.layout.fragment_project_team) {
 
     private var binding: FragmentProjectTeamBinding? = null
     private val projectId by lazy { requireArguments().getLong(ARG_PROJECT_ID) }
-    private val adapter = RowAdapter { row -> row.payload?.let { confirmRemove(it, row.title) } }
+    private val adapter = RowAdapter(onClick = { row -> row.payload?.let { confirmRemove(it, row.title) } })
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)

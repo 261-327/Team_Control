@@ -37,6 +37,7 @@ class ProjectActivity : AppCompatActivity() {
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.setDisplayShowTitleEnabled(false)
 
+        binding.pagerProject.isUserInputEnabled = false
         binding.pagerProject.adapter = ProjectPagerAdapter(this, projectId)
         TabLayoutMediator(binding.tabProject, binding.pagerProject) { tab, position ->
             tab.text = tabTitle(position)

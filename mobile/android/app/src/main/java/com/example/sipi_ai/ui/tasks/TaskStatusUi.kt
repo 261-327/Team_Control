@@ -15,6 +15,7 @@ data class StatusStyle(
 )
 
 private val URGENT_STYLE = StatusStyle(R.string.status_urgent, R.color.status_urgent, R.color.status_urgent_bg)
+private val OVERDUE_STYLE = StatusStyle(R.string.task_overdue_label, R.color.status_urgent, R.color.status_urgent_bg)
 
 val TaskStatus.style: StatusStyle
     get() = when (this) {
@@ -24,9 +25,16 @@ val TaskStatus.style: StatusStyle
         TaskStatus.DONE -> StatusStyle(R.string.status_done, R.color.status_done, R.color.status_done_bg)
     }
 
-/** Срочные задачи подсвечиваются как «Срочно», остальные — своим статусом. */
+/** Статусы «На проверке» и «Готово» важнее срочности; у остальных задач показываем срок. */
 val Task.displayStyle: StatusStyle
-    get() = if (TaskRepository.isUrgent(this)) URGENT_STYLE else status.style
+    get() = when (status) {
+        TaskStatus.REVIEW, TaskStatus.DONE -> status.style
+        else -> when {
+            TaskRepository.isOverdue(this) -> OVERDUE_STYLE
+            TaskRepository.isUrgent(this) -> URGENT_STYLE
+            else -> status.style
+        }
+    }
 
 val TaskTab.tabTitleRes: Int
     get() = when (this) {

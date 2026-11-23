@@ -15,10 +15,13 @@ import com.example.sipi_ai.data.TaskStatus
 import com.example.sipi_ai.data.TaskTab
 import com.example.sipi_ai.databinding.FragmentTaskBinding
 import com.example.sipi_ai.ui.common.openTask
+import com.example.sipi_ai.ui.common.confirmTaskSubmitForReview
 import com.example.sipi_ai.util.russianPlural
 import com.google.android.material.snackbar.Snackbar
 
 class TaskFragment : Fragment(R.layout.fragment_task) {
+
+    enum class DashboardFilter { OPEN, URGENT, DONE }
 
     private val tab by lazy { TaskTab.entries[requireArguments().getInt(ARG_TAB)] }
     private val taskAdapter = TaskAdapter(
@@ -26,6 +29,7 @@ class TaskFragment : Fragment(R.layout.fragment_task) {
         onClick = { task -> requireContext().openTask(task.id) },
     )
     private var binding: FragmentTaskBinding? = null
+    private var dashboardFilter: DashboardFilter? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -50,10 +54,33 @@ class TaskFragment : Fragment(R.layout.fragment_task) {
 
     fun refreshTasks() = showTasks()
 
+    fun setDashboardFilter(filter: DashboardFilter?) {
+        dashboardFilter = filter
+        showTasks()
+    }
+
     private fun showTasks() {
         val binding = binding ?: return
-        val tasks = TaskRepository.mineIn(tab)
+        val tasks = dashboardFilter?.let { filter ->
+            TaskRepository.mine().filter { task ->
+                when (filter) {
+                    DashboardFilter.OPEN -> task.status != TaskStatus.DONE
+                    DashboardFilter.URGENT -> TaskRepository.isUrgent(task)
+                    DashboardFilter.DONE -> task.status == TaskStatus.DONE
+                }
+            }.sortedBy { it.deadlineMillis ?: Long.MAX_VALUE }
+        } ?: TaskRepository.mineIn(tab)
         taskAdapter.submitList(tasks)
+
+        binding.tvTabTitle.text = dashboardFilter?.let { filter ->
+            getString(
+                when (filter) {
+                    DashboardFilter.OPEN -> R.string.stat_open
+                    DashboardFilter.URGENT -> R.string.stat_today
+                    DashboardFilter.DONE -> R.string.stat_done
+                },
+            )
+        } ?: getString(tab.tabTitleRes)
 
         val countPhrase = russianPlural(
             tasks.size,
@@ -69,17 +96,19 @@ class TaskFragment : Fragment(R.layout.fragment_task) {
     }
 
     private fun submitForReview(task: Task) {
-        ApiClient.moveTask(task.id, "in_review", { response ->
-            response.onSuccess { snapshot ->
-                ApiClient.applySnapshot(snapshot.optJSONObject("snapshot") ?: snapshot, UserStore(requireContext()))
-                showTasks()
-                Snackbar.make(requireView(), R.string.task_submitted, Snackbar.LENGTH_LONG)
-                    .setAnchorView(requireActivity().findViewById<View>(R.id.bottomNavigationView))
-                    .show()
-            }.onFailure {
-                Snackbar.make(requireView(), it.message ?: "Не удалось обновить задачу", Snackbar.LENGTH_LONG).show()
-            }
-        })
+        requireContext().confirmTaskSubmitForReview(task) {
+            ApiClient.moveTask(task.id, "in_review", { response ->
+                response.onSuccess { snapshot ->
+                    ApiClient.applySnapshot(snapshot.optJSONObject("snapshot") ?: snapshot, UserStore(requireContext()))
+                    showTasks()
+                    Snackbar.make(requireView(), R.string.task_submitted, Snackbar.LENGTH_LONG)
+                        .setAnchorView(requireActivity().findViewById<View>(R.id.bottomNavigationView))
+                        .show()
+                }.onFailure {
+                    Snackbar.make(requireView(), it.message ?: "Не удалось обновить задачу", Snackbar.LENGTH_LONG).show()
+                }
+            })
+        }
     }
 
     /** Активити, которое показывает статистику над вкладками и должно обновляться после изменений. */

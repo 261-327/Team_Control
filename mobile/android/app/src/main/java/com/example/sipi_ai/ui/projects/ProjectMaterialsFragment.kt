@@ -1,6 +1,9 @@
 package com.example.sipi_ai.ui.projects
 
 import android.os.Bundle
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.text.InputType
 import android.view.View
 import android.widget.EditText
@@ -24,10 +27,16 @@ class ProjectMaterialsFragment : Fragment(R.layout.fragment_project_materials) {
 
     private var binding: FragmentProjectMaterialsBinding? = null
     private val projectId by lazy { requireArguments().getLong(ARG_PROJECT_ID) }
-    private val adapter = RowAdapter { row ->
-        val material = ProjectRepository.get(projectId)?.materials?.firstOrNull { it.id == row.payload }
-        if (material != null) confirmRemove(material)
-    }
+    private val adapter = RowAdapter(
+        onClick = { row ->
+            ProjectRepository.get(projectId)?.materials?.firstOrNull { it.id == row.payload }
+                ?.let(::openMaterial)
+        },
+        onMoreClick = { row ->
+            ProjectRepository.get(projectId)?.materials?.firstOrNull { it.id == row.payload }
+                ?.let(::confirmRemove)
+        },
+    )
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -122,6 +131,20 @@ class ProjectMaterialsFragment : Fragment(R.layout.fragment_project_materials) {
                 }
             }
             .show()
+    }
+
+    private fun openMaterial(material: ProjectMaterial) {
+        val enteredUrl = material.url.trim()
+        val url = if (enteredUrl.startsWith("http://", true) || enteredUrl.startsWith("https://", true)) {
+            enteredUrl
+        } else {
+            "https://$enteredUrl"
+        }
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(requireContext(), R.string.material_open_error, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun extension(name: String): String {

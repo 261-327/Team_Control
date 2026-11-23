@@ -24,6 +24,7 @@ private const val COLLAPSED_DESCRIPTION_LINES = 3
 class TaskAdapter(
     private val onSubmitForReview: ((Task) -> Unit)? = null,
     private val onClick: ((Task) -> Unit)? = null,
+    private val calendarPresentation: Boolean = false,
 ) : ListAdapter<Task, TaskAdapter.TaskViewHolder>(TaskDiff) {
 
     private val expandedTaskIds = mutableSetOf<Long>()
@@ -45,7 +46,29 @@ class TaskAdapter(
             boundTaskId = task.id
             val context = binding.root.context
 
-            val style = task.displayStyle
+            val mutedPastWork = calendarPresentation &&
+                (task.status == TaskStatus.REVIEW || task.status == TaskStatus.DONE)
+            val style = if (mutedPastWork) {
+                task.displayStyle.copy(
+                    color = R.color.calendar_completed_text,
+                    background = R.color.calendar_completed_chip_bg,
+                )
+            } else {
+                task.displayStyle
+            }
+            val overdue = TaskRepository.isOverdue(task)
+            val density = context.resources.displayMetrics.density
+            binding.root.setCardBackgroundColor(
+                context.getColor(if (mutedPastWork) R.color.calendar_completed_bg else R.color.surface_card),
+            )
+            binding.root.strokeColor = context.getColor(
+                when {
+                    overdue -> R.color.status_urgent
+                    mutedPastWork -> R.color.calendar_completed_stroke
+                    else -> R.color.field_stroke
+                },
+            )
+            binding.root.strokeWidth = (density * if (overdue) 2 else 1).toInt()
             binding.tvStatus.setText(style.label)
             binding.tvStatus.setTextColor(context.getColor(style.color))
             binding.tvStatus.backgroundTintList = ColorStateList.valueOf(context.getColor(style.background))
@@ -53,9 +76,18 @@ class TaskAdapter(
             val project = ProjectRepository.get(task.projectId)
             val code = if (project != null) "${project.key}-${task.number}" else "#${task.number}"
             binding.tvTaskMeta.text = listOfNotNull(code, project?.name, task.direction).joinToString(" · ")
+            binding.tvTaskMeta.setTextColor(
+                context.getColor(if (mutedPastWork) R.color.calendar_completed_text else R.color.text_hint),
+            )
 
             binding.tvTaskTitle.text = task.title
+            binding.tvTaskTitle.setTextColor(
+                context.getColor(if (mutedPastWork) R.color.calendar_completed_text else R.color.text_primary),
+            )
             binding.tvTaskDescription.text = task.description
+            binding.tvTaskDescription.setTextColor(
+                context.getColor(if (mutedPastWork) R.color.calendar_completed_text else R.color.text_secondary),
+            )
             binding.tvTaskDescription.isVisible = task.description.isNotEmpty()
             bindDeadline(task, context)
 
@@ -80,7 +112,14 @@ class TaskAdapter(
         }
 
         private fun bindDeadline(task: Task, context: Context) {
-            if (task.status == TaskStatus.REVIEW || task.status == TaskStatus.DONE) {
+            if (calendarPresentation && (task.status == TaskStatus.DONE || task.status == TaskStatus.REVIEW)) {
+                binding.dividerDeadline.isVisible = false
+                binding.rowDeadline.isVisible = false
+                return
+            }
+            binding.dividerDeadline.isVisible = true
+            binding.rowDeadline.isVisible = true
+            if (task.status == TaskStatus.DONE || task.status == TaskStatus.REVIEW) {
                 val color = context.getColor(if (task.status == TaskStatus.DONE) R.color.status_done else R.color.status_review)
                 binding.ivDeadlineIcon.setImageResource(R.drawable.ic_check_circle)
                 ImageViewCompat.setImageTintList(binding.ivDeadlineIcon, ColorStateList.valueOf(color))
@@ -108,7 +147,7 @@ class TaskAdapter(
             val now = System.currentTimeMillis()
             binding.tvTimeRemaining.text = context.remainingTimeText(deadline, now)
             binding.tvTimeRemaining.setTextColor(context.getColor(remainingTimeColorRes(deadline, now)))
-            binding.tvTimeRemaining.isVisible = true
+            binding.tvTimeRemaining.isVisible = !TaskRepository.isOverdue(task, now)
         }
 
         private fun bindDescriptionState(task: Task) {
@@ -153,6 +192,6 @@ private fun Context.remainingTimeText(deadlineMillis: Long, nowMillis: Long): St
 
 private fun remainingTimeColorRes(deadlineMillis: Long, nowMillis: Long): Int = when {
     deadlineMillis < nowMillis -> R.color.status_urgent
-    daysUntil(deadlineMillis, nowMillis) <= TaskRepository.URGENT_DAYS_BEFORE_DEADLINE -> R.color.mustard_dark
+    deadlineMillis - nowMillis <= TaskRepository.URGENT_WINDOW_MILLIS -> R.color.mustard_dark
     else -> R.color.text_secondary
 }

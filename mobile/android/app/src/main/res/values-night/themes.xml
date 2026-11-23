@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.SIPI_AI" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/mustard</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorPrimaryInverse">@color/mustard_dark</item>
+        <item name="colorSecondaryContainer">@color/mustard_soft</item>
+        <item name="colorOnSecondaryContainer">@color/text_primary</item>
+        <item name="colorSurface">@color/surface_card</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorSurfaceVariant">@color/field_bg</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+        <item name="colorOutline">@color/field_stroke</item>
+        <item name="android:windowBackground">@color/beige</item>
+        <item name="android:statusBarColor">@color/beige</item>
+        <item name="android:navigationBarColor">@color/beige</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

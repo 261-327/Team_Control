@@ -22,6 +22,7 @@ import com.example.sipi_ai.data.UserStore
 import com.example.sipi_ai.databinding.ActivityTaskEditBinding
 import com.example.sipi_ai.ui.common.MemberNames
 import com.example.sipi_ai.util.formatDeadline
+import com.example.sipi_ai.util.bindCharacterCounter
 import java.util.Calendar
 
 /** Создание и редактирование задачи (поля как в форме «Новая задача» на сайте). */
@@ -56,6 +57,7 @@ class TaskEditActivity : AppCompatActivity() {
         val presetProject = intent.getLongExtra(EXTRA_PROJECT_ID, -1L)
 
         supportActionBar?.setTitle(if (task != null) R.string.task_form_edit else R.string.task_form_new)
+        binding.etTitle.bindCharacterCounter(binding.tvTitleCounter, 200)
 
         setAdapter(binding.spinnerProject, projects.map { it.name })
         setAdapter(binding.spinnerDirection, Directions.all)

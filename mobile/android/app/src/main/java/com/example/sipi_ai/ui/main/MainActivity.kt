@@ -2,6 +2,7 @@ package com.example.sipi_ai.ui.main
 
 import android.content.Intent
 import android.graphics.Color
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -50,13 +51,18 @@ class MainActivity : AppCompatActivity(), TaskFragment.StatsHost {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT))
+        val darkTheme = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        val systemBars = if (darkTheme) {
+            SystemBarStyle.dark(Color.TRANSPARENT)
+        } else {
+            SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+        }
+        enableEdgeToEdge(statusBarStyle = systemBars, navigationBarStyle = systemBars)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         setUpToolbarAndDrawer()
         setUpTabs()
-        binding.fabAssistant.setOnClickListener { openAssistant() }
         ApiClient.initialize(this)
     }
 
@@ -110,11 +116,14 @@ class MainActivity : AppCompatActivity(), TaskFragment.StatsHost {
         binding.statsRow.showStats(
             listOf(
                 R.string.stat_open to mine.count { it.status != TaskStatus.DONE },
-                R.string.stat_today to mine.count { TaskRepository.isDueToday(it) },
-                R.string.stat_overdue to mine.count { TaskRepository.isOverdue(it) },
+                R.string.stat_today to mine.count { TaskRepository.isUrgent(it) },
                 R.string.stat_done to mine.count { it.status == TaskStatus.DONE },
             ),
-        )
+        ) { index ->
+            val filter = TaskFragment.DashboardFilter.entries[index]
+            supportFragmentManager.fragments.filterIsInstance<TaskFragment>()
+                .forEach { it.setDashboardFilter(filter) }
+        }
     }
 
     private fun setUpToolbarAndDrawer() {
@@ -182,10 +191,14 @@ class MainActivity : AppCompatActivity(), TaskFragment.StatsHost {
         binding.viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 binding.bottomNavigationView.menu.findItem(tabs[position].menuItemId).isChecked = true
+                supportFragmentManager.fragments.filterIsInstance<TaskFragment>()
+                    .forEach { it.setDashboardFilter(null) }
             }
         })
 
         binding.bottomNavigationView.setOnItemSelectedListener { item ->
+            supportFragmentManager.fragments.filterIsInstance<TaskFragment>()
+                .forEach { it.setDashboardFilter(null) }
             val page = tabs.indexOfFirst { it.menuItemId == item.itemId }
             if (page != -1) binding.viewPager.currentItem = page
             page != -1

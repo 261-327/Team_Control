@@ -5,6 +5,8 @@ import android.content.Context
 import android.view.LayoutInflater
 import android.widget.Toast
 import android.widget.AdapterView
+import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import com.example.sipi_ai.R
@@ -18,6 +20,7 @@ import com.example.sipi_ai.ui.assistant.AssistantActivity
 import com.example.sipi_ai.ui.projects.ProjectActivity
 import com.example.sipi_ai.ui.taskdetail.TaskDetailActivity
 import com.example.sipi_ai.ui.taskedit.TaskEditActivity
+import com.example.sipi_ai.util.bindCharacterCounter
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 private val COLORS = intArrayOf(
@@ -43,18 +46,33 @@ fun Context.openAssistant(projectId: Long? = null) = startActivity(AssistantActi
 /** Диалог создания проекта. Не закрывается, пока не введено название. */
 fun Activity.showCreateProjectDialog(onCreated: (Project) -> Unit) {
     val binding = DialogProjectBinding.inflate(LayoutInflater.from(this))
+    binding.etProjectName.bindCharacterCounter(binding.tvProjectNameCounter, 80)
     val roleValues = resources.getStringArray(R.array.project_role_values)
     val specializationValues = resources.getStringArray(R.array.project_specialization_values)
     binding.spProjectSpecialization.setSelection(specializationValues.indexOf("android").coerceAtLeast(0))
+    binding.spProjectRole.setSelection(roleValues.indexOf("developer").coerceAtLeast(0))
     binding.tvProjectSpecializationLabel.visibility = android.view.View.VISIBLE
     binding.spProjectSpecialization.visibility = android.view.View.VISIBLE
     binding.spProjectRole.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
         override fun onNothingSelected(parent: AdapterView<*>?) = Unit
         override fun onItemSelected(parent: AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
-            val showSpecialization = roleValues.getOrNull(position) == "developer"
+            val selectedRole = roleValues.getOrNull(position)
+            val showSpecialization = selectedRole == "developer"
+            val showCustomRole = selectedRole == "other"
             binding.tvProjectSpecializationLabel.visibility = if (showSpecialization) android.view.View.VISIBLE else android.view.View.GONE
             binding.spProjectSpecialization.visibility = if (showSpecialization) android.view.View.VISIBLE else android.view.View.GONE
+            binding.etProjectCustomRole.visibility = if (showCustomRole) android.view.View.VISIBLE else android.view.View.GONE
         }
+    }
+    binding.spProjectRole.setOnTouchListener { _, event ->
+        if (event.action == android.view.MotionEvent.ACTION_DOWN) {
+            currentFocus?.let { focusedView ->
+                (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                    .hideSoftInputFromWindow(focusedView.windowToken, 0)
+                focusedView.clearFocus()
+            }
+        }
+        false
     }
     val dialog = MaterialAlertDialogBuilder(this)
         .setTitle(R.string.project_dialog_title)
@@ -63,6 +81,7 @@ fun Activity.showCreateProjectDialog(onCreated: (Project) -> Unit) {
         .setPositiveButton(R.string.action_create, null)
         .create()
     dialog.setOnShowListener {
+        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val name = binding.etProjectName.text.toString().trim()
             if (name.isEmpty()) {
@@ -70,11 +89,23 @@ fun Activity.showCreateProjectDialog(onCreated: (Project) -> Unit) {
                 return@setOnClickListener
             }
             val positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            val role = roleValues[binding.spProjectRole.selectedItemPosition]
+            val customRole = binding.etProjectCustomRole.text.toString().trim()
+            if (role == "other" && customRole.isEmpty()) {
+                binding.etProjectCustomRole.error = getString(R.string.project_error_custom_role)
+                binding.etProjectCustomRole.requestFocus()
+                return@setOnClickListener
+            }
             positive.isEnabled = false
             ApiClient.initialize(this)
-            val role = roleValues[binding.spProjectRole.selectedItemPosition]
             val specialization = specializationValues[binding.spProjectSpecialization.selectedItemPosition]
-            ApiClient.createProject(name, binding.etProjectDescription.text.toString(), role, specialization) { result ->
+            ApiClient.createProject(
+                name,
+                binding.etProjectDescription.text.toString(),
+                role,
+                specialization,
+                customRole,
+            ) { result ->
                 positive.isEnabled = true
                 result.onSuccess { response ->
                     ApiClient.applyMutation(response, UserStore(this))

@@ -1,6 +1,7 @@
 package com.example.sipi_ai.ui.calendar
 
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
@@ -42,7 +43,6 @@ class CalendarDaysAdapter(
             val day = cell.day
             if (day == null) {
                 binding.tvDay.isInvisible = true
-                binding.tvDot.isInvisible = true
                 binding.root.setOnClickListener(null)
                 binding.root.isClickable = false
                 return
@@ -50,23 +50,33 @@ class CalendarDaysAdapter(
 
             val isSelected = selectedDay?.isSameDay(day) == true
             val isToday = day.isSameDay(startOfDay())
-            val background = when {
-                isSelected -> R.drawable.bg_calendar_day_selected
-                isToday -> R.drawable.bg_calendar_day_today
-                else -> 0
+            val context = binding.root.context
+            val background = cell.marker?.let { marker ->
+                GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(ContextCompat.getColor(context, if (isSelected) R.color.mustard else marker.backgroundRes))
+                    setStroke(
+                        (1.5f * context.resources.displayMetrics.density).toInt().coerceAtLeast(1),
+                        ContextCompat.getColor(context, marker.colorRes),
+                    )
+                }
             }
             val textColor = when {
                 isSelected -> R.color.white
+                cell.marker != null -> cell.marker.colorRes
                 isToday -> R.color.mustard_dark
                 else -> R.color.text_primary
             }
 
             binding.tvDay.isInvisible = false
             binding.tvDay.text = day.get(Calendar.DAY_OF_MONTH).toString()
-            binding.tvDay.setBackgroundResource(background)
-            binding.tvDay.setTextColor(ContextCompat.getColor(binding.root.context, textColor))
+            binding.tvDay.background = background ?: when {
+                isSelected -> ContextCompat.getDrawable(context, R.drawable.bg_calendar_day_selected)
+                isToday -> ContextCompat.getDrawable(context, R.drawable.bg_calendar_day_today)
+                else -> null
+            }
+            binding.tvDay.setTextColor(ContextCompat.getColor(context, textColor))
             binding.tvDay.setTypeface(null, if (isSelected || isToday) Typeface.BOLD else Typeface.NORMAL)
-            binding.tvDot.isInvisible = !cell.hasTasks
 
             binding.root.setOnClickListener { onDayClick(day) }
         }

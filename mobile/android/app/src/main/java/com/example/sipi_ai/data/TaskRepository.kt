@@ -1,12 +1,11 @@
 package com.example.sipi_ai.data
 
-import com.example.sipi_ai.util.daysUntil
 import com.example.sipi_ai.util.isSameDay
 import com.example.sipi_ai.util.startOfDay
 
 object TaskRepository {
 
-    const val URGENT_DAYS_BEFORE_DEADLINE = 2
+    const val URGENT_WINDOW_MILLIS = 24L * 60 * 60 * 1000
 
     private val tasks = mutableListOf<Task>()
     private val counters = mutableMapOf<Long, Int>()
@@ -34,13 +33,14 @@ object TaskRepository {
 
     fun isUrgent(task: Task): Boolean {
         val deadline = task.deadlineMillis ?: return false
-        val active = task.status == TaskStatus.TODO || task.status == TaskStatus.IN_PROGRESS
-        return active && daysUntil(deadline) <= URGENT_DAYS_BEFORE_DEADLINE
+        val activeWork = task.status == TaskStatus.TODO || task.status == TaskStatus.IN_PROGRESS
+        return activeWork && deadline - System.currentTimeMillis() <= URGENT_WINDOW_MILLIS
     }
 
     fun isOverdue(task: Task, nowMillis: Long = System.currentTimeMillis()): Boolean {
         val deadline = task.deadlineMillis ?: return false
-        return task.status != TaskStatus.DONE && deadline < nowMillis
+        val activeWork = task.status == TaskStatus.TODO || task.status == TaskStatus.IN_PROGRESS
+        return activeWork && deadline < nowMillis
     }
 
     fun isDueToday(task: Task): Boolean {

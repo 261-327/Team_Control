@@ -47,6 +47,12 @@ object ApiClient {
         "auth/verify/", JSONObject().put("code", code), done
     ) { markSessionAuthenticated(); Unit }
 
+    fun resendCode(done: (Result<Unit>) -> Unit) = post("auth/resend/", JSONObject(), done) { Unit }
+
+    fun requestPasswordReset(email: String, done: (Result<Unit>) -> Unit) = post(
+        "auth/password-reset/", JSONObject().put("email", email), done
+    ) { Unit }
+
     fun logout(done: (Result<JSONObject>) -> Unit) = post("auth/logout/", JSONObject(), done) { it }
 
     fun updateProfile(name: String, bio: String, done: (Result<JSONObject>) -> Unit) = post(
@@ -161,12 +167,13 @@ object ApiClient {
         description: String,
         profession: String = "developer",
         specialization: String = "android",
+        customRole: String = "",
         done: (Result<JSONObject>) -> Unit,
     ) = post(
         "projects/", JSONObject().put("name", name).put("description", description)
             .put("role", JSONObject().put("profession", profession)
                 .put("specialization", if (profession == "developer") specialization else "")
-                .put("customRole", "")), done
+                .put("customRole", if (profession == "other") customRole else "")), done
     ) { it }
 
     fun updateProject(projectId: Long, name: String, description: String, done: (Result<JSONObject>) -> Unit) = post(

@@ -2,6 +2,7 @@ package com.example.sipi_ai.ui.projects
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -19,6 +20,7 @@ data class Row(
 
 class RowAdapter(
     private val onClick: (Row) -> Unit,
+    private val onMoreClick: ((Row) -> Unit)? = null,
 ) : ListAdapter<Row, RowAdapter.ViewHolder>(Diff) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder =
@@ -33,6 +35,8 @@ class RowAdapter(
             binding.tvMemberRole.text = row.subtitle
             binding.root.isClickable = row.clickable
             binding.root.setOnClickListener { if (row.clickable) onClick(row) }
+            binding.btnRowDelete.isVisible = onMoreClick != null && row.clickable && row.payload != null
+            binding.btnRowDelete.setOnClickListener { onMoreClick?.invoke(row) }
         }
     }
 

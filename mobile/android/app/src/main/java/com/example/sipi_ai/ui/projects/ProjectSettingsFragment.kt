@@ -10,6 +10,7 @@ import com.example.sipi_ai.data.ProjectRepository
 import com.example.sipi_ai.data.ApiClient
 import com.example.sipi_ai.data.UserStore
 import com.example.sipi_ai.databinding.FragmentProjectSettingsBinding
+import com.example.sipi_ai.util.bindCharacterCounter
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /** Вкладка «Настройки»: название, описание, период и удаление проекта. */
@@ -24,6 +25,7 @@ class ProjectSettingsFragment : Fragment(R.layout.fragment_project_settings) {
         val project = ProjectRepository.get(projectId) ?: return
 
         b.etSettingsName.setText(project.name)
+        b.etSettingsName.bindCharacterCounter(b.tvSettingsNameCounter, 80)
         b.etSettingsDescription.setText(project.description)
         b.btnSaveSettings.setOnClickListener {
             val current = ProjectRepository.get(projectId) ?: return@setOnClickListener

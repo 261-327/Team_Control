@@ -2,6 +2,7 @@ package com.example.sipi_ai.ui.register
 
 import android.content.Intent
 import android.os.Bundle
+import android.text.InputType
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.sipi_ai.R
@@ -17,6 +18,27 @@ class RegisterActivity : AppCompatActivity() {
         binding = ActivityRegisterBinding.inflate(layoutInflater)
         setContentView(binding.root)
         ApiClient.initialize(this)
+        var passwordVisible = false
+        binding.btnTogglePassword.setOnClickListener {
+            val cursor = binding.etPassword.selectionStart
+            passwordVisible = !passwordVisible
+            binding.etPassword.inputType = if (passwordVisible) {
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+            } else {
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            }
+            if (cursor >= 0) binding.etPassword.setSelection(cursor.coerceAtMost(binding.etPassword.length()))
+            binding.btnTogglePassword.animate().cancel()
+            binding.btnTogglePassword.animate().alpha(0f).setDuration(90).withEndAction {
+                binding.btnTogglePassword.setImageResource(
+                    if (passwordVisible) R.drawable.ic_visibility else R.drawable.ic_visibility_off,
+                )
+                binding.btnTogglePassword.animate().alpha(1f).setDuration(130).start()
+            }.start()
+            binding.btnTogglePassword.setContentDescription(
+                getString(if (passwordVisible) R.string.password_hide else R.string.password_show),
+            )
+        }
         binding.btnRegister.setOnClickListener { register() }
     }
 

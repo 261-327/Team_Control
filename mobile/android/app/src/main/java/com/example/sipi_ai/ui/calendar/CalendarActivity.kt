@@ -21,6 +21,7 @@ import com.example.sipi_ai.data.Project
 import com.example.sipi_ai.data.ProjectRepository
 import com.example.sipi_ai.data.Task
 import com.example.sipi_ai.data.TaskRepository
+import com.example.sipi_ai.data.TaskStatus
 import com.example.sipi_ai.databinding.ActivityCalendarBinding
 import com.example.sipi_ai.ui.common.openTask
 import com.example.sipi_ai.ui.tasks.TaskAdapter
@@ -40,7 +41,7 @@ class CalendarActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityCalendarBinding
     private val daysAdapter = CalendarDaysAdapter { day -> select(day) }
-    private val dayTasksAdapter = TaskAdapter(onClick = { task -> openTask(task.id) })
+    private val dayTasksAdapter = TaskAdapter(onClick = { task -> openTask(task.id) }, calendarPresentation = true)
     private var projects: List<Project> = emptyList()
     private var filterProjectId: Long? = null
 
@@ -193,7 +194,7 @@ class CalendarActivity : AppCompatActivity() {
         val tasks = personalTasks()
 
         binding.tvMonthTitle.text = monthFormat.format(shownMonth.time).replaceFirstChar { it.uppercase() }
-        daysAdapter.submit(monthCells(shownMonth) { day -> tasks.any { it.isDueOn(day) } }, selectedDay)
+        daysAdapter.submit(monthCells(shownMonth) { day -> markerForDay(tasks.filter { it.isDueOn(day) }) }, selectedDay)
 
         val dayTasks = tasks.filter { it.isDueOn(selectedDay) }
         binding.tvSelectedDate.text = selectedDayFormat.format(selectedDay.time).replaceFirstChar { it.uppercase() }
@@ -202,10 +203,35 @@ class CalendarActivity : AppCompatActivity() {
         binding.rvDayTasks.isVisible = dayTasks.isNotEmpty()
     }
 
+    private fun markerForDay(dayTasks: List<Task>): CalendarMarker? {
+        if (dayTasks.isEmpty()) return null
+        if (dayTasks.any { TaskRepository.isOverdue(it) }) {
+            return CalendarMarker.URGENT
+        }
+        if (dayTasks.all { it.status == TaskStatus.DONE || it.status == TaskStatus.REVIEW }) {
+            return CalendarMarker.COMPLETED
+        }
+        val activeWork = dayTasks.filter { it.status == TaskStatus.TODO || it.status == TaskStatus.IN_PROGRESS }
+        val now = System.currentTimeMillis()
+        if (activeWork.any { TaskRepository.isUrgent(it) }) {
+            return CalendarMarker.URGENT
+        }
+        if (activeWork.any { task ->
+                val deadline = task.deadlineMillis ?: return@any false
+                val remaining = deadline - now
+                remaining > TaskRepository.URGENT_WINDOW_MILLIS && remaining <= THREE_DAYS_MILLIS
+            }
+        ) {
+            return CalendarMarker.SOON
+        }
+        return CalendarMarker.LATER
+    }
+
     private companion object {
         const val DAYS_IN_WEEK = 7
         const val MIN_SWIPE_DISTANCE_DP = 80
         const val MIN_SWIPE_VELOCITY_PX = 800f
+        const val THREE_DAYS_MILLIS = 3L * 24 * 60 * 60 * 1000
     }
 }
 

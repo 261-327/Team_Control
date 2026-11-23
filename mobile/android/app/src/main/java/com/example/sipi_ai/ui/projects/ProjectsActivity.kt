@@ -36,7 +36,6 @@ class ProjectsActivity : AppCompatActivity() {
         }
         binding.cardNewProject.setOnClickListener { createProject() }
         binding.btnCreateWithAssistant.setOnClickListener { openAssistant() }
-        binding.fabAssistant.setOnClickListener { openAssistant() }
     }
 
     override fun onResume() {

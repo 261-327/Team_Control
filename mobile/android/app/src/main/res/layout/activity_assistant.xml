@@ -72,7 +72,8 @@
             android:layout_gravity="center"
             android:gravity="center_horizontal"
             android:orientation="vertical"
-            android:paddingHorizontal="24dp">
+            android:paddingHorizontal="24dp"
+            android:visibility="gone">
 
             <ImageView
                 android:layout_width="64dp"
@@ -125,43 +126,57 @@
         </LinearLayout>
     </FrameLayout>
 
-    <com.google.android.material.button.MaterialButtonToggleGroup
-        android:id="@+id/toggleAssistantMode"
+    <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="12dp"
         android:layout_marginTop="8dp"
-        app:checkedButton="@+id/btnModeAssistant"
-        app:selectionRequired="true"
-        app:singleSelection="true">
+        android:fillViewport="true"
+        android:scrollbars="horizontal">
 
-        <Button
-            android:id="@+id/btnModeAssistant"
-            style="?attr/materialButtonOutlinedStyle"
-            android:layout_width="0dp"
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/toggleAssistantMode"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/assistant_mode_assistant"
-            android:textAllCaps="false" />
+            android:layout_gravity="center_horizontal"
+            android:layout_marginHorizontal="12dp"
+            app:checkedButton="@+id/btnModeAssistant"
+            app:selectionRequired="true"
+            app:singleSelection="true">
 
-        <Button
-            android:id="@+id/btnModeDrafts"
-            style="?attr/materialButtonOutlinedStyle"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/assistant_mode_drafts"
-            android:textAllCaps="false" />
+            <Button
+                android:id="@+id/btnModeAssistant"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="0dp"
+                android:paddingHorizontal="8dp"
+                android:text="@string/assistant_mode_assistant"
+                android:textAllCaps="false"
+                android:textSize="13sp" />
 
-        <Button
-            android:id="@+id/btnModeLogo"
-            style="?attr/materialButtonOutlinedStyle"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/assistant_mode_logo"
-            android:textAllCaps="false" />
-    </com.google.android.material.button.MaterialButtonToggleGroup>
+            <Button
+                android:id="@+id/btnModeDrafts"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="0dp"
+                android:paddingHorizontal="8dp"
+                android:text="@string/assistant_mode_drafts"
+                android:textAllCaps="false"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnModeLogo"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="0dp"
+                android:paddingHorizontal="8dp"
+                android:text="@string/assistant_mode_logo"
+                android:textAllCaps="false"
+                android:textSize="13sp" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+    </HorizontalScrollView>
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -207,14 +222,4 @@
         android:textSize="12sp"
         tools:text="0/4000" />
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="2dp"
-        android:paddingBottom="10dp"
-        android:text="@string/assistant_footer"
-        android:textColor="@color/text_hint"
-        android:textSize="12sp" />
 </LinearLayout>

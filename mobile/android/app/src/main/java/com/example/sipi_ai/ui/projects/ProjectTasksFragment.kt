@@ -19,6 +19,7 @@ import com.example.sipi_ai.data.UserStore
 import com.example.sipi_ai.databinding.FragmentProjectTasksBinding
 import com.example.sipi_ai.databinding.ViewBoardColumnBinding
 import com.example.sipi_ai.ui.common.openTask
+import com.example.sipi_ai.ui.common.confirmTaskSubmitForReview
 import com.example.sipi_ai.ui.tasks.TaskAdapter
 import com.example.sipi_ai.ui.tasks.style
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -135,6 +136,14 @@ class ProjectTasksFragment : Fragment(R.layout.fragment_project_tasks) {
     }
 
     private fun move(task: Task, status: TaskStatus) {
+        if (status == TaskStatus.REVIEW && task.status != TaskStatus.REVIEW) {
+            requireContext().confirmTaskSubmitForReview(task) { moveConfirmed(task, status) }
+            return
+        }
+        moveConfirmed(task, status)
+    }
+
+    private fun moveConfirmed(task: Task, status: TaskStatus) {
         val previous = task.status
         val wire = status.toWireStatus()
         val reason = if (previous == TaskStatus.REVIEW && status == TaskStatus.IN_PROGRESS)

@@ -160,16 +160,5 @@
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
 
-        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-            android:id="@+id/fabAssistant"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom|end"
-            android:layout_margin="16dp"
-            android:text="@string/assistant_fab"
-            android:textColor="@color/white"
-            app:backgroundTint="@color/text_primary"
-            app:icon="@drawable/ic_sparkle"
-            app:iconTint="@color/mustard" />
     </FrameLayout>
 </LinearLayout>

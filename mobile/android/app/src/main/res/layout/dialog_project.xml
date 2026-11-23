@@ -1,10 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
+    android:fillViewport="true"
     android:paddingHorizontal="24dp"
     android:paddingTop="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
 
     <EditText
         android:id="@+id/etProjectName"
@@ -15,6 +20,15 @@
         android:importantForAutofill="no"
         android:inputType="textCapSentences"
         android:maxLength="80" />
+
+    <TextView
+        android:id="@+id/tvProjectNameCounter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:paddingTop="4dp"
+        android:textColor="@color/text_hint"
+        android:textSize="12sp" />
 
     <EditText
         android:id="@+id/etProjectDescription"
@@ -42,6 +56,17 @@
         android:layout_height="wrap_content"
         android:entries="@array/project_roles" />
 
+    <EditText
+        android:id="@+id/etProjectCustomRole"
+        style="@style/SipiEditText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:hint="@string/project_custom_role_hint"
+        android:inputType="textCapSentences"
+        android:maxLength="100"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/tvProjectSpecializationLabel"
         android:layout_width="match_parent"
@@ -56,4 +81,5 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:entries="@array/project_specializations" />
-</LinearLayout>
+    </LinearLayout>
+</ScrollView>

@@ -29,6 +29,15 @@
             android:maxLength="80" />
 
         <TextView
+            android:id="@+id/tvSettingsNameCounter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:paddingTop="4dp"
+            android:textColor="@color/text_hint"
+            android:textSize="12sp" />
+
+        <TextView
             style="@style/SipiFieldLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

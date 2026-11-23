@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="white">#FFFFFFFF</color>
+    <color name="surface_card">#FFFFFFFF</color>
 
     <color name="beige">#EDE4D3</color>
     <color name="mustard">#D4A537</color>
@@ -24,6 +25,18 @@
 
     <color name="status_done">#2F6F6A</color>
     <color name="status_done_bg">#D5EAE7</color>
+    <color name="calendar_deadline_urgent">#C2453A</color>
+    <color name="calendar_deadline_soon">#D4A537</color>
+    <color name="calendar_deadline_later">#5275A3</color>
+    <color name="calendar_deadline_urgent_bg">#F8DCD7</color>
+    <color name="calendar_deadline_soon_bg">#F4E6BF</color>
+    <color name="calendar_deadline_later_bg">#E3EAF4</color>
+    <color name="calendar_deadline_completed">#8A8882</color>
+    <color name="calendar_deadline_completed_bg">#E7E5E0</color>
+    <color name="calendar_completed_bg">#F0EEE9</color>
+    <color name="calendar_completed_stroke">#D0CEC8</color>
+    <color name="calendar_completed_text">#77756F</color>
+    <color name="calendar_completed_chip_bg">#E1DFDA</color>
 
     <color name="project_yellow">#D4A537</color>
     <color name="project_purple">#8E7CC3</color>

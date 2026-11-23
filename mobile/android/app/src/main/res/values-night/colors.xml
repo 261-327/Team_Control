@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="white">#FFFFFFFF</color>
+    <color name="surface_card">#242320</color>
+
+    <color name="beige">#171715</color>
+    <color name="mustard">#8C6A17</color>
+    <color name="mustard_dark">#E2BC58</color>
+    <color name="mustard_soft">#3D3218</color>
+
+    <color name="text_primary">#F3F0E9</color>
+    <color name="text_secondary">#C5BFB4</color>
+    <color name="text_hint">#A29B90</color>
+    <color name="field_bg">#302E29</color>
+    <color name="field_stroke">#45423A</color>
+
+    <color name="status_urgent">#F08E7D</color>
+    <color name="status_urgent_bg">#3A2421</color>
+    <color name="status_in_progress">#E2BC58</color>
+    <color name="status_in_progress_bg">#393019</color>
+    <color name="status_review">#8BC49A</color>
+    <color name="status_review_bg">#233129</color>
+    <color name="status_backlog">#B9B3A9</color>
+    <color name="status_backlog_bg">#302E29</color>
+    <color name="status_done">#70C1B8</color>
+    <color name="status_done_bg">#1D3532</color>
+    <color name="calendar_deadline_urgent">#F08E7D</color>
+    <color name="calendar_deadline_soon">#E2BC58</color>
+    <color name="calendar_deadline_later">#8FB8E8</color>
+    <color name="calendar_deadline_urgent_bg">#3A2421</color>
+    <color name="calendar_deadline_soon_bg">#393019</color>
+    <color name="calendar_deadline_later_bg">#283449</color>
+    <color name="calendar_deadline_completed">#AAA8A1</color>
+    <color name="calendar_deadline_completed_bg">#302F2B</color>
+    <color name="calendar_completed_bg">#292824</color>
+    <color name="calendar_completed_stroke">#45433E</color>
+    <color name="calendar_completed_text">#B5B1A8</color>
+    <color name="calendar_completed_chip_bg">#3B3934</color>
+
+    <color name="project_yellow">#E2BC58</color>
+    <color name="project_purple">#B2A3E0</color>
+    <color name="project_green">#8BC49A</color>
+    <color name="project_blue">#83B4DF</color>
+    <color name="project_red">#F08E7D</color>
+    <color name="project_gray">#B9B3A9</color>
+    <color name="project_yellow_soft">#3D3218</color>
+    <color name="project_purple_soft">#302B3D</color>
+    <color name="project_green_soft">#233129</color>
+    <color name="project_blue_soft">#222F3A</color>
+    <color name="project_red_soft">#3A2421</color>
+    <color name="project_gray_soft">#302E29</color>
+</resources>

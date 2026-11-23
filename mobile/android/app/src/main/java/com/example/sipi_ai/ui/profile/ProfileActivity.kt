@@ -18,6 +18,8 @@ import com.example.sipi_ai.databinding.ItemMemberBinding
 import com.example.sipi_ai.ui.common.MemberNames
 import com.example.sipi_ai.ui.register.LoginActivity
 import com.example.sipi_ai.util.initials
+import com.example.sipi_ai.util.ThemeChoice
+import com.example.sipi_ai.util.ThemeSettings
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class ProfileActivity : AppCompatActivity() {
@@ -42,6 +44,19 @@ class ProfileActivity : AppCompatActivity() {
 
         binding.btnSaveProfile.setOnClickListener { save() }
         binding.btnLogout.setOnClickListener { confirmLogout() }
+
+        binding.radioTheme.check(when (ThemeSettings.choice(this)) {
+            ThemeChoice.SYSTEM -> R.id.radioThemeSystem
+            ThemeChoice.LIGHT -> R.id.radioThemeLight
+            ThemeChoice.DARK -> R.id.radioThemeDark
+        })
+        binding.radioTheme.setOnCheckedChangeListener { _, checkedId ->
+            when (checkedId) {
+                R.id.radioThemeSystem -> ThemeSettings.select(this, ThemeChoice.SYSTEM)
+                R.id.radioThemeLight -> ThemeSettings.select(this, ThemeChoice.LIGHT)
+                R.id.radioThemeDark -> ThemeSettings.select(this, ThemeChoice.DARK)
+            }
+        }
 
         renderHeader()
         renderColleagues()

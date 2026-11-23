@@ -157,6 +157,7 @@ class AssistantActivity : AppCompatActivity() {
                         appendFinalTurn(turn, null)
                     }
                 }
+                if (turns.length() == 0) appendIntroMessages()
                 busy = pendingIds.isNotEmpty()
                 updateAvailability()
                 renderMessages()
@@ -400,9 +401,14 @@ class AssistantActivity : AppCompatActivity() {
         adapter.submitList(messages.toList()) {
             if (messages.isNotEmpty()) binding.rvMessages.scrollToPosition(messages.size - 1)
         }
-        binding.welcomeBlock.isVisible = messages.isEmpty()
+        binding.welcomeBlock.isVisible = false
         binding.rvMessages.isVisible = messages.isNotEmpty()
         updateAvailability()
+    }
+
+    private fun appendIntroMessages() {
+        messages += ChatMessage(nextMessageId++, false, getString(R.string.assistant_intro_greeting))
+        messages += ChatMessage(nextMessageId++, false, getString(R.string.assistant_intro_modes))
     }
 
     private fun confirmClear() {
@@ -417,6 +423,7 @@ class AssistantActivity : AppCompatActivity() {
                     busy = false
                     result.onSuccess {
                         messages.clear()
+                        appendIntroMessages()
                         renderMessages()
                     }.onFailure { Toast.makeText(this, it.message ?: "Не удалось очистить чат", Toast.LENGTH_LONG).show() }
                     updateAvailability()

@@ -4,7 +4,7 @@
     android:id="@+id/drawerLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white"
+    android:background="@color/surface_card"
     android:fitsSystemWindows="true">
 
     <LinearLayout
@@ -48,25 +48,13 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
 
-            <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-                android:id="@+id/fabAssistant"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="bottom|end"
-                android:layout_margin="16dp"
-                android:text="@string/assistant_fab"
-                android:textColor="@color/white"
-                app:backgroundTint="@color/text_primary"
-                app:icon="@drawable/ic_sparkle"
-                app:iconTint="@color/mustard" />
-
         </FrameLayout>
 
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottomNavigationView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/white"
+            android:background="@color/surface_card"
             app:elevation="8dp"
             app:itemIconTint="@color/bottom_nav_item"
             app:itemTextColor="@color/bottom_nav_item"
@@ -80,7 +68,7 @@
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="start"
-        android:background="@color/white"
+        android:background="@color/surface_card"
         app:headerLayout="@layout/nav_header"
         app:itemIconTint="@color/mustard_dark"
         app:itemTextColor="@color/text_primary"
