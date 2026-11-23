@@ -249,8 +249,8 @@ export function ProjectLayout({ children }: { children: React.ReactNode }) {
             aria-current={pathname === `/projects/${projectId}${tab.path}` ? "page" : undefined}
           >
             <Icon name={tab.icon} size={17} />
-            {tab.label}
-            {tab.count !== undefined && <span className="count-pill">{tab.count}</span>}
+            <span className="project-tab-label">{tab.label}</span>
+            {tab.count !== undefined && <span className="count-pill" aria-label={`${tab.count} элементов`}>{tab.count}</span>}
           </Link>
         ))}
       </nav>
