@@ -1710,7 +1710,9 @@ select:focus {
     color: #71766f;
     font-size: 10px;
     z-index: 1;
-    transition: transform 180ms var(--ease-ui), background-color 180ms ease;
+    transition:
+      transform 180ms var(--ease-ui),
+      background-color 180ms ease;
   }
   .project-tabs > a.active .count-pill {
     transform: translate(3px, -3px);
@@ -1752,8 +1754,14 @@ select:focus {
     animation: project-tab-label-in 180ms var(--ease-ui) both;
   }
   @keyframes project-tab-label-in {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
   .project-tabs > a:not(.active) .project-tab-label {
     position: absolute;
@@ -2299,7 +2307,6 @@ select:focus {
   font-variant-numeric: tabular-nums;
 }
 
-
 /* Theme preference: colors are switched at the document root so every route shares it. */
 :root {
   color-scheme: light;
@@ -2544,7 +2551,6 @@ select:focus {
   color: var(--text);
   border-color: var(--line);
 }
-
 
 /* Accessible dark theme: complete surface, typography and authentication coverage. */
 :root[data-theme="dark"] {
@@ -2854,13 +2860,25 @@ select:focus {
 :root[data-theme="dark"] .assistant-prompts > button:hover {
   background: #303d34;
 }
-:root[data-theme="dark"] .status-todo { color: #d4ddd6; }
-:root[data-theme="dark"] .status-in_progress { color: #a9dcf4; }
-:root[data-theme="dark"] .status-in_review { color: #dfc0ff; }
-:root[data-theme="dark"] .status-done { color: #b9e4bc; }
-:root[data-theme="dark"] .deadline-overdue { color: #ffad9b; }
+:root[data-theme="dark"] .status-todo {
+  color: #d4ddd6;
+}
+:root[data-theme="dark"] .status-in_progress {
+  color: #a9dcf4;
+}
+:root[data-theme="dark"] .status-in_review {
+  color: #dfc0ff;
+}
+:root[data-theme="dark"] .status-done {
+  color: #b9e4bc;
+}
+:root[data-theme="dark"] .deadline-overdue {
+  color: #ffad9b;
+}
 :root[data-theme="dark"] .deadline-soon,
-:root[data-theme="dark"] .deadline-today { color: #ffe08a; }
+:root[data-theme="dark"] .deadline-today {
+  color: #ffe08a;
+}
 :root[data-theme="dark"] .form-error,
 :root[data-theme="dark"] .assistant-turn-error {
   color: #ffd1c7;
@@ -2879,4 +2897,103 @@ select:focus {
 :root[data-theme="dark"] ::selection {
   color: #171b18;
   background: #f4d46f;
+}
+
+/* Shared text contrast on dark surfaces, including compact workspace widgets. */
+:root[data-theme="dark"] .page-heading h1,
+:root[data-theme="dark"] .deadline-summary h2,
+:root[data-theme="dark"] .deadline-summary button,
+:root[data-theme="dark"] .task-column > header h2,
+:root[data-theme="dark"] .tabs > .active,
+:root[data-theme="dark"] .project-tab-label,
+:root[data-theme="dark"] .profile-colleague-add > summary {
+  color: var(--text);
+}
+:root[data-theme="dark"] .stat-card span,
+:root[data-theme="dark"] .stat-card small,
+:root[data-theme="dark"] .timezone,
+:root[data-theme="dark"] .tabs > button,
+:root[data-theme="dark"] .view-switch > button,
+:root[data-theme="dark"] .project-mini-card > p,
+:root[data-theme="dark"] .task-card p,
+:root[data-theme="dark"] .task-card-id,
+:root[data-theme="dark"] .column-limit,
+:root[data-theme="dark"] .add-card,
+:root[data-theme="dark"] .board-footnote,
+:root[data-theme="dark"] .deadline-summary p,
+:root[data-theme="dark"] .calendar-export-note,
+:root[data-theme="dark"] .calendar-swipe-hint,
+:root[data-theme="dark"] .assistant-action-summary {
+  color: var(--muted);
+}
+:root[data-theme="dark"] .focus-task > span,
+:root[data-theme="dark"] .role-badge,
+:root[data-theme="dark"] .tag {
+  background: #354038;
+  color: #e0e8e2;
+}
+:root[data-theme="dark"] .auth-preview-tabs > span,
+:root[data-theme="dark"] .calendar-cell.today .calendar-day-button {
+  color: #ffe08a;
+  background: #514522;
+}
+:root[data-theme="dark"] .status-badge.status-todo,
+:root[data-theme="dark"] .calendar-cell-tasks .calendar-task {
+  background: #303a36;
+  color: #d4ddd6;
+}
+:root[data-theme="dark"] .status-badge.status-in_progress,
+:root[data-theme="dark"] .calendar-cell-tasks .calendar-task.status-in_progress {
+  background: #243a4a;
+  color: #a9dcf4;
+  border-left-color: #78bde8;
+}
+:root[data-theme="dark"] .status-badge.status-in_review,
+:root[data-theme="dark"] .calendar-cell-tasks .calendar-task.status-in_review {
+  background: #3e2d4c;
+  color: #dfc0ff;
+  border-left-color: #c9a3ec;
+}
+:root[data-theme="dark"] .status-badge.status-done,
+:root[data-theme="dark"] .calendar-cell-tasks .calendar-task.status-done {
+  background: #254333;
+  color: #b9e4bc;
+  border-left-color: #88c49b;
+}
+:root[data-theme="dark"] .calendar-cell-tasks .calendar-task.deadline-overdue {
+  border-right-color: #ffad9b;
+}
+:root[data-theme="dark"] .calendar-cell-tasks .calendar-task.deadline-overdue small {
+  color: #ffad9b;
+}
+:root[data-theme="dark"] .column-limit > span,
+:root[data-theme="dark"] .assistant-toolbar label,
+:root[data-theme="dark"] .assistant-mode-note > strong {
+  color: var(--muted);
+}
+:root[data-theme="dark"] .view-switch > .active,
+:root[data-theme="dark"] .assistant-attachment-controls > span,
+:root[data-theme="dark"] .assistant-help {
+  color: var(--text);
+  background: #354038;
+}
+
+:root[data-theme="dark"] .empty-state p {
+  color: var(--muted);
+}
+@media (max-width: 640px) {
+  .calendar-heading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .calendar-heading > .btn {
+    align-self: flex-start;
+    max-width: 100%;
+  }
+}
+/* The search container owns the border and focus ring in both themes. */
+:root[data-theme="dark"] .search-field input:not([type="checkbox"]):not([type="radio"]) {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none;
 }

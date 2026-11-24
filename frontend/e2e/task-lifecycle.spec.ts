@@ -94,8 +94,8 @@ test("Task lifecycle: submit, review, accept, reset, resubmit with new URL", asy
   const resetTask = resetData.tasks.find((t: Task) => t.id === taskId);
   expect(resetTask.status).toBe("todo");
   expect(resetTask.resultUrl).toBe("");
-  expect(resetTask.submittedAt).toBeNull();
-  expect(resetTask.acceptedAt).toBeNull();
+  expect(resetTask.submittedAt).toBe("");
+  expect(resetTask.acceptedAt).toBe("");
 });
 
 test("in_review → in_progress clears result_url", async ({ page }) => {
@@ -134,5 +134,5 @@ test("in_review → in_progress clears result_url", async ({ page }) => {
   const task = data.tasks.find((t: Task) => t.id === taskId);
   expect(task.status).toBe("in_progress");
   expect(task.resultUrl).toBe("");
-  expect(task.submittedAt).toBeNull();
+  expect(task.submittedAt).toBe("");
 });

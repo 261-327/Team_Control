@@ -7,20 +7,27 @@ import { useUi } from "@/providers/UiContext";
 import { client } from "@/services/client";
 import { canManage } from "@/lib/permissions";
 
-export function ProjectPassport({ 
-  projectId, 
-  onClose 
-}: { 
-  projectId: string; 
-  onClose: () => void 
+export function ProjectPassport({
+  projectId,
+  onClose,
+}: {
+  projectId: string;
+  onClose: () => void;
 }) {
   const data = useReadyData();
   const ui = useUi();
-  const project = data.projects.find((p) => p.id === projectId)!;
+  const project = data.projects.find((p) => p.id === projectId);
   const manage = canManage(data, projectId);
-  
-  const [description, setDescription] = useState(project.description || "");
+
+  const [description, setDescription] = useState(project?.description || "");
   const action = useAction();
+
+  if (!project)
+    return (
+      <Modal title="Проект недоступен" onClose={onClose}>
+        <p>Доступ к проекту изменился. Закрой это окно и обнови список проектов.</p>
+      </Modal>
+    );
 
   return (
     <Modal
@@ -34,11 +41,11 @@ export function ProjectPassport({
           onSubmit={(e) => {
             e.preventDefault();
             void action.run(
-              () => client.updateProjectDescription(projectId, description), 
+              () => client.updateProjectDescription(projectId, description),
               () => {
                 ui.notify("Паспорт обновлен");
                 onClose();
-              }
+              },
             );
           }}
         >

@@ -1,4 +1,5 @@
 "use client";
+import { isAssigned } from "@/lib/permissions";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -19,7 +20,7 @@ import { ColleaguesView } from "./ColleaguesView";
 export function ProfileView() {
   const data = useReadyData();
   const user = data.users.find((u) => u.id === data.sessionId)!;
-  const taskCount = data.tasks.filter((t) => t.assigneeId === user.id).length;
+  const taskCount = data.tasks.filter((t) => isAssigned(t, user.id)).length;
   const [name, setName] = useState(user.name);
   const [editingRole, setEditingRole] = useState("");
   const [bio, setBio] = useState(user.bio);

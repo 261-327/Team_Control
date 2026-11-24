@@ -34,7 +34,7 @@ class SelfRoleTests(TestCase):
         self.membership.refresh_from_db()
         self.assertEqual(self.membership.developer_specialization, "")
         self.assertEqual(self.membership.custom_role, "Мобильный дизайнер")
-        self.assertEqual(self.update(specialization="invalid").status_code, 400)
+        self.assertEqual(self.update(specialization="x" * 101).status_code, 400)
         self.assertEqual(self.update(profession="other", customRole="").status_code, 400)
         self.membership.refresh_from_db()
         self.assertEqual(self.membership.custom_role, "Мобильный дизайнер")

@@ -1,4 +1,5 @@
 "use client";
+import { PasswordInput } from "@/components/ui";
 
 import Link from "next/link";
 import { Suspense, useState } from "react";
@@ -75,7 +76,7 @@ function ResetPasswordForm() {
                   hint="Пароль проверяется по правилам безопасности сайта."
                   required
                 >
-                  <input
+                  <PasswordInput
                     type="password"
                     name="password"
                     value={password}
@@ -88,7 +89,7 @@ function ResetPasswordForm() {
                   />
                 </Field>
                 <Field label="Повтори новый пароль" required>
-                  <input
+                  <PasswordInput
                     type="password"
                     name="passwordConfirm"
                     value={passwordConfirm}

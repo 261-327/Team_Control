@@ -118,7 +118,15 @@ export function TaskForm({
               />
             </Field>
             <div className="form-grid">
-              <Field label="Проект" required>
+              <Field
+                label="Проект"
+                hint={
+                  task
+                    ? "Задача остаётся в своём проекте. Перенос между проектами недоступен."
+                    : undefined
+                }
+                required
+              >
                 <select
                   value={form.projectId}
                   disabled={!!task}

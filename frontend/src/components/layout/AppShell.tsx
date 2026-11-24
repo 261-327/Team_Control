@@ -1,6 +1,8 @@
 "use client";
+import { isAssigned } from "@/lib/permissions";
 
 import Link from "next/link";
+import Image from "next/image";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -27,6 +29,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobile, setMobile] = useState(false);
   const [search, setSearch] = useState(false);
   const [query, setQuery] = useState("");
+  const [projectsExpanded, setProjectsExpanded] = useState(true);
   const [help, setHelp] = useState(false);
   const [assistant, setAssistant] = useState<{ message?: string } | null>(null);
   const [taskForm, setTaskForm] = useState<{
@@ -129,10 +132,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       "/projects/new": "Новый проект",
     }[pathname] ??
       "Рабочее пространство");
-  const mine = data.tasks.filter((t) => t.assigneeId === user.id && t.status !== "done");
+  const mine = data.tasks.filter((t) => isAssigned(t, user.id) && t.status !== "done");
   const attention = data.tasks.filter(
     (t) =>
-      (t.assigneeId === user.id && urgency(t, data.now) === "overdue") ||
+      (isAssigned(t, user.id) && urgency(t, data.now) === "overdue") ||
       (t.status === "in_review" && canManage(data, t.projectId)),
   );
   const notify = (message: string) => {
@@ -176,9 +179,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             />
           </div>
           <div className="workspace-chip">
-            <span className="university-mark">
-              М<span>П</span>
-            </span>
+            <Image
+              src="/icons/mospolytech-logo-white.png"
+              alt="Логотип Московского Политеха"
+              width={34}
+              height={34}
+              className="university-logo"
+            />
             <div>
               <strong>Московский Политех</strong>
               <span>Проектная деятельность</span>
@@ -219,12 +226,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Icon name="arrow" size={16} />
           </button>
           <div className="sidebar-project-title">
-            <span className="nav-caption">Проекты</span>
+            <button
+              type="button"
+              className="nav-caption project-nav-toggle"
+              aria-expanded={projectsExpanded}
+              aria-controls="sidebar-projects"
+              onClick={() => setProjectsExpanded((value) => !value)}
+            >
+              Проекты <span aria-hidden="true">{projectsExpanded ? "−" : "+"}</span>
+            </button>
             <Link href="/projects/new" title="Создать проект" aria-label="Создать проект">
               <Icon name="plus" size={16} />
             </Link>
           </div>
-          <nav className="project-nav">
+          <nav className="project-nav" id="sidebar-projects" hidden={!projectsExpanded}>
             {data.projects.slice(0, 5).map((p) => (
               <Link
                 key={p.id}
@@ -283,9 +298,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 className="mobile-menu"
                 onClick={() => setMobile(true)}
               />
-              <span className="breadcrumb-home">
+              <Link
+                href="/my-tasks"
+                className="breadcrumb-home"
+                aria-label="На главную: мои задачи"
+              >
                 <Icon name="home" size={16} />
-              </span>
+              </Link>
               <Icon name="chevron" size={13} />
               {project ? (
                 <>
@@ -383,60 +402,66 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             />
           </div>
           <div className="search-results">
-            {!query.trim() ? (
-              <p className="muted">Начни вводить название</p>
-            ) : (
-              <>
-                {data.projects
-                  .filter((p) => p.name.toLowerCase().includes(query.toLowerCase()))
-                  .map((p) => (
-                    <Link
-                      href={`/projects/${p.id}`}
-                      key={p.id}
-                      onClick={() => {
-                        setSearch(false);
-                        setQuery("");
-                      }}
-                    >
-                      <span className={`project-icon ${p.color}`}>
-                        <Icon name={p.symbol} />
-                      </span>
-                      <div>
-                        <strong>{p.name}</strong>
-                        <span>Проект</span>
-                      </div>
-                      <Icon name="arrow" size={17} />
-                    </Link>
-                  ))}
-                {data.tasks
-                  .filter((t) => t.title.toLowerCase().includes(query.toLowerCase()))
-                  .map((t) => (
-                    <Link
-                      href={`/projects/${t.projectId}/tasks/${t.id}`}
-                      key={t.id}
-                      onClick={() => {
-                        setSearch(false);
-                        setQuery("");
-                      }}
-                    >
-                      <Icon name="tasks" />
-                      <div>
-                        <strong>{t.title}</strong>
-                        <span>{data.projects.find((p) => p.id === t.projectId)?.name}</span>
-                      </div>
-                      <Icon name="arrow" size={17} />
-                    </Link>
-                  ))}
-                {!data.projects.some((p) => p.name.toLowerCase().includes(query.toLowerCase())) &&
-                  !data.tasks.some((t) => t.title.toLowerCase().includes(query.toLowerCase())) && (
-                    <EmptyState
-                      icon="search"
-                      title="Ничего не нашлось"
-                      description="Попробуй другое название."
-                    />
-                  )}
-              </>
-            )}
+            <>
+              {!query.trim() && <p className="muted">Твои проекты</p>}
+              {data.projects
+                .filter((p) => p.name.toLowerCase().includes(query.toLowerCase()))
+                .map((p) => (
+                  <Link
+                    href={`/projects/${p.id}`}
+                    key={p.id}
+                    onClick={() => {
+                      setSearch(false);
+                      setQuery("");
+                    }}
+                  >
+                    <span className={`project-icon ${p.color}`}>
+                      <Icon name={p.symbol} />
+                    </span>
+                    <div>
+                      <strong>{p.name}</strong>
+                      <span>Проект</span>
+                    </div>
+                    <Icon name="arrow" size={17} />
+                  </Link>
+                ))}
+              {data.tasks
+                .filter(
+                  (t) => query.trim() && t.title.toLowerCase().includes(query.trim().toLowerCase()),
+                )
+                .map((t) => (
+                  <Link
+                    href={`/projects/${t.projectId}/tasks/${t.id}`}
+                    key={t.id}
+                    onClick={() => {
+                      setSearch(false);
+                      setQuery("");
+                    }}
+                  >
+                    <Icon name="tasks" />
+                    <div>
+                      <strong>{t.title}</strong>
+                      <span>{data.projects.find((p) => p.id === t.projectId)?.name}</span>
+                    </div>
+                    <Icon name="arrow" size={17} />
+                  </Link>
+                ))}
+              {!data.projects.some((p) => p.name.toLowerCase().includes(query.toLowerCase())) &&
+                (!query.trim() ||
+                  !data.tasks.some((t) =>
+                    t.title.toLowerCase().includes(query.trim().toLowerCase()),
+                  )) && (
+                  <EmptyState
+                    icon="search"
+                    title={query.trim() ? "Ничего не нашлось" : "Пока нет проектов"}
+                    description={
+                      query.trim()
+                        ? "Попробуй другое название."
+                        : "Создай проект или прими приглашение команды."
+                    }
+                  />
+                )}
+            </>
           </div>
         </Modal>
       )}

@@ -62,7 +62,14 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
     });
     for (const cookie of upstream.headers.getSetCookie())
       responseHeaders.append("Set-Cookie", cookie);
-    for (const name of ["Content-Disposition", "X-Content-Type-Options"])
+    for (const name of [
+      "Content-Disposition",
+      "X-Content-Type-Options",
+      "X-Frame-Options",
+      "Allow",
+      "Retry-After",
+      "Referrer-Policy",
+    ])
       if (upstream.headers.has(name)) responseHeaders.set(name, upstream.headers.get(name)!);
     return new Response(request.method === "HEAD" ? null : await upstream.arrayBuffer(), {
       status: upstream.status,

@@ -58,7 +58,9 @@ export function RoleFields({
               }}
               required
             >
-              <option value="">Выбери направление</option>
+              <option value="" disabled>
+                Выбери направление
+              </option>
               <option value="frontend">Фронтенд</option>
               <option value="backend">Бэкенд</option>
               <option value="ios">Мобильная разработка · iOS</option>

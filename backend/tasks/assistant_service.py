@@ -314,6 +314,33 @@ def requested_task_count(message):
     return 1 if re.search(r"\bзадач[ау]\b", message.lower()) else None
 
 
+def unsupported_chat_action(message):
+    """Explain common unsupported commands before inference; permissions stay in tools.
+
+    This is a UX guard, not the security boundary. The model has no deletion or
+    role-changing tool, and every creation is authorized again at commit time.
+    Reject the entire mixed request instead of silently performing one fragment.
+    """
+    value = message.casefold().replace("ё", "е")
+    deletion = re.search(r"\b(?:удали\w*|delete|remove)\b", value)
+    change = re.search(r"\b(?:назначь|назначить|сделай\s+меня|смени|измени\w*)\b", value)
+    target = re.search(r"задач|проект|руководител|рол[ьи]|владель|task|project|owner|role", value)
+    if deletion or (change and target):
+        return (
+            "Я не удаляю задачи и проекты и не меняю роли или существующие задачи через чат. "
+            "Изменения не выполнены. Используй действия в проекте: "
+            "они доступны в соответствии с твоими правами."
+        )
+    command = r"\b(?:создай|создать|создавай|заведи)\b.{0,25}?"
+    multiple = re.search(command + r"\b(?:[2-9]\d*|несколько|два|три|четыре|пять)\s+проект", value)
+    if multiple or len(re.findall(command + r"\bпроект\b", value)) > 1:
+        return (
+            "Создавай по одному проекту за запрос: укажи его название и нужные задачи. "
+            "Из этого сообщения ничего не создано."
+        )
+    return ""
+
+
 def generate_reply(turn):
     context, pids = build_context(turn)
     attachments = list(turn.files.select_related("thread"))
@@ -376,6 +403,10 @@ def generate_reply(turn):
         context["coverage"]["tasksIncluded"] = len(context["tasks"])
     if not set(pids).issubset(set(accessible(turn.thread.user).values_list("pk", flat=True))):
         raise AssistantUnavailable("Доступ к проектам изменился. Повтори запрос.")
+    if turn.mode == "chat":
+        explanation = unsupported_chat_action(turn.message)
+        if explanation:
+            return {"text": explanation, "sources": [], "drafts": []}, pids
     intent = creation_intent(turn.message) if turn.mode == "chat" else ""
     if intent:
         return generate_creation(turn, context, intent), pids
@@ -704,6 +735,9 @@ def process_turn(turn):
         result, scope = generate_reply(turn)
         if execute_creation(turn, result, scope):
             return
+        # A server-issued receipt, never model prose, determines whether writes happened.
+        if turn.mode == "chat":
+            result["readOnly"] = True
         image = None
         if turn.mode == "logo":
             from .assistant_images import generate_image
@@ -728,7 +762,7 @@ def process_turn(turn):
             error=(
                 "Проект или исполнитель недоступен. Проверь контекст и участников."
                 if isinstance(exc, Http404)
-                else str(exc)
+                else (exc.message if isinstance(exc, APIError) else str(exc))
             ),
             finished_at=timezone.now(),
         )
